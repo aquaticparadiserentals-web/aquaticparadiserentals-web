@@ -23,7 +23,7 @@ function _sheet() {
     sh = ss.insertSheet(SHEET_NAME);
     sh.appendRow(['Timestamp','BookingID','CustomerName','WhatsApp','Email','Gear','Date',
       'StartTime','EndTime','Location','PaymentMethod','PriceXCD','Status','Driver',
-      'WaiverSigned','WaiverTimestamp','WaiverIP','WaiverDevice','SignatureDataURL','Notes','_Owner']);
+      'WaiverSigned','WaiverTimestamp','WaiverIP','WaiverDevice','SignatureDataURL','IDPhotoURL','Notes','_Owner']);
   }
   // Runs every time (not just on first creation) so it also repairs a sheet that
   // was already created by an older version of this script. Plain-text format on
@@ -38,6 +38,24 @@ function _sheet() {
 // a person typed an apostrophe first in the UI — Sheets hides the apostrophe
 // and just shows the text. Also closes a formula-injection security gap on
 // this public-facing form.
+function _saveImageToDrive(dataUrl, filename) {
+  try {
+    var matches = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+    if (!matches) return '';
+    var mime = matches[1];
+    var bytes = Utilities.base64Decode(matches[2]);
+    var blob = Utilities.newBlob(bytes, mime, filename);
+    var folderName = 'APR Waiver ID Photos';
+    var folders = DriveApp.getFoldersByName(folderName);
+    var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return file.getUrl();
+  } catch (err) {
+    return '';
+  }
+}
+
 function _safe(val) {
   var s = (val === undefined || val === null) ? '' : String(val);
   if (/^[=+\-@]/.test(s)) return "'" + s;
@@ -92,10 +110,14 @@ function doPost(e) {
         if (data[i][idIdx] === body.bookingId) {
           var row = i + 1;
           sh.getRange(row, headers.indexOf('WaiverSigned') + 1).setValue(true);
-          sh.getRange(row, headers.indexOf('WaiverTimestamp') + 1).setValue(body.timestamp || new Date().toISOString());
-          sh.getRange(row, headers.indexOf('WaiverIP') + 1).setValue(body.ip || 'unavailable');
-          sh.getRange(row, headers.indexOf('WaiverDevice') + 1).setValue(body.device || '');
+          sh.getRange(row, headers.indexOf('WaiverTimestamp') + 1).setValue(_safe(body.timestamp || new Date().toISOString()));
+          sh.getRange(row, headers.indexOf('WaiverIP') + 1).setValue(_safe(body.ip || 'unavailable'));
+          sh.getRange(row, headers.indexOf('WaiverDevice') + 1).setValue(_safe(body.device || ''));
           sh.getRange(row, headers.indexOf('SignatureDataURL') + 1).setValue(body.signature || '');
+          if (body.idPhoto) {
+            var idUrl = _saveImageToDrive(body.idPhoto, body.bookingId + '-ID');
+            sh.getRange(row, headers.indexOf('IDPhotoURL') + 1).setValue(idUrl || '');
+          }
           return _json({ ok: true });
         }
       }
