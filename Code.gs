@@ -24,16 +24,24 @@ function _sheet() {
     sh.appendRow(['Timestamp','BookingID','CustomerName','WhatsApp','Email','Gear','Date',
       'StartTime','EndTime','Location','PaymentMethod','PriceXCD','Status','Driver',
       'WaiverSigned','WaiverTimestamp','WaiverIP','WaiverDevice','SignatureDataURL','Notes','_Owner']);
-    // Force Date/StartTime/Timestamp/WaiverTimestamp columns to plain text.
-    // Without this, Sheets auto-converts strings like "2026-07-01" into real
-    // Date objects, which then come back from the API as full ISO timestamps
-    // and silently break the admin "today" / date-matching logic.
-    sh.getRange('A:A').setNumberFormat('@');
-    sh.getRange('G:G').setNumberFormat('@');
-    sh.getRange('H:H').setNumberFormat('@');
-    sh.getRange('P:P').setNumberFormat('@');
   }
+  // Runs every time (not just on first creation) so it also repairs a sheet that
+  // was already created by an older version of this script. Plain-text format on
+  // these columns stops Sheets from auto-converting dates/phone numbers.
+  ['A:A','D:D','G:G','H:H','P:P'].forEach(function(rng){ sh.getRange(rng).setNumberFormat('@'); });
   return sh;
+}
+
+// Google Sheets treats values starting with = + - @ as the start of a formula
+// when written programmatically, which is what mangled the WhatsApp number and
+// dates earlier. Prepending a literal apostrophe forces plain-text, same as if
+// a person typed an apostrophe first in the UI — Sheets hides the apostrophe
+// and just shows the text. Also closes a formula-injection security gap on
+// this public-facing form.
+function _safe(val) {
+  var s = (val === undefined || val === null) ? '' : String(val);
+  if (/^[=+\-@]/.test(s)) return "'" + s;
+  return s;
 }
 
 function _json(obj) {
@@ -67,9 +75,9 @@ function doPost(e) {
       var sh = _sheet();
       var id = 'APR-' + Utilities.formatDate(new Date(), 'GMT', 'yyMMdd-HHmmss');
       sh.appendRow([
-        new Date(), id, body.customerName || '', body.whatsapp || '', body.email || '',
-        body.gear || '', body.date || '', body.startTime || '', body.endTime || '',
-        body.location || '', body.paymentMethod || '', body.priceXCD || '',
+        new Date(), id, _safe(body.customerName), _safe(body.whatsapp), _safe(body.email),
+        _safe(body.gear), _safe(body.date), _safe(body.startTime), _safe(body.endTime),
+        _safe(body.location), _safe(body.paymentMethod), body.priceXCD || 0,
         'Requested', '', false, '', '', '', '', '', OWNER_NOTE
       ]);
       return _json({ ok: true, bookingId: id });
