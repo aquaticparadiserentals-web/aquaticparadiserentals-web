@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Aquatic Paradise Rentals</title>
+<meta name="theme-color" content="#03939E">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="APR">
+<!-- Internal record: built for Delroy Stapleton / Aquatic Paradise Rentals. Owner name kept out of customer-facing UI. -->
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --teal:#03939E; --teal-d:#02707A; --teal-l:#E3F4F5;
+  --gold:#FBC62C; --coral:#E0351B; --navy:#0B1E2D;
+  --bg:#F7FAFA; --card:#fff; --text:#11242E; --muted:#5C7680; --border:#DDEBEC;
+}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);overscroll-behavior:none}
+#app{min-height:100vh;display:flex;flex-direction:column}
+
+/* ── TOP BAR ── */
+.topbar{position:sticky;top:0;z-index:40;background:var(--navy);color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;padding-top:max(14px,env(safe-area-inset-top))}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-icon{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--teal),var(--teal-d));display:flex;align-items:center;justify-content:center;font-size:16px}
+.brand-name{font-size:14px;font-weight:700;letter-spacing:.02em}
+.brand-sub{font-size:10px;color:#8FB4BA}
+.tabs{display:flex;gap:4px;background:rgba(255,255,255,.08);border-radius:10px;padding:3px}
+.tab-btn{background:none;border:none;color:#B9CDD2;font-size:12px;font-weight:600;padding:7px 12px;border-radius:8px;cursor:pointer}
+.tab-btn.active{background:var(--teal);color:#fff}
+
+/* ── CONTENT ── */
+.view{flex:1;padding:18px 16px 90px;max-width:560px;margin:0 auto;width:100%}
+.view.hidden{display:none}
+
+h1.page-title{font-size:20px;font-weight:800;margin-bottom:4px;color:var(--navy)}
+.page-sub{font-size:13px;color:var(--muted);margin-bottom:18px}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(11,30,45,.04)}
+label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:6px;margin-top:14px}
+label:first-child{margin-top:0}
+input,select,textarea{width:100%;padding:11px 12px;border:1.5px solid var(--border);border-radius:9px;font-size:15px;font-family:inherit;background:#fff;color:var(--text)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--teal)}
+textarea{resize:vertical;min-height:70px}
+
+.gear-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.gear-opt{border:1.5px solid var(--border);border-radius:10px;padding:10px;cursor:pointer;font-size:12.5px;position:relative}
+.gear-opt.sel{border-color:var(--teal);background:var(--teal-l)}
+.gear-opt .name{font-weight:700;color:var(--navy);display:block}
+.gear-opt .price{color:var(--teal-d);font-weight:700;font-size:11px;margin-top:2px;display:block}
+.gear-opt input{position:absolute;opacity:0;pointer-events:none}
+
+.btn{display:block;width:100%;padding:14px;border:none;border-radius:11px;background:var(--teal);color:#fff;font-size:15px;font-weight:700;cursor:pointer;text-align:center}
+.btn:active{background:var(--teal-d)}
+.btn.secondary{background:#fff;color:var(--teal-d);border:1.5px solid var(--teal)}
+.btn.coral{background:var(--coral)}
+.btn-row{display:flex;gap:8px}
+.btn-row .btn{flex:1}
+
+.total-bar{display:flex;justify-content:space-between;align-items:center;background:var(--navy);color:#fff;border-radius:12px;padding:14px 16px;margin:14px 0}
+.total-bar .label{font-size:11px;color:#8FB4BA;text-transform:uppercase;letter-spacing:.04em}
+.total-bar .amt{font-size:22px;font-weight:800;color:var(--gold)}
+
+/* waiver / signature */
+.waiver-text{font-size:12px;line-height:1.6;color:var(--muted);max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:8px}
+.sig-wrap{border:1.5px dashed var(--border);border-radius:10px;margin-top:8px;background:#fff}
+canvas#sigpad{width:100%;height:140px;display:block;touch-action:none;border-radius:10px}
+.sig-actions{display:flex;justify-content:flex-end;padding:6px}
+.sig-actions button{background:none;border:none;color:var(--coral);font-size:12px;font-weight:600}
+.check-row{display:flex;align-items:flex-start;gap:8px;margin-top:10px;font-size:12.5px;color:var(--text)}
+.check-row input{width:auto;margin-top:2px}
+
+.success{text-align:center;padding:40px 10px}
+.success .emoji{font-size:48px}
+.success h2{margin-top:12px;color:var(--navy)}
+.success p{color:var(--muted);font-size:13px;margin-top:6px}
+.booking-id{display:inline-block;background:var(--teal-l);color:var(--teal-d);font-weight:700;padding:6px 12px;border-radius:8px;margin-top:10px;font-size:13px}
+
+/* ── ADMIN ── */
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
+.stat .n{font-size:19px;font-weight:800;color:var(--navy)}
+.stat .l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-top:2px}
+
+.booking-card{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:14px;margin-bottom:10px}
+.bk-top{display:flex;justify-content:space-between;align-items:flex-start}
+.bk-name{font-weight:700;color:var(--navy);font-size:14.5px}
+.bk-id{font-size:10.5px;color:var(--muted);font-family:monospace}
+.badge{font-size:10px;font-weight:700;padding:4px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.02em}
+.badge.Requested{background:#FFF3D6;color:#92670A}
+.badge.Dispatched{background:#DCEEFF;color:#0A5FA8}
+.badge.Completed{background:#DCF7E8;color:#0A8A4A}
+.badge.Cancelled{background:#FBE0E0;color:#A8200A}
+.bk-meta{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.6}
+.bk-meta b{color:var(--text)}
+.waiver-flag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;margin-top:8px}
+.waiver-flag.signed{color:#0A8A4A}
+.waiver-flag.unsigned{color:var(--coral)}
+.bk-actions{display:flex;gap:6px;margin-top:10px}
+.bk-actions select{font-size:12px;padding:8px}
+.bk-actions input{font-size:12px;padding:8px}
+
+.empty{text-align:center;padding:40px 10px;color:var(--muted);font-size:13px}
+.refresh-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.refresh-btn{background:none;border:1px solid var(--border);border-radius:9px;padding:8px 12px;font-size:12px;font-weight:600;color:var(--teal-d)}
+
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:11px 18px;border-radius:30px;font-size:13px;font-weight:600;z-index:100;opacity:0;transition:opacity .25s;pointer-events:none}
+.toast.show{opacity:1}
+
+.config-banner{background:#FFF3D6;color:#92670A;border-radius:10px;padding:10px 12px;font-size:11.5px;margin-bottom:14px;line-height:1.5}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-icon">🌊</div>
+      <div>
+        <div class="brand-name">Aquatic Paradise</div>
+        <div class="brand-sub">Bequia, SVG</div>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn" data-view="book">Book</button>
+      <button class="tab-btn" data-view="admin">Admin</button>
+    </div>
+  </div>
+
+  <!-- ══════════ BOOKING VIEW ══════════ -->
+  <div class="view" id="view-book">
+    <div id="bookStep1">
+      <h1 class="page-title">Book Your Gear</h1>
+      <div class="page-sub">Delivered to your beach, villa, or yacht in Bequia.</div>
+
+      <div class="card">
+        <label>Full Name</label>
+        <input id="cName" placeholder="Your name">
+        <label>WhatsApp Number</label>
+        <input id="cWhatsapp" placeholder="+1 784 ...">
+        <label>Email (optional)</label>
+        <input id="cEmail" type="email" placeholder="you@example.com">
+        <label>Delivery Location</label>
+        <input id="cLocation" placeholder="Beach, hotel, or yacht name">
+      </div>
+
+      <div class="card">
+        <label style="margin-top:0">Select Gear</label>
+        <div class="gear-grid" id="gearGrid"></div>
+      </div>
+
+      <div class="card">
+        <label style="margin-top:0">Date</label>
+        <input id="cDate" type="date">
+        <label>Start Time</label>
+        <input id="cStart" type="time">
+        <label>Duration</label>
+        <select id="cDuration">
+          <option value="hour">Per Hour</option>
+          <option value="half" selected>Half Day</option>
+          <option value="full">Full Day</option>
+        </select>
+        <label>Payment Method</label>
+        <select id="cPayment">
+          <option>Cash on Delivery</option>
+          <option>Bank Transfer</option>
+          <option>Other (confirm via WhatsApp)</option>
+        </select>
+      </div>
+
+      <div class="total-bar">
+        <div><div class="label">Estimated Total</div></div>
+        <div class="amt" id="totalAmt">$0 XCD</div>
+      </div>
+
+      <button class="btn" id="toWaiverBtn">Continue to Waiver →</button>
+    </div>
+
+    <div id="bookStep2" style="display:none">
+      <h1 class="page-title">Safety Waiver</h1>
+      <div class="page-sub">Required before any gear leaves our hands.</div>
+      <div class="card">
+        <div class="waiver-text">
+          I confirm I am participating in water recreation activities voluntarily and accept all associated risks. I release Aquatic Paradise Rentals, its staff, and agents from liability for injury, loss, or damage arising from my use of rental equipment, except where caused by gross negligence. I am responsible for damage to equipment beyond normal wear. I agree to return all equipment on time and in the condition received. I confirm I am 18+ (or have parental consent) and in good physical health to participate. I consent to a pre-rental safety briefing and PFD fitting.
+        </div>
+        <div class="check-row">
+          <input type="checkbox" id="agreeWaiver">
+          <span>I have read and agree to the terms above.</span>
+        </div>
+        <label>Signature</label>
+        <div class="sig-wrap">
+          <canvas id="sigpad"></canvas>
+          <div class="sig-actions"><button type="button" id="clearSig">Clear</button></div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn secondary" id="backToBook">← Back</button>
+        <button class="btn" id="submitBookingBtn">Submit Booking</button>
+      </div>
+    </div>
+
+    <div id="bookSuccess" class="success" style="display:none">
+      <div class="emoji">🏝️</div>
+      <h2>Booking Sent!</h2>
+      <p>We'll WhatsApp you shortly to confirm delivery time.</p>
+      <div class="booking-id" id="successId"></div>
+      <button class="btn" style="margin-top:24px" id="newBookingBtn">New Booking</button>
+    </div>
+  </div>
+
+  <!-- ══════════ ADMIN VIEW ══════════ -->
+  <div class="view hidden" id="view-admin">
+    <h1 class="page-title">Operations</h1>
+    <div class="page-sub">Live bookings, waivers, dispatch.</div>
+
+    <div id="configBanner" class="config-banner" style="display:none">
+      ⚠️ Backend not connected yet. Open this file and set <b>CONFIG.API_URL</b> to your deployed Apps Script Web App URL (see Code.gs instructions).
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="n" id="statToday">0</div><div class="l">Today</div></div>
+      <div class="stat"><div class="n" id="statPending">0</div><div class="l">Unsigned</div></div>
+      <div class="stat"><div class="n" id="statRevenue">$0</div><div class="l">Rev (XCD)</div></div>
+    </div>
+
+    <div class="refresh-row">
+      <span style="font-size:11px;color:var(--muted)" id="lastSync">—</span>
+      <button class="refresh-btn" id="refreshBtn">↻ Refresh</button>
+    </div>
+
+    <div id="bookingsList"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ════════════════════════════════════════════════════
+   CONFIG — paste your Apps Script Web App URL here
+   (Deploy Code.gs as a Web App, "Anyone" access)
+   ════════════════════════════════════════════════════ */
+const CONFIG = {
+  API_URL: '', // e.g. 'https://script.google.com/macros/s/XXXXX/exec'
+  DRIVERS: ['Brandon','Steve','Jeff','Mick','Jago']
+};
+
+const GEAR = [
+  { id:'PB', name:'Paddle Board', hour:35, half:80, full:140 },
+  { id:'KY1', name:'Single Kayak', hour:30, half:70, full:120 },
+  { id:'KY2', name:'Double Kayak', hour:45, half:95, full:160 },
+  { id:'SN', name:'Snorkel Set', hour:20, half:40, full:65 },
+  { id:'FL', name:'Floater', hour:10, half:18, full:30 },
+  { id:'GG', name:'GoPro Camera', hour:40, half:80, full:130 },
+  { id:'BS', name:'Beach Setup', hour:0, half:100, full:200 },
+  { id:'EXP', name:'Explorer Duo', hour:0, half:280, full:280 },
+  { id:'FAM', name:'Family Wave', hour:0, half:380, full:380 }
+];
+
+let selectedGear = new Set();
+let bookings = [];
+let lastBookingPayload = null;
+
+/* ── ROUTING ── */
+function setView(name){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.view===name));
+  document.getElementById('view-book').classList.toggle('hidden', name!=='book');
+  document.getElementById('view-admin').classList.toggle('hidden', name!=='admin');
+  if(name==='admin') loadBookings();
+  location.hash = name;
+}
+document.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click', ()=>setView(b.dataset.view)));
+window.addEventListener('hashchange', ()=>setView(location.hash.slice(1)||'book'));
+
+/* ── GEAR GRID ── */
+function renderGear(){
+  const grid = document.getElementById('gearGrid');
+  grid.innerHTML = GEAR.map(g=>`
+    <label class="gear-opt" data-id="${g.id}">
+      <input type="checkbox" value="${g.id}">
+      <span class="name">${g.name}</span>
+      <span class="price">$${g.half}/half · $${g.full}/full</span>
+    </label>`).join('');
+  grid.querySelectorAll('.gear-opt').forEach(opt=>{
+    opt.addEventListener('click', e=>{
+      e.preventDefault();
+      const id = opt.dataset.id;
+      if(selectedGear.has(id)) selectedGear.delete(id); else selectedGear.add(id);
+      opt.classList.toggle('sel', selectedGear.has(id));
+      updateTotal();
+    });
+  });
+}
+function updateTotal(){
+  const dur = document.getElementById('cDuration').value;
+  let total = 0;
+  selectedGear.forEach(id=>{
+    const g = GEAR.find(x=>x.id===id);
+    total += g[dur] || g.half;
+  });
+  document.getElementById('totalAmt').textContent = `$${total} XCD`;
+}
+document.getElementById('cDuration').addEventListener('change', updateTotal);
+
+/* ── SIGNATURE PAD ── */
+let sigCtx, drawing=false, sigHasContent=false;
+function initSigPad(){
+  const canvas = document.getElementById('sigpad');
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = canvas.offsetWidth*ratio;
+  canvas.height = canvas.offsetHeight*ratio;
+  sigCtx = canvas.getContext('2d');
+  sigCtx.scale(ratio,ratio);
+  sigCtx.strokeStyle = '#0B1E2D';
+  sigCtx.lineWidth = 2.2;
+  sigCtx.lineCap = 'round';
+  const pos = e=>{
+    const r = canvas.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return { x: t.clientX-r.left, y: t.clientY-r.top };
+  };
+  const start = e=>{ drawing=true; sigHasContent=true; const p=pos(e); sigCtx.beginPath(); sigCtx.moveTo(p.x,p.y); e.preventDefault(); };
+  const move = e=>{ if(!drawing) return; const p=pos(e); sigCtx.lineTo(p.x,p.y); sigCtx.stroke(); e.preventDefault(); };
+  const end = ()=>{ drawing=false; };
+  canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', start, {passive:false}); canvas.addEventListener('touchmove', move, {passive:false}); canvas.addEventListener('touchend', end);
+  document.getElementById('clearSig').addEventListener('click', ()=>{
+    sigCtx.clearRect(0,0,canvas.width,canvas.height); sigHasContent=false;
+  });
+}
+
+/* ── STEP NAV ── */
+document.getElementById('toWaiverBtn').addEventListener('click', ()=>{
+  if(!document.getElementById('cName').value || !document.getElementById('cWhatsapp').value){
+    showToast('Name and WhatsApp are required'); return;
+  }
+  if(selectedGear.size===0){ showToast('Select at least one item'); return; }
+  document.getElementById('bookStep1').style.display='none';
+  document.getElementById('bookStep2').style.display='block';
+  if(!sigCtx) initSigPad();
+});
+document.getElementById('backToBook').addEventListener('click', ()=>{
+  document.getElementById('bookStep2').style.display='none';
+  document.getElementById('bookStep1').style.display='block';
+});
+
+/* ── SUBMIT ── */
+document.getElementById('submitBookingBtn').addEventListener('click', async ()=>{
+  if(!document.getElementById('agreeWaiver').checked){ showToast('Please agree to the waiver'); return; }
+  if(!sigHasContent){ showToast('Signature required'); return; }
+
+  const gearNames = [...selectedGear].map(id=>GEAR.find(g=>g.id===id).name).join(', ');
+  const dur = document.getElementById('cDuration').value;
+  const total = parseFloat(document.getElementById('totalAmt').textContent.replace(/[^0-9.]/g,''));
+
+  const payload = {
+    action: 'create',
+    customerName: document.getElementById('cName').value,
+    whatsapp: document.getElementById('cWhatsapp').value,
+    email: document.getElementById('cEmail').value,
+    location: document.getElementById('cLocation').value,
+    gear: gearNames,
+    date: document.getElementById('cDate').value,
+    startTime: document.getElementById('cStart').value,
+    endTime: '',
+    paymentMethod: document.getElementById('cPayment').value,
+    priceXCD: total
+  };
+
+  const btn = document.getElementById('submitBookingBtn');
+  btn.textContent = 'Submitting…'; btn.disabled = true;
+
+  let bookingId = 'LOCAL-' + Date.now();
+  try {
+    if(CONFIG.API_URL){
+      const res = await fetch(CONFIG.API_URL, { method:'POST', body: JSON.stringify(payload) });
+      const json = await res.json();
+      if(json.ok) bookingId = json.bookingId;
+    }
+  } catch(err){ console.warn('Create failed, saving locally', err); }
+
+  // Save locally as fallback / offline queue
+  saveLocalQueue('bookings', payload);
+
+  // Capture waiver: timestamp, device, best-effort IP, signature
+  const signature = document.getElementById('sigpad').toDataURL('image/png');
+  let ip = 'unavailable';
+  try {
+    const ipRes = await fetch('https://api.ipify.org?format=json');
+    const ipJson = await ipRes.json();
+    ip = ipJson.ip;
+  } catch(e){ /* offline or blocked — timestamp + signature still stand as proof */ }
+
+  const waiverPayload = {
+    action: 'sign_waiver',
+    bookingId,
+    timestamp: new Date().toISOString(),
+    ip,
+    device: navigator.userAgent,
+    signature
+  };
+  try {
+    if(CONFIG.API_URL) await fetch(CONFIG.API_URL, { method:'POST', body: JSON.stringify(waiverPayload) });
+  } catch(err){ console.warn('Waiver sync failed, queued locally', err); saveLocalQueue('waivers', waiverPayload); }
+
+  document.getElementById('bookStep2').style.display='none';
+  document.getElementById('bookSuccess').style.display='block';
+  document.getElementById('successId').textContent = bookingId;
+  btn.textContent = 'Submit Booking'; btn.disabled = false;
+});
+
+document.getElementById('newBookingBtn').addEventListener('click', ()=>{
+  document.getElementById('bookSuccess').style.display='none';
+  document.getElementById('bookStep1').style.display='block';
+  selectedGear.clear();
+  document.querySelectorAll('.gear-opt').forEach(o=>o.classList.remove('sel'));
+  ['cName','cWhatsapp','cEmail','cLocation','cDate','cStart'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('agreeWaiver').checked = false;
+  if(sigCtx) sigCtx.clearRect(0,0,9999,9999);
+  sigHasContent = false;
+  updateTotal();
+});
+
+/* ── LOCAL OFFLINE QUEUE (fallback if API_URL not set / offline) ── */
+function saveLocalQueue(key, item){
+  const list = JSON.parse(localStorage.getItem('apr_'+key) || '[]');
+  list.push({ ...item, _queuedAt: new Date().toISOString() });
+  localStorage.setItem('apr_'+key, JSON.stringify(list));
+}
+
+/* ── ADMIN: LOAD + RENDER ── */
+async function loadBookings(){
+  document.getElementById('configBanner').style.display = CONFIG.API_URL ? 'none' : 'block';
+  const list = document.getElementById('bookingsList');
+  list.innerHTML = '<div class="empty">Loading…</div>';
+
+  let serverBookings = [];
+  try {
+    if(CONFIG.API_URL){
+      const res = await fetch(CONFIG.API_URL);
+      const json = await res.json();
+      if(json.ok) serverBookings = json.bookings;
+    }
+  } catch(err){ console.warn('Load failed', err); }
+
+  const localQueued = JSON.parse(localStorage.getItem('apr_bookings') || '[]')
+    .map(b=>({ ...b, BookingID: 'QUEUED', CustomerName:b.customerName, WhatsApp:b.whatsapp, Gear:b.gear,
+      Date:b.date, StartTime:b.startTime, Location:b.location, PriceXCD:b.priceXCD,
+      Status:'Queued (offline)', WaiverSigned:false }));
+
+  bookings = [...serverBookings.reverse(), ...localQueued];
+  document.getElementById('lastSync').textContent = 'Synced ' + new Date().toLocaleTimeString();
+  renderBookings();
+}
+
+function renderBookings(){
+  const list = document.getElementById('bookingsList');
+  if(bookings.length===0){ list.innerHTML = '<div class="empty">No bookings yet.</div>'; updateStats(); return; }
+
+  list.innerHTML = bookings.map(b=>`
+    <div class="booking-card">
+      <div class="bk-top">
+        <div>
+          <div class="bk-name">${b.CustomerName||'—'}</div>
+          <div class="bk-id">${b.BookingID||''}</div>
+        </div>
+        <span class="badge ${b.Status||'Requested'}">${b.Status||'Requested'}</span>
+      </div>
+      <div class="bk-meta">
+        <b>Gear:</b> ${b.Gear||'—'}<br>
+        <b>Date:</b> ${b.Date||'—'} ${b.StartTime||''}<br>
+        <b>Location:</b> ${b.Location||'—'}<br>
+        <b>Price:</b> $${b.PriceXCD||0} XCD &nbsp;·&nbsp; <b>WhatsApp:</b> ${b.WhatsApp||'—'}
+      </div>
+      <div class="waiver-flag ${b.WaiverSigned ? 'signed':'unsigned'}">
+        ${b.WaiverSigned ? '✓ Waiver signed' : '⚠ Waiver not signed'}
+      </div>
+      ${b.BookingID && b.BookingID!=='QUEUED' ? `
+      <div class="bk-actions">
+        <select onchange="updateBooking('${b.BookingID}','status',this.value)">
+          <option ${b.Status==='Requested'?'selected':''}>Requested</option>
+          <option ${b.Status==='Dispatched'?'selected':''}>Dispatched</option>
+          <option ${b.Status==='Completed'?'selected':''}>Completed</option>
+          <option ${b.Status==='Cancelled'?'selected':''}>Cancelled</option>
+        </select>
+        <select onchange="updateBooking('${b.BookingID}','driver',this.value)">
+          <option value="">Driver…</option>
+          ${CONFIG.DRIVERS.map(d=>`<option ${b.Driver===d?'selected':''}>${d}</option>`).join('')}
+        </select>
+      </div>` : ''}
+    </div>
+  `).join('');
+  updateStats();
+}
+
+async function updateBooking(bookingId, field, value){
+  const payload = { action:'update_status', bookingId };
+  payload[field] = value;
+  try {
+    if(CONFIG.API_URL){
+      await fetch(CONFIG.API_URL, { method:'POST', body: JSON.stringify(payload) });
+      showToast('Updated');
+      loadBookings();
+    }
+  } catch(err){ showToast('Update failed — check connection'); }
+}
+window.updateBooking = updateBooking;
+
+function updateStats(){
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('statToday').textContent = bookings.filter(b=>b.Date===today).length;
+  document.getElementById('statPending').textContent = bookings.filter(b=>!b.WaiverSigned).length;
+  const rev = bookings.reduce((s,b)=>s+(parseFloat(b.PriceXCD)||0),0);
+  document.getElementById('statRevenue').textContent = '$'+rev;
+}
+
+document.getElementById('refreshBtn').addEventListener('click', loadBookings);
+
+/* ── TOAST ── */
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+/* ── INIT ── */
+renderGear();
+updateTotal();
+setView(location.hash.slice(1) || 'book');
+
+/* ── PWA SERVICE WORKER ── */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
