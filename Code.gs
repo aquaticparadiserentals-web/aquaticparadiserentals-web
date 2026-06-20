@@ -24,6 +24,14 @@ function _sheet() {
     sh.appendRow(['Timestamp','BookingID','CustomerName','WhatsApp','Email','Gear','Date',
       'StartTime','EndTime','Location','PaymentMethod','PriceXCD','Status','Driver',
       'WaiverSigned','WaiverTimestamp','WaiverIP','WaiverDevice','SignatureDataURL','Notes','_Owner']);
+    // Force Date/StartTime/Timestamp/WaiverTimestamp columns to plain text.
+    // Without this, Sheets auto-converts strings like "2026-07-01" into real
+    // Date objects, which then come back from the API as full ISO timestamps
+    // and silently break the admin "today" / date-matching logic.
+    sh.getRange('A:A').setNumberFormat('@');
+    sh.getRange('G:G').setNumberFormat('@');
+    sh.getRange('H:H').setNumberFormat('@');
+    sh.getRange('P:P').setNumberFormat('@');
   }
   return sh;
 }

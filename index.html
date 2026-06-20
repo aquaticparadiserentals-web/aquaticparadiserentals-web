@@ -372,16 +372,18 @@ document.getElementById('submitBookingBtn').addEventListener('click', async ()=>
   btn.textContent = 'Submitting…'; btn.disabled = true;
 
   let bookingId = 'LOCAL-' + Date.now();
+  let serverOk = false;
   try {
     if(CONFIG.API_URL){
       const res = await fetch(CONFIG.API_URL, { method:'POST', body: JSON.stringify(payload) });
       const json = await res.json();
-      if(json.ok) bookingId = json.bookingId;
+      if(json.ok){ bookingId = json.bookingId; serverOk = true; }
     }
   } catch(err){ console.warn('Create failed, saving locally', err); }
 
-  // Save locally as fallback / offline queue
-  saveLocalQueue('bookings', payload);
+  // Only queue locally if the server save didn't happen (offline, not configured, or failed) —
+  // otherwise this booking would show twice in the admin list (once live, once "queued").
+  if(!serverOk) saveLocalQueue('bookings', payload);
 
   // Capture waiver: timestamp, device, best-effort IP, signature
   const signature = document.getElementById('sigpad').toDataURL('image/png');
@@ -400,9 +402,15 @@ document.getElementById('submitBookingBtn').addEventListener('click', async ()=>
     device: navigator.userAgent,
     signature
   };
+  let waiverOk = false;
   try {
-    if(CONFIG.API_URL) await fetch(CONFIG.API_URL, { method:'POST', body: JSON.stringify(waiverPayload) });
-  } catch(err){ console.warn('Waiver sync failed, queued locally', err); saveLocalQueue('waivers', waiverPayload); }
+    if(CONFIG.API_URL){
+      const wres = await fetch(CONFIG.API_URL, { method:'POST', body: JSON.stringify(waiverPayload) });
+      const wjson = await wres.json();
+      waiverOk = !!wjson.ok;
+    }
+  } catch(err){ console.warn('Waiver sync failed', err); }
+  if(!waiverOk) saveLocalQueue('waivers', waiverPayload);
 
   document.getElementById('bookStep2').style.display='none';
   document.getElementById('bookSuccess').style.display='block';
@@ -495,14 +503,13 @@ function renderBookings(){
 }
 
 async function updateBooking(bookingId, field, value){
+  if(!CONFIG.API_URL){ showToast('Connect the backend first (see setup)'); return; }
   const payload = { action:'update_status', bookingId };
   payload[field] = value;
   try {
-    if(CONFIG.API_URL){
-      await fetch(CONFIG.API_URL, { method:'POST', body: JSON.stringify(payload) });
-      showToast('Updated');
-      loadBookings();
-    }
+    await fetch(CONFIG.API_URL, { method:'POST', body: JSON.stringify(payload) });
+    showToast('Updated');
+    loadBookings();
   } catch(err){ showToast('Update failed — check connection'); }
 }
 window.updateBooking = updateBooking;
