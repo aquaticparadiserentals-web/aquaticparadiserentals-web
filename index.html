@@ -1,578 +1,1315 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#0B1E2D"/>
 <title>Aquatic Paradise Rentals</title>
-<meta name="theme-color" content="#03939E">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="APR">
-<!-- Internal record: built for Delroy Stapleton / Aquatic Paradise Rentals. Owner name kept out of customer-facing UI. -->
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="manifest" href="manifest.json"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- APR Business App — Internal: Aquatic Paradise Rentals, Bequia SVG -->
 <style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
-  --teal:#03939E; --teal-d:#02707A; --teal-l:#E9F6F7;
-  --gold:#FBC62C; --gold-d:#B8940E; --coral:#E0351B; --navy:#0B1E2D; --navy2:#10293D;
-  --bg:#FAFAF7; --card:#fff; --text:#11242E; --muted:#5C7680; --border:#E4ECE9;
-  --serif:'Cormorant Garamond',serif; --sans:'Outfit',sans-serif;
+  --teal:#03939E;--teal-d:#02707A;--teal-l:#E9F6F7;
+  --gold:#FBC62C;--coral:#E0351B;--navy:#0B1E2D;--navy2:#10293D;
+  --green:#1B8A4C;--green-l:#E3F5EC;
+  --bg:#FAFAF7;--card:#fff;--text:#11242E;--muted:#5C7680;--border:#E4ECE9;
+  --serif:'Cormorant Garamond',serif;--sans:'Outfit',sans-serif;
 }
-html,body{height:100%}
-body{font-family:var(--sans);background:var(--bg);color:var(--text);overscroll-behavior:none;-webkit-font-smoothing:antialiased}
-#app{min-height:100vh;display:flex;flex-direction:column}
-
-/* ── TOP BAR ── */
-.topbar{position:sticky;top:0;z-index:40;background:linear-gradient(180deg,var(--navy2),var(--navy));color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;padding-top:max(16px,env(safe-area-inset-top));border-bottom:1px solid rgba(251,198,44,.15)}
-.brand{display:flex;align-items:center;gap:11px}
-.brand-icon{display:block;border-radius:9px;box-shadow:0 2px 8px rgba(3,147,158,.4)}
-.brand-name{font-family:var(--serif);font-size:18px;font-weight:600;letter-spacing:.01em;line-height:1.1}
-.brand-sub{font-size:9.5px;color:var(--gold);text-transform:uppercase;letter-spacing:.14em;margin-top:2px;font-weight:500}
-.tabs{display:flex;gap:3px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:3px}
-.tab-btn{background:none;border:none;color:#9FBDC4;font-family:var(--sans);font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:8px 14px;border-radius:8px;cursor:pointer;transition:all .15s}
-.tab-btn.active{background:var(--gold);color:var(--navy)}
-
-/* ── CONTENT ── */
-.view{flex:1;padding:24px 18px 90px;max-width:560px;margin:0 auto;width:100%}
-.view.hidden{display:none}
-
-h1.page-title{font-family:var(--serif);font-size:30px;font-weight:600;margin-bottom:6px;color:var(--navy);letter-spacing:-.01em}
-.page-sub{font-size:13px;color:var(--muted);margin-bottom:22px;letter-spacing:.01em}
-.eyebrow{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:var(--teal-d);margin-bottom:4px;display:block}
-
-.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:14px;box-shadow:0 1px 2px rgba(11,30,45,.03),0 8px 24px rgba(11,30,45,.04)}
-label{display:block;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:7px;margin-top:16px}
-label:first-child{margin-top:0}
-input,select,textarea{width:100%;padding:12px 13px;border:1.5px solid var(--border);border-radius:10px;font-size:15px;font-family:var(--sans);background:#fdfdfb;color:var(--text);transition:border-color .15s}
-input:focus,select:focus,textarea:focus{outline:none;border-color:var(--teal);background:#fff}
-textarea{resize:vertical;min-height:70px}
-
-.gear-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px}
-.gear-opt{border:1.5px solid var(--border);border-radius:12px;padding:12px;cursor:pointer;font-size:12.5px;position:relative;transition:all .15s;background:#fdfdfb}
-.gear-opt.sel{border-color:var(--teal);background:var(--teal-l);box-shadow:0 0 0 1px var(--teal) inset}
-.gear-opt .name{font-weight:600;color:var(--navy);display:block;font-size:13.5px}
-.gear-opt .price{color:var(--teal-d);font-weight:600;font-size:11px;margin-top:3px;display:block}
-.gear-opt input{position:absolute;opacity:0;pointer-events:none}
-
-.btn{display:block;width:100%;padding:15px;border:none;border-radius:12px;background:var(--teal);color:#fff;font-family:var(--sans);font-size:14.5px;font-weight:600;letter-spacing:.02em;cursor:pointer;text-align:center;transition:all .15s}
-.btn:active{background:var(--teal-d);transform:scale(.99)}
-.btn.secondary{background:#fff;color:var(--teal-d);border:1.5px solid var(--teal)}
-.btn.coral{background:var(--coral)}
-.btn-row{display:flex;gap:8px}
-.btn-row .btn{flex:1}
-
-.total-bar{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,var(--navy2),var(--navy));color:#fff;border-radius:14px;padding:16px 20px;margin:16px 0;box-shadow:0 4px 16px rgba(11,30,45,.18)}
-.total-bar .label{font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
-.total-bar .amt{font-family:var(--serif);font-size:26px;font-weight:600;color:#fff}
-
-/* waiver / signature */
-.waiver-text{font-size:12px;line-height:1.7;color:var(--muted);max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:12px;margin-top:9px;background:#fdfdfb}
-.sig-wrap{border:1.5px dashed var(--border);border-radius:12px;margin-top:9px;background:#fdfdfb}
-canvas#sigpad{width:100%;height:140px;display:block;touch-action:none;border-radius:12px}
-.sig-actions{display:flex;justify-content:flex-end;padding:7px}
-.sig-actions button{background:none;border:none;color:var(--coral);font-size:11.5px;font-weight:600;font-family:var(--sans)}
-.check-row{display:flex;align-items:flex-start;gap:9px;margin-top:12px;font-size:12.5px;color:var(--text);line-height:1.5}
-.check-row input{width:auto;margin-top:2px}
-
-.success{text-align:center;padding:50px 10px}
-.success .emoji{font-size:50px}
-.success h2{font-family:var(--serif);font-size:28px;font-weight:600;margin-top:14px;color:var(--navy)}
-.success p{color:var(--muted);font-size:13px;margin-top:7px}
-.booking-id{display:inline-block;background:var(--teal-l);color:var(--teal-d);font-weight:700;padding:7px 14px;border-radius:9px;margin-top:12px;font-size:12.5px;letter-spacing:.03em;font-family:var(--sans)}
-
-/* ── ADMIN ── */
-.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:16px}
-.stat{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:14px 10px;text-align:center}
-.stat .n{font-family:var(--serif);font-size:23px;font-weight:600;color:var(--navy)}
-.stat .l{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:3px;font-weight:500}
-
-.booking-card{background:var(--card);border:1px solid var(--border);border-radius:15px;padding:16px;margin-bottom:11px;box-shadow:0 1px 2px rgba(11,30,45,.03)}
-.bk-top{display:flex;justify-content:space-between;align-items:flex-start}
-.bk-name{font-family:var(--serif);font-weight:600;color:var(--navy);font-size:17px}
-.bk-id{font-size:10px;color:var(--muted);font-family:monospace;letter-spacing:.02em}
-.badge{font-size:9.5px;font-weight:700;padding:5px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:.04em}
-.badge.Requested{background:#FFF3D6;color:#92670A}
-.badge.Dispatched{background:#DCEEFF;color:#0A5FA8}
-.badge.Completed{background:#DCF7E8;color:#0A8A4A}
-.badge.Cancelled{background:#FBE0E0;color:#A8200A}
-.bk-meta{font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.75}
-.bk-meta b{color:var(--text);font-weight:600}
-.waiver-flag{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;margin-top:10px}
-.waiver-flag.signed{color:#0A8A4A}
-.waiver-flag.unsigned{color:var(--coral)}
-.bk-actions{display:flex;gap:7px;margin-top:12px}
-.bk-actions select{font-size:12px;padding:9px;border-radius:9px}
-
-.empty{text-align:center;padding:50px 10px;color:var(--muted);font-size:13px}
-.refresh-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
-.refresh-btn{background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:9px 14px;font-size:12px;font-weight:600;color:var(--teal-d);font-family:var(--sans)}
-
-.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 20px;border-radius:30px;font-size:13px;font-weight:500;z-index:100;opacity:0;transition:opacity .25s;pointer-events:none;box-shadow:0 4px 16px rgba(11,30,45,.3)}
-.toast.show{opacity:1}
-
-.config-banner{background:#FFF3D6;color:#92670A;border-radius:11px;padding:12px 14px;font-size:11.5px;margin-bottom:16px;line-height:1.6}
+html,body,#root{height:100%;font-family:var(--sans);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+button{font-family:var(--sans);cursor:pointer}
+input,select,textarea{font-family:var(--sans)}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.anim{animation:fadeIn .3s ease}
 </style>
 </head>
 <body>
-<div id="app">
-  <div class="topbar">
-    <div class="brand">
-      <svg class="brand-icon" viewBox="0 0 40 40" width="34" height="34" role="img" aria-label="Aquatic Paradise Rentals logo">
-        <circle cx="20" cy="20" r="20" fill="#03939E"/>
-        <path d="M20 7c2.5 3 4 6 4 9.5 0 3-1.7 5-4 5s-4-2-4-5c0-3.5 1.5-6.5 4-9.5z" fill="#FBC62C"/>
-        <path d="M8 27c2-2 4-2 6 0s4 2 6 0 4-2 6 0 4 2 6 0" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-        <path d="M8 31c2-2 4-2 6 0s4 2 6 0 4-2 6 0 4 2 6 0" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" opacity=".55"/>
-      </svg>
-      <div>
-        <div class="brand-name">Aquatic Paradise</div>
-        <div class="brand-sub">Bequia, SVG</div>
-      </div>
-    </div>
-    <div class="tabs">
-      <button class="tab-btn" data-view="book">Book</button>
-      <button class="tab-btn" data-view="admin">Admin</button>
-    </div>
-  </div>
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useEffect,useRef,useCallback}=React;
 
-  <!-- ══════════ BOOKING VIEW ══════════ -->
-  <div class="view" id="view-book">
-    <div id="bookStep1">
-      <span class="eyebrow">Bequia, St. Vincent &amp; the Grenadines</span>
-      <h1 class="page-title">Book Your Gear</h1>
-      <div class="page-sub">Delivered to your beach, villa, or yacht.</div>
+/* ═══════════════════════════════════════════
+   LOGO — embedded directly, no external dep
+═══════════════════════════════════════════ */
+const LOGO_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAAB4CAIAAAC2BqGFAABTD0lEQVR42q29d5xc1ZE2XHXOufd27p6cpFEaZQkFgkQQIDKInMHgnHbttQ3O7+56nVjbu7bX6V3jhI0JNhiJIGQZESUQklDOOY1mNHmmp/MN59T3x+1wu6cH+/t+3/wGMdPTfUPdOlVPVT1VBwcH+wGIAIAQEfJfRISAUPwdAAjKfkUAGu9vxVep4hDkPQcAAQFglU96D1s8ERbOQ4XTeX8G7w/FSyz9WjgMeo+M7p0X/5j/Bck9sntpRGW3XHbj434h5g9Q+DTLH6JcAoA4RnQ4RgjF14sfxcI3AGDZgyvcBFHZIceRMnr+R8VjFmSBxQNT6aow/0wRiw+XAEtXWZIyEqD7AnnOUToSYfHIVPZ04B+TsueuPO8VhTsnorwKF58tAUJBKakof+8jLv0FiABLN46uulLVJUCVD6p08LyOe/SUAJHGrBSggi4QoHtqKilw4c/5X0pPjYqiy6uXZ+VQhRKNvcDiAqQqKucxBlXFz8qWNgLhmCVQOHGZ8mA1JSxdbZkeuCIhz9vcp44F1SkpIebNgedc6Fk3WLYyiQqCI/d9+fPQ2OtyzRjB+y1SKlNpwCqCxDItRe8y/juvAiMgxNKN52/Ic3+Fv2HFdWHJvOCYS8eS9cHCcsKqpgzLBVJhT7CK0S43Fug9SOE3xEpLjWPuHr2Gp/SG/KLF0gLOP9exwqNyW1l+mMqFyLDChRCMsYTjuaryZYhQ7TLAa64QYMzbvHpD5dawYpFWFV2Fz6MxT4HKhYwFBUEARCrY9fzlYUl6+V+K2oRYrkBVnVjFugSgogxZuaTKrw2wym1WLsqyRVfFO5ckgFRuk8c4EByjyDjmX6p6axV+GMpX+xjbiwUEUHGnNHZhVoEANFYelUCCCuusaLHZ+14bVXtxvCfqufMKGJKXI1V5fpXrqJp8iofEassUxpE8eLEjlow8lq0wLFtnCGMsZLmr8V4gVkAN9w3oAUNYMpkoSm58XEhL5eaRqj3JcknR2PdQ/nWsAL40RsdLGMALSKgcxSBglUVG5eYGKy/d+xEX2lCFrStD6jTufVf+XoQLebSGlI8i8mpGJXgHpdOMI+pxYWMVJFS8F0KkagYXqhtczF8ueZana1Sx5KBdN+PaQCL3H29UMZ4PKLsKpHLbTliQOpVdVQFzAsI/KITi8aB4IwAgCugVq5hcrLpI3x+0l1siHIsWcLwwqnhRDBnjjDHu/ss554xxxkqQwr0FIkUklZJKSSmllKSUIkVSuofCooseJ6RFKsWNWGGYCapBKRpfAlgWXJWZGyIgQWV2qiQTonKR0FgUR1X/QDAeWnWdu+di3GdMRATImBCCcSGEMDSNcz4W5DiOtJVyFCEAZ6hxLjgb+07Ltk3LchyHlCSlitkE9AgW0LvWy6++ygrEKmawMuancohV+XmBVTwPenFJ+fmrCp5gLJqvzA+UMgyImF/xipBxTdOFJnRN14QofmwwlTkyHN8/HD8wPHJsNHk2kxnK5kYtx1LSIQICwdAnRFQTdT5jUjg8LRqeXROdXRvrqInWBQO6prnHyZmmaZl5oQMhMiyFXpQ3n5UWsjJQHKNEOMZ70/iGtLC4Bwf7wZNBqZ4lovGsx3gBBY1RfPRYQgICLoTQdJ9hFOXbM5rceLZvXWf32z19h0ZGwbSAM2EYzQFfs9/f4DfqfL6gpmmICsmUKmHaQ2auP5PryWSHslkwbQBCn29OTWxZS+PV7a0XtTY3R0LuwTO5rGlayrHziS3EQuRe7Urp79phqgY3x1nY7m0PDvSXklhVV8aYoxApKNl0rOYxsTxbl1+NihQCCE3TDSNg+NxjnImPvnj89J+OnHi3pw8sJxAKLGmsv6il6bym+pmxaFs4GDF0YOx9PJFjO4PZ3Olk8sBQfFvfwKbegV1DI5TJgM93cWvTfdOn3jJt0oRYBABs207nso5lASlE5s2ujSNfGgdfwT+axis+Plejqyvo+38aq8AMeB8NJxJC6D5/wOcDAJJy7YnO/91zcM2pTnCcmY31t02bfMPkiYsa6kJ+n/cgikipvLN0D6iIFBBHxgAYAmOsIoodTKV39A3+7XTXC6c6T/YPgyZuntr+6fmzr5vSjpwpKZOZjGOZZWlbzLsl8mYy6e/Er/+otKgk6GL29R+BGVjNTI97dkUkhDAMv99nIGLOsp48cOS/duw72jtQH4t+eHbHB2Z1LGyqd9VWKeUo8gTRJUDAiqGLe6WKFOWTdQSgcU5K2UoxZIIXVoBUW/sG/nz4+OOHjg6NJKY3N3x58fwH58zw6ZrjOKl02rEtAECGpfTceICtuMwrccI/ppYDg/1l2GQcpEFQFf5gtcVVQhmkFCD6fD7D59c4J6l+v/fQN7bs6B4aXjSx9cuL59/aMcVv6ADgSAVAogAhlKICfs2Hs1Kq+9a8dnQ0mZEyqok7pk166LwFmuDuezjDznjCr2l1AR9BKbPHGXLGACBjWquPn/rxzv3vdXa1xKLfXnruR86ZzTnLmmY2k5aOwzjLo1+qzDyMrT9UurR/QM0LGv2PwuT3y9NXvKYUCc79gaDPMADgjROdD23YvKe75/xJE7+5dNEN0ya7JtKSEgB0ISzL2Xy2dziXW9BY3x4Nl7kMRFJyyh+ePZNI3d4x+dDI6IEzZz9/4bk/ufKSnG0bQjvQP3jJs6sZZ2/efsM5zQ2OIxlDIGCcAYDpOIIxV+JvnDrzzc073j5+elZL448vXXp9x2QASKRSZi6DwJBBqXxDNJ7T+/9gPbyCHg+H0xgAXmF+sUKzXTOq64Y/ENQ4H0ilv7Jhyx927ptYX/ujS5fcNasDEG0piYgjIyDB+cYzPZ94df3B3gFQUgSDhz9055SaGiklcyNLBCSa/cTKhO2c/cT9ADD5t0/niM58+B7kTCDesGrt2hOnAeDx65Z/cP4sy5Gu7e6KJ86MJi+ePMEVN0d0F83aY6e+9PaWA2f77p4388eXX9QWDWdNM51KEinGeMmIFCJqT8lsbO5sbHSPY9P/opoZGj/6prEpp7ILcvMEBBAIhPx+PwKsOXryI+vWD6TS/37pkq9dsDBgGFIpJZUmOBA5SnHGehKpW196ZdSyfnjVJbU+I2nZk6JRpRQiepJKqDFMWta6E52HR+Kd8cQlE1o4Z4yxVYeOrT1yfMX0qeu6e3YPDrvXphQIjj/dte/Hm3dcNHnilxfPv3XGVEVkOxIZXt8x+ZopE3+2Y++XNmx5+eSZX115yQPzZ/k0bXh0VEmbIStPShbFXFWyY8AvVVFYUc0qj+f6ikE8VXXFCKhIMWSBUNin60qqr2/Y/IN3t81vbVp72/XntjYppXK2o3GmcXawf2hCJOjTNER8/MCRwdHRv9x6w51zpruHtKX0ZoVd5+jnPJUzr312NUhnYl3Nj5YtQcZGM9kvrN80q6lh5YorWx9/ds+QK2jQBI9nck8dPlFbEx3Mmbc9u/qBRfN+d93lrgGxHEcw9tD5C2+eNvnTr65/8IW/vd7Z/YurltXV1IwkRm3T5Ix5q1JYJQYZR53LfGrpdfY+te1xADJVK1mgCxg458FwxKfrA8n0tX9Z/YN33vvckkVbH7j93NamrO0wQJ8mGLK3O7vnP/an3+49pHEOALsHh5lhXNzWbEqZNi3TcTTOBedlSTeGDDHm97942/Wv3nfrrgfvOr+tGQEeeW/nmeF4QqovbtwqiY6PJi3bcVNQzx461jc09LVF8w5/5J7vX73syd37nj9ygjMmFQnGCMBy5LTa2Kv33PLf11z6hz0Hljy56sjgcE0k6vMHlSrkS0rf9A9XwbGimuoKumoVY4zSElSrfZAHwykhRDAUMTTt4MDQ0qeff62z+8nbrvvpVcs0LrK249fEcDb7XlcPIsxrqGutq/nee7sGk2kCmBwOKtN8o7Pb4Dxo6IYQ/75+8+snOxmAIioWo5OmnXCcm2dMvWrqpJjfUERbu3t+uG3XlKb62bHI04ePpx1nMGf2JNMaY6Zl/3zfQTD0AOeW4yxsqAdk3elMMStMRIKhUspy5JeWLN5w/+392cziJ1a+eqIzEgr6QyFFRKTy6ZgKo0vkKe5XSc0TUUW2iX/lK18ek8731O+8CSD3P6yoP5KbDtWEFgxHdCE2d/Usf2a1Q+rNe266vmOK6UgEMATffKbnqr+8/OTh45+aPyvq99do4umd+/wB3/L2tgaf8esDR1850xMWYiSb+/bmHb9497004D2zOqTKZ10QcTCVmRYJXdXeiggOkcb4j7fuOto//MT1V/7Hxed/+dz5fcn0xiMnbpo5bUpNdPWRkz/fta8mFFx1vPPpw8d+vmNvTSjw48sujPkMAJBEmhAImLYsv66ZjjO1Nnb/zI63znR/f9P2jljkvLYW4MzM5RDcBIm3BIXjVWDHFCBKUsTBwYGxnJNx4kQsc30FFKKIXIuhC/FOZ/dVz65uj4RfuXPFlNqYaTuGJoDgB5u2f2PT1hm1Nb+95rLFzQ0M0ZFy/hMr+1OZgx+6uyUa+s2u/V/asDmRSgMgCH77jCm/vvqymN9HeUETEHEhAFBJu+icbKUytqzx+yypDE28frLzS+vWf/WSJXfMmnb+U8/v6x/c8+CdD7/z3iunOz85Z+Y/LZy3sLnBchyGKDjvjic+++bGfQPDT9945XktTaYjfZrI2fb9q199/sDRX1y//DPnnpPKZpOJOGecYdXysjfQ+DtRjCgvoFBZnQI9yaZiOaIs9wWKiDHmSnnjmbNXPbt6Wiz62j03tYRDpu1onJ8eGf3Amtc3dp0FTTQH/EtamxwiR0pD0751wcL7n1/7i937H7l0yScWzl0xpX13/6Cp1IxYdE5jHZB0pI2MAwhkQAgWAABwrhWv3gDw6eA4UiA5tnnlpLYdH7/fJhpIZXKmedfMaXOa6ut8us74T5Zf7Df0rGX5dR2UenT7ni++817GkeA4G86cPb+1mSHYjjSEWHnrdR819M+ueUMp+pfzFxCpxGhcE4IBI6xAspXcCipXRu/jENWqi3mVLtoZKs/ieh8jIgZCYV2IPb391/1lzcRI+PV7bmoOhyxHcoYMERGHMtmX71hxOpH8zOpXP/XK+l9dd7lUypHyrlkd353Y9p9bdnxq/qy2aLg1EmqNhl2D7zgAXKAmgADspMr0gDWA9hDItFI2IgceABGTWh0ZTajVg9AQwFGAIDmolnBg94fuSts2AUyLhK346La+gWXtbX5d393T/5UNm9edOH35tMlTQ6HHDhy+bvJE99Y4ou1IxtjvV1wFiJ975c2grn10wRxHqmQi7tONUlYbx4bMFfnoylyH8Po5xIpkK1ZUZwrlzvzaJaJAMOTT9e7RxA0r1wZ0se7OFc3hkOk4hhBSKctx2qPhfR+9hwsBAOu7en69ddfFrU0fPGd21rL9uvbtJYs2d/fE/D4isqQNgMR0xhiqJMV30OgWSO2BzCmwh1BlSdqub3SDEQAOTAcRJaOFAtMhshgj51JgJghdKtA4xZhOUn1s/uxjA0ODmexAOvPzbXu+s303ZHMzWhpXr7jqupdfbQoFZ9TWKKUYokNK14RUypby99dfkbKdj615vSngXzF9im1buUzab/jy0Xex9FVma8cUQPMqSwBYERmWYGv1VeB5p1LK7w8EgiHbti995sWdfYObP3Db4pYmy3F0IUYz2ajfB4hSKkmklNKEGM1mz3ty1UAmu+m+W+c11dtSapwDIihHKgKhAYEa3QkDL+DwW5A7jcoCJgB1YBoREz4GBgIA5MixFCIAKVSSyAJlARDxMARmQO1yqLseInMQARzJOQByR6rVR47fvmrtuZMnLGtu/MnOfTNrY0fio/fOmPb0jVdZjgMEuib29w20RyN+XXPrElc8u3rr2f5tD94xr6m+u7dHScdnGFgEBe+X16wSgg9UzbFSZWW/TO8VkdBEKBwVjH3yb2/+ZvueVXfeeNvMaTnbMQTf1Ttw18uvtoXDX1o09/qpk4QmgCBj2wFd23C667InV142pf2Ne28pJD8lFwYB0NCbcPYPEN/IVBZ4AJhRpOMRKeHDvSfU37ZYmoAblhoz2tCxqFgOKmiWApkFZRILU2wptNzP6q8hZMqxOGOciz29/a2hYH0o+OLh459+693eeOKx65Z/ZMGctGkHDW39qTM3vfC3W2dM++MNV7hYfjCVWfTEcwGN73jgTkMT3T3duhCGppcL+v2rBvlXXHiH4xUJqgAPBIC8A9Q4f2LvoX9/Y+O/XXbRPy+ebzkOIgrOXj15+rG9hzot60+79j199BQq1RGNRP0+AJgUi0QM48G5M9qjEVIOY5wJjRI76cjXsPOnzDyFPAgiCIwX+Z4KQPjZ5oPq2ofj6zab67ZYL260b7nUVxtBqRBLtXs3j2cgCwACZo5A/2qIv0NaPQtPR2TKMVui0YCmZW1nXlP99t7+A8MjP1i2pCbgNwRfffjETatfzZLa09NvK7pmSrvpOFG/b1lr039t3nkymbpn9nTGRTwRF0JwVs5EKyMfVUd+XkFjde7MmLIsEQSCQZ9unBqOX79qzUWTJv7x+uW2UhyRIQLA3Prax4+cqNe0n19xyab+gT/uO/Tbg0fTuVyz3x8zjEvaW9ujEZI2Cp1UVp34Lzz+ryx3HLUIMB8gAVKeCsgQEBWhCPEf/jGzabfZUs8jAewZcs6fY8yfozkmMoYuoRlL9FIFAMD9yH2Y64T+5yl5EEJz0dcgbYsIOOOK1P/s2GMDfuei8zlnj+85eM9fX/Nr2nM3XOkg/uq9Xec1N81prMuY1uSaWMzQf7Rx66RYZGl7W862U6mkYRhFag7iP1T1Yp7Aj8YlpHq4AERK1w3d8IGij7+2AQD+eN1lhOim4RWRLaUmxOfmzz7eP6hxPikc8hl6Syj4nTc2PnvwqMZZzrZt2yShy+Qe2nUn6/4lcoO0KIEidGGzh3OZJ8ihVMAZOA7YEnQNQwEGxACRkBFjgIyQAUP3B0IEUEAKRAi0KBtcCztuUV2Po6Yj46Achmzliqt/fskSIfj/vLfrw2temxAOvXHHDTfNmPrDZRf4A/5f7DkAAIIx03a+cN6Cq2dO+8zrb3cOx5vrGwgxncm4Ke/3qV55Q2eiAveOxqvaUInH5HKFENHw+zni7/cefP3w8f9ZfsmkmpjlSF1wTQhNcCJSSj04Z3pdLHrP2jfWd/X8ZcWVuz5w27oH7vi3i89XSgkEphmyZxXsuRezh0GvJwRABQzRFRZjhEgMiblyRECcM1VTKr+iOMNomAMgMgaMAaL7rytiRFfcSIgECkiRXoPg4JGvq32fJZlCoStpNYeDd86d8Yutux5+9a0FrU3bPnD7+W0tOdtpj0RCAV9vNgvuQyeliH579TIC+Mxb73LGmhoa09mM5Tiu2PJFBsqnLSv4e3keJRYEjdUZdlgkYGKBk6zphq5pw6nMF9dvumDqpE8umG06Uhf84MDQB1/4297eAZ+uKaLGcOjBmdPQNH9z5SU3Tp+qAK7umEykFCkUmjz5UzzyBWQAIoTgFIhxrkwZMSzqpiQEZGDCTcv8TfXCcSiXI0OHKa0aOYC8JGVg+W/CAtGYYYFw4xAyMOrYwCradY/KnkJhOI5lS3nl5InTGuoH0tnO0SQA+DTxm937B4ZGLmpuAIaWVIJz03baa2I/uHTpyweOvnj4WCwc8fmDiWRSkSrLaeAYFjpBkUjFygOW8qQSej+AbgbN8PkR4Dtbd46kMr+4/CJkTEoJAK+d6npi94Fznl71f97alDQtAPjU/NmkiccOHHWkBEDTsgkIuCaPfZt1/oDpMUAOKF2FLVrkwjcjQMaYERO+sACf6Bok0yYi8PvZr/61YcJEnjXdTzFyZc0YIMv/wApHYwgsT0FGcECvZ+l9sOtuldzHdR8oZ3ZD3Uu3XW8rdcFTK29/8ZUbVq755Lr1zbWxLy0+x5EyaOhSKr8mbNv5zMK5c9qaP79+S9a0Wpuac5aVzeWomF3CSsJT3oAXCOfFpFIVVgG6XQuYh0+KlG74Av7AmZHRB9a8dve8mZ879xzLdnyCK6JzWxovmTRh98Dgyj0HnzlxenY0unRiy4HB4fOaGpa3txERBwKhq2PfYWcfBb2h0GKChIjIwC3+F74VoW6wnOK/fT79X4+PProy/YcXk9msYgg+Ay84x9/eqEUbOJfoyEJp1XVLiOUtBegpiSGQBB5gcpQG1lDNZczX7Ni55kjkrulTz6YzK4+fPj6avHlq+x+uvXxmQx1jbNXBo/e//Or5zY1t4SAXYno49IstOxvCoWWTJmSyuXgiHggEmHv9BSKWt/Oh1EuDlTVDLGOkl1GcCRFDkZihaZ9+dcOvd+078pF7p9bVkKKMaWmM+Xw6AOQs65c7939l41a/4Ps/eGdzMKgJIZUk5aBmyJM/xdM/YEYDgSpxurHIqWWuvBQBEzCUwvu/3r9ha8ZvIGega4xzICAlIZ5U0ybpt1wZ+pe7I621aJrESomaYlWXMN96oZAKzDMAJEUg0EmR3kILn2NGq3RMXTMAoXc0qYhao2FA7Euk/vWd9363e7/f53tuxRXXT5+as22/pl3+7MsHhoaPf+QejeHuA/tqo9FIKMTyaMtDXh9DRmVVqNqFlC15uMlExIVmaFpPIvnYnoP3zZ3ZUV9rO5KA7lrz6iV/en7X2T4A4Jw/tGTR49dclkym3jrTo2kia9t5Kfc8j6d/iHo9gCx2cLirm1zMUHRigCIg/vUXI+u3ZNqaRCTEgn7GeV6GnGNjLR8ccn74u+Hr/7mnc5CEzgjQXROICMAkoVRIZa614DaRAUgSYTS7YP+nlUxzxi3Htmy7ORxsjUUAceWBo+c9/fzvtu++ccbU/R+664bpU3OW7S6XRy5cNBBPPLbvkM8wopFYfHTUkZLK+yXIAx8KvxYT/+VlLsIqtHfd8AHA/+4+YNv21xfPJyCGaDuyKRDY3tO/6E8vfG/jNiUVADQH/YCoceZqEHBDJQ7i8X9FEYZSZx/moUVB4lQwGkaIb99jP/9asqWBWxZJBYqKSQMgAkeSEDChSRw4Zv5mZZIHuXSBNCIBI0BfSPgignNG4MI+Vlg6LN+cBA7pNZjcBkf/nbhgQAhoK3VqZPSjL79+5wtrB3Lmozdctfr2G6bEIoDgN3TBmGnZF09oXTpl4n/t2Gta9oSmJtOy0pmMUqqiSworiMR5eEdjCOxUVlchIs6F3zBylv3ovkPLpk6a19zoOBIBNMEfX3Hlqtuvbw8H/8/rb1/y7Oqvb9jygVfWR8Oh5RNalVKcMVI5OPo1VFniWikYwQIkQIau+0IkhohIyL//h7htExFISd4KbZEtDYCOhEiIvb4lY6ZQ44wAbYmMgR7h//HL+Me/ORzPAROYV3aWV/nSD2SDUY99f6azfwFNV8rRhDg8NPz7HXtWzJi26wO3ferc+ZbjkKK3T3WtO3oSiBCBkP3rufPPDo6sOX46FAr5A4HRZELmC19UJV9RqMAwcrveio1kZUWbAoWFiGsaIr56snNwePQL82fnmVoF1HLbrI6dH7j94+cv2NbX//23N+cs64lrL2+KhGzbQk2jM7+G5FYQUSBJUKnChZCEAaKjUA+L1zdn172TCvkZ41gTE45DUJ4pc39IZZTfYAeOme/uMUWQEYE/ysEQP/tj4pFfDf/umZHXtuR4gCnCQlyDLrguoAQEUiDCcOp7KtPDhe7Y1lWTJ775wB0v33rdrIY6cqTGxbc3bb/0Ty9c+8yLt774ilQkpXPNpIltDbU/2XMQABrrGtKZjGlbVApgvJCvxJNn6FFvLCUNyvLWiGjoBgD85sCR2prodVMmKqXcdJftyJ3dvZs7u4NC/Ob6Kw5/8K7X773l0IfvvmnGVMuyuDBU4jB2P4paDYEDBTWmgvKCNw5ExhkqYj97Os4QRpLyv7/acsuVkURSuQSmYlFHKeAcVyyPOlIxhG89OqiIWcCeXJ2+8IEzX/mfwSsvDFyyJDh1gk4OIHMb/PKnQ0QqIj8kYAZafXD6x8QYEUmiy6e2m0re8fza54+dICkf2bn32plTV95x45qjJ586eEQIoRv6x+fMeLuz6+TQSGtDAwAmUymppCoJu6ygmneGRFSldaoseiTGuc/Qh9OZV06fuXf6lIDPMG3H0LW/HTs15/FnF//xLxc+tWra7//86I69Mxrqrpg2uSkcMi2LIRAidP4PyiSgcJc8efAyYd5fuYomCfUQX/9eduO2jFT0uQ813PNAbWujhqzMdxZMGf74q02XnBfKWWr/kdwHv9Z7y+d7Hny4eySuXn1s0tpHJ7zxmwnnzTIcEzlnngXEABl6cCSABC2G/StpZBsInZSUUvans6sOHds/PAoMpVJzamK3z+5orImuPd0NAEo6982YCqSeO3qCa1ooFE4kko6UUPQj5I1c8j+xQlZknLQTIgFwoQPga53dVta8Z8ZUIDA0sfNs740vrE0p9Y1Ll375ovMsgH9av2nR43954OVXc7bDEIjrFN+Kw+tAiwHIQotsyWIU7pkhQ3TjDiGeey0ZTzhLF4W+8y9NalS2NmqcFSxbvkcYHQk1Ud4Yw8ceaZvWbjCktRsSb21KXrEs/MYTk5dd4LNNAgJLAvCCfPNaDKXQsVhmRcbIhu5HXe/BEX2ccZ/Rl80yzsO6diaVlkQd4VBYcADI2XJGXc3c5sanj54CoobaupxpWrZTqrTi2O4IFGOau1wwV0Zv1zQNAFYdPxWNRs5vbnSkFIJ/b9senxDv3X3zpNrYU3sPCgBgeCSVum7yREUk3I6es79D5RSSam4bPhK4LFuWf6VgphlDZcLxU5ZSNKfD0AMMVKkLuWTHGJiWmj3NN5Rlv3pqwE0nmLb65H31//2VprAPMqNScEZEWCLhEpCLrxQV+uDyvH5CAEUijMNv0egejMw3bashHLp6Ytv/3bk/kbNGE6lZ0QhHfOmWay3HMS2LiJDzu6dN+ubmHV2jyea6usPHjmRz2aDPl4dF5f3A7nWzko3AsbknBCJkzKdrtmO/1tWzvK3Zb+iKSDny3f6BRW3Nk2pjWdve1Dswv7ZmQjC4oK72e5ct1TkSE5Q6jCNvgQgDKCi2qxZNc2EtE+b7wZGhApQKEEHTGAGCwJNnbaVKMY1LNA342Z5DuUvuObZlr/nrRyb+9TdTnv3ZpEe/3RrQMWuC0BggI1YAdqUF5AmRmOdFAECOKgP9z7hVDanUL6+4aElT/RP7Dy+fNOGfF8w1bTtq6C3RiKHrGmdA6uqJbWTZG7p7DL/f8PlS6bRySSCVmTkaQwkr1bjLMh6Mccb44cGRoUTqqgsWAYAkpTHR6vcf7Bs4Gx9tjUV/cfWl2Uxu4mN/EuGQVEoqh2kaDLwITpL0OiRV6FHFUqcyFhtI0B1jAYCcoWEwUtDSoCFHZcKW3RlNIJVYVoSF4QePfa/9wqVByBEQAYdcUgIi5wCU797Ih8KllhSGoNxjuDMU8p2ACEAKeBCHXqf2LzIRk449ORrdeO8t8Uy2LhpxLa207K7h+MGR+OKmhlrO5tbVBIKBVzu77587MxwKDw8POlIKLnBMj0q+Cu7xhfnAtaJ+yzgHgK19A6DUkuaGPMDi7KEFc+5/8ZXLVv31K4vPCevaf27dNTSa+Nq1l3OGNgiyczD8OnB/MeFCYxpNqYQ3EBEVAWrM72OM47wZfonY3WvvPZT1G4wU5Ye1ACJCLqfmdPguvDiS6rcYyydiOGclFIslZSL0tpoh5mPkfHm1ED4RMANyZyC+kZpuAlKmdByl0o7cdvTk3sHhnYPD2/oHjyaSZFpv3n3z5ZMnRHzG4oa6jT39QFQTifb0nLVt29B0QiofMZMXvCj2UCJiZZczAgIKIQBgc++AHgjMiEVJKcHQsu375szoyeT+ffO2T655HYDQZ/z3Vctu6JhsWZYQhorvwswx4D6g/MrPn8cFWIjkGaVQwhMckEFjvTZ/lp9HxcmeTO+AHQ1zpTz9lgp0DU91W8kBaeguTKZ8XqlAEcdiDyYBMgRS+ZCNISgEICQELI6wUIV+MaKRt6DpJqXIMLR3jp++4cVXLEeCY4MmptbV3jx54uqjJw+NjF4+ZSIwdlFz4w937h1MZ+qjEalUzjSDgUAFd6MocYHFiQqlFl30wEHUuACArf2DM2KRiN9nO9LNoFhSPnzBwrumT9nc0+eQunxCa0s0Ylk2AyIGOLoJVZZEAEHm+c1YiuuwGLYUO+7d61CYzSqpiIC99tfRf/2vbp+Rv5hCGICKwDDYsVO5A8dzSxYFMhnFSmM+sKzxgby1OLcjF0vDDQoMWEAGqIAIuA+SO8HOINORaEIkZJG6ZebUh86ZfeWqtQ8vmPOZBXPxJ7/ZPzziAobFjXXKtI4Ox5e2NnHGstkcxWi8hkxWHC1CxcyXx0QjoiaEbTtHRhNza2OA6PZIOkohIEg1sSZ615wZ982dZUt1ejjOGCpAkECJ7YBakeBEJbCIHm4PFpq60ZHAGMRH5alukyTd8NEjn/rqqVRaMdciF4eIICAC55jNqo3bM2AIRcV6CgPI/5sXcAHDEZTcgztGhYpXggULBgDMQLObsieRCUc67eFgzOfjCJdNnRT2+/7a2U2C14WCb/f0k+MAqWnRCCAeHhlFITRdy5rZfEeHF0QXYhhWeJm834X/ESAyxgaz2UQ2NzMWcSNvnTGfrgOpk/HRVQePfv61t5c8tWrSr57Y0tMvhFAgyI5D5jgxvVgxoMIkIyj9kD+rlKAkBQJMbzDeeC9zusuyHUok5YYX5i1dHE5lJOfoyawDASgFPgOfXzeSGZUaLxwQS6coTsigsrZNLB+7UsTRJconyBRkjgCCI6Vf12fVxjb2DEgpL26qz+RMALisuSEimGU7pKgl4AdNOxIfBQBdN3K5XDG5VKxvFWMWUb0rseghEQGgP5MDx5kcDgGAxvmR4fh/btmxazi+e3AYMjkwdNTFTTOnnd/cIB0bmQaZM2gNANMAVCkTi96MBRCAkoAM/BEOnG3cmv3h787s3J+Z2KpbNn3hYy1trdrh4xldYzRmNAYRBf189/7Uph3pK5eF00nFWUXzgevwsNgVXQZBAEuTm6hI0ScABqQwe5QQFCngfHYssvVs31Ay/dR1ywHAsqzHrr7UJzgBOkrV+IyIzziVTAGAoRup5KhSyjMKzZvGIIHVOgFc31z8SH8mC4qag34A0ITY3Nv/+K79LBz6yMxpH543+5NvvtPs9790+w3ScaS0maaR2QUqAzwKoPK5EsyvFDelIxUxRH+EAbC/bUj/6PeDew9nb7oi+rfHO2ojgnNWVydG++1cTjIGpWQNYLGhBDk4tnrj3cSVy6NEslDeKClIsWuwOIet4PIJCmyuAthUxTciMsp1AQFHZtv2/zlvwUML54YMXXeLzkQBXXNpP5LAr4kGv+9sOgsAPsNwHEmkSrEgeuc7kaBx+OvoaXwdzOUAoc5nAJEk6ohGJtbXnkmmN/UPLouPZm1ncnMIAHKOozMgBDB7kGS+/ovokmDyfX+SBII/ysnGVeuSP3ps+GSXdc+NNb/+7sQpHQZklSORAK2slAosu9SSTkVYVKD9CYF7D2WURW7rlacJo8BCJPK2s7nTozxDfdDbdFIARQztQddkSimn1cYQwXKkW/ZEBKnyC52IkLFaQx/K5QDA0HWpZHniroy7JMbpGc8PZ0PGACBp2YAsoGlul+9FE1q2feD2R3cf+OHOfR9dvQ58htPalMqZgjFFDgKAPVzpdImkQ0IjIyZsEx5flfjpk6P9Q/aDt8ae+3l7S7sOGcoMOcwtYwNpghGRUvlJf+BhtxYTN5zjaNKxLWL5p1HQJkLy4rsie5NKyk1EOJY5TgTIyUmCyos150iA4vHL4JoiAMbCmjaYzQKR4JyUIjVuw7Oo2q5SnMDi4qCM4wBDnTFXr0zHqff7vnHJBZ+YP+t/dx/49YEjT+0+cGo09dadK5S7ulWumKonIqlQN0AP80wKH/tz8mdPJ7Km+sRdsU/cXVvfrFFaZYYcxhnnDNGVkWe4H5YeF+eolDfAgnwKvzQ0slhMzh8A82C1oLB5s1Ew3ViabkClJKwJyia33loCu6XTQKlZn/yCW1JBvr5BJQ8xpkdFVPOEhWx/gRMiFbnxcTE9bUslHbM5GPjOpUs/fc7sH23bs6V/kArTYUjaLshRinwG0yIsPky/W5l8dGUaAf753sjHbo+G6zSZosyQw4SbySwOlWEAyBBNS1m2q03IGKTS8nOfmvTS2v6u7pyuu9EFGDpyDpYs63UtzEZ0bYeHA1ToZy6bvekmq5WnDEWSQCFw1+BSBaO/GKKCO82CyWISmlR5Y0sZKUyUEf7HxspEAODaQFWgK2Fhdo0plXLMtnDox1ctG0mmbOmgcpDpgmtCQzAQfGxwEH/5p/RvXkiH/OxLD0Y/eGPQH+VOGjJDDhOMc0+HaKFeT0SMQTKtslnljjVQijQNP3pXQ29P9tjJtN+vEYFS4DcYZ4xI4pgObaKyURxFu4NUpr2uNhVbcYCoAJNozKCHIjcaitOI8jlCABdvuHqGVDY2yX2jqCQZUHkEDggAASGAlK2kF/wRIANgiBnLlipXEwwUhz1kIHJ2gOKOfOHt3KPPZxpr+SP/FL33mqAWYHZaZUaAcy64J2T2NrO7ZovjcNzJ5KTPYIJjOqMWzQ9NnmZcfWnst0+fjYTINSPRCEeOFePgyjK8qtCUT+DhteVLdkUtpVIbCQHXAAWA8rBUqTwF5IoXgSgnHY0JZEw6DkNkjFX2IBZnKpWWUCH4L0t4EAFAVNdBUdpyXG9bgAKkiEhRIOAHgIGBgV27dm3dumXfvv3Hj+4bGlID8aGAD3/0+ch9V/vRQDslM3HiAgUvNj1S2UixgrYoRcDheGc2l6OQHzNZZ3jIWrakDRhcuiRy583NW7bFHUcpopZGHTiQAuDF4T1ExY65EsfDk7GkEq8QC4pfgEduFbEGmEZOFsrxWWm0WAk2UsJy/IIDQ9u2XUGPaYfLpxsFVRnmQxXxY43PAILhXA48j0E60uf3McZ27dz1xz/+Yd26dd3d3ZZlcs59Pr8kUReBl39UO2e2sEakyiITTDBv31ExYECvoiCRu7o37UgxBNuh8xdGa+u0FVfWypQT9OGzj8/55ndO/eiXpwRH21FFUJL3eKUCHEFJ4qr4Sr6tmzw5h2IkB4AkQW8qDL/g1ceuQYGnIdWwadbqOgDkzJzbL+0FWkU4AACinJdHFV7TNfB1hgEI/dlc0bFLKQPBQHd3138+8sjKlc+lUulgKBgKhxDDCGA7DjjO4//eOGcaywxITUdeWMCediNX+zytIPmhuagJSMbVlp1pv59lc+rrn51w6dU1Zr9p5RQRkWnpmlvlwKFhG6SqJA0WujDH1JkLap6vTRdcGnnJAYp87UWbPT4hl5CxrGMPZs1Z0QgApDMZXdMZYwVbSFA+8lFUjVU8Tf0EAA0BHwjemUy7mQqlVCAQWLPm5Ycffqi7qysWq6mrq5NKKqUQAEGlsvy3/z572eLB7KjSC8yKUhK2CJKwvLncBbtKaT6++0j2zFlT1xhj5DdQDpm2o4Tb7keQSktAYAyHRx3lKIZU6Moptw9UJtmyYNyDITzke0Lg4J9Bf2ekFBGAQBywrBHTbA+HACCbzfh9PizDmmVfrLLDrchhyqdviIjqfIbfMI6NJlz3ahjG1q3vffhDHxoZHq6vrycgR9ruSuGcDw0Nfee7j9z94Y/mBofdXDbIDMg0kEvHJpcVh0URlK9xUgQCDp/MpbMKCEJB3lzPQRHDIumEdIFE4CIT2yYERURIymMi8nw7z5ErE2duocU1U64lQXJIxFRgFhSY2OUTIT0YkYgz7EvnyLKmRcNAlM1mA4FAPsFYbfYj88QnlX9FQCJpO07QMNrDwYMjoyAlAjHGDh8+nM1mQuGwbdsFi884F319fQ89/MXPf+YjGXMC14KociQtCswm/1xQgFYciEEZdduz0kuigURKMgTTUlPbfU0NwrJV3ssRgVKTJuhYbMPzfjxvjlVJo0tTpqkgUCJV5RkjIMgc+aeAMRGUWdZl4vGspQw3shOJBEg1IxYlM2dbZjAYHDs/vaw46518WhGaEpFl28DY/NrYwXgibZq6ELZtX3PttZMmT06Mjuq6zpAJTUjp9Pf3P/TwFx/5z+/ncjmMLFY8pFhYzv0jzVup5j5jzfmLXXsT2Amgojt3VRs8fHlXa5R0ABFztrrhipjuR+koJEIiRCJLLZrjj4SZ45BPZ4IBVAguL83C/eSlrEriBi8pi7A4hZ8silwEXAOSHjdVmGicH6JdqEIw3D8UByFm1kTjySSQ8vv94ySOCFymbLk/qIwSpXQA4ILG+kQqfSqR0oUwLbuxofGnP/25ruuDg4PZbHZwYIAL8ZOf/vR73/t+LmsCKd1Xp7d/Ws38OUWXknQ4QDA2MzjnJ9D8YbTjSAyICiEQleIIV+kAuADLVo21+s3LoyojeZ6LSRzBMtWMycbkib5MVkVCjDMiRUVDgZ5DeekgSIV4pHgi5ZEyAYAk5qfaKws5xqLrKNGPii4AEUHR9oHh2lBwYiQ8ODysCWEYvoppd94RqgK8FNMqk5HJJfQvaW4AJXcMDM1tbmCMZTKZq6666q9rX/nhf/9XV1fXBUuWfOxjH585c2Ymk0HGEPlIOpmIfHhSKIAqR1wkLXvlsaM+Lm6e9BV/7pBKvAd6JG9MgRGoUjcNISgK+sDMqmUXhKZN1jIpyVipb0FKCoTEjMm+Te8l6mICGJBShaanfIEDi5WOIqTLG/EyK1CKXABBpim4QIUWgpNDYOBxrxVOjAA4YjZnbu4fPL+hVjf0vqGBUCjEhcijKKqICqE8e0djx3MgACrpKCnn1dUaAf8b3b0PzptFQIKzTCazcOHCJ5962rIsXdeJKJ1OA2MIYDB227sb3x7uu6im/pfnL+WM3fz2mwdSSSntFV39f1r0BV/yQ6Qk5JGIcokAJWorkU9HILhwYRBchfW04ZEi4DRjigFEho7kseyQ97FApBCKXo4AlMeflYw1Fuw3AgNpyobbgekgk4TC67cqPJhSKqhp+0eG+0YTy8+ZBUAjI8NNDQ15EY8zBFlUa+LyRlOgpMzZVm0oeFFL06tdZy3TFIjuUINMJgMAjLF0Oo2IjDO/ppuWFbfsByZP2Z6Mvzo8eN+md2aGwvvSyWafD8C3puf4G1OvuCW6IBvfzrVQyasTAKN87KWIMwSBk1oFOLIU62EhWyrVxCYBgJYlUSlpSyZcu19K8BSCBgVlCAfykJW8+IqBzCrfFFV3IzgmIKvoXauYIKUIGGdvdfcCqeUTWq1Uysxla2pqCvFWviulYnqS8FTpq/fmK1KWZQd8/tumTPzcGxv3DY0samrI2rYLP1zozzgHIB35Hw4ffvzUybNmtt7wxTQNEI5kU4czyQZdt5TUkGmMNo+kb6mbA0PvgggDyCLEREUEBBKJ1OCwJQQ2RDiYEmQB1BcHNqL0+1H3sV0HcpmkjNRyJ6cklqwPEOWzHKpgH1TpG90fis8PGNgpOeGroNWRnUAmPECsQMQpceQIEUiqVSc7G2LRBU31ZzpPG7oeDIZKG6yUD11yIyNRGu9VBVHn3y8dm5S6vn0CMPbiic7FrU3KAsZKtD2pVEg3frxv7xe3bwWNM86PpJKAGNU1PxOSlKOIAzpADNlb/X3ZlvnC7SZBAuYaUAacUCDTAHXYtDurCwzWcQgh58SASAJKRQ6QSUSYGnHAYIdO5u56+Mxn7q9ZHGNRR5mFVgVkBAyAAfJ8qycKAAGoAQrGDAIOiIQkQSJYCRVdApM/CspBoZOUoFQhGYjAsCyxSuDjvCuR3Njd86HZMwzD6Orprqmp4VxIpdCbh4KyspqoTNmNCYgQUTpOzjQ76mouaGt64uiJfzt/gcB8RdFtwPcJcTqR+Na+vZe3tN0xcWKbP2AptXV46PnuM6ey6TrDYAhENE0LDHO+efDU2syFt4fnZJNHhB4BpZjBQEdlKmdEsSSdPpvdsj0TDLChl0aSIUyOSJZVlCGVVZRVyqKcA7GknBzkxGDT1tQbW1JT/Ox/68VMjeUUsWLQwBA4Q47AAJkislGZyGw0CEOMx3Req/PGII9ymnc9ne5iGrFwDQuGQBOllIXtkGUVY3lJpAu+rrPbzln3T58izdzo6MjMGTNdr4CIXnadd/wd9vadrT7KoyxFTUYgWBOJ/nrHnk+tW7/+nluWtbemc5bg+eSMwfnxRGLLwOD906ZyUcqfpCzrfw7s/96hAz4hOAISLK9pOJiOmxjYeVFIHPkEMB2NgN1jpd/N2kcds0/GsvTEkPP5hC04/jYsbjRYnCDfZFLoGCQGgmMWIO1QjkFaEQOcoKFRoKcSICoFjk1mjkyTFIE/wBpaeNsU3tYOtY0YrkHDT4wDAdkmpUdUok/FEyqV5JbJm5pZaztva+ctbay5jTe3IOaJ5AogJMQlq/56JpU5/qG7uru7Dh3ev2Dh4pJZwOrDNEW1aSleN5B3H45tSce+bdqkh/y+n+87fGl7a7HSgICmlFPCoRmxmoxtKcchAMFw/8Dwhr6+uZHY9+cueOTwAQlEAK8M9X+pY+azZ05+9kjzY/N+ldn/kLAGh/+gzE2SRzn6wDRwXr32aR2yEubWCFOgUPlJjp7uX3QADMCADsztPSOylFKOQ5ZJpklSga6xukY+/1w+e4GYMZe1TUR/gJIJ2XXaOXNSHt8p+89ifBjSKTJzYNskFUgJlunksraZA0UUCrMJk/Vrbo186iEwDNexBjRtb//QpjM931i6WDeMU2dONzQ0csZdEFzh77xJNOztPUsluhSVsXbLsymBUCQSCn563frf7T105IN3ToyGTUe6TCI3/aQAePlU/zOp9KOHD+8cGVFIe9IJHZmpVICx/110wbf27bx76jlfnx1Qnf+bPvmquaXL2mc7Z5hMckNxv+CKYRZBIiAvV4NCIE5SKuko6ZBUBMAMg9XU44RJomM2n7tATJvN6urJNOXpE/LALrl/lzpxhAZ6IZdhSgnGdMFzimy3us4E6DoEQ1hTz1sniinTxcy5YuZcPmEyC4XJMkEpAHCUivl9n3z9ncf2Hj7yoTsbNL7h3bfnzz9HCG2sJhe7DfM8yt7es1VnmFfEiqRI9/lro9EDfQPznlj50PkLf3zZhclsTjB8nxZ/gzGu6y8cP/HpbVuyQD7GACDlONMD4ceXXPixLe/MiTU+cu5FE/0jYG5VA5uznfutk2etE8NmV1YN2JCQkFVksXw+AwGRgdDAMLjPz8NRUVOrN7TorRO19ili4iRW24DI1PCgc+yQs3eHvWuLOnlUpRIEpHSf8gccn98SekbTM37/SaHPbJs4YUqHqmvkDc2sqYU3tbK6BhYK52sTUpFpknQgz5ggnfP+ZHrmk6tumjbp2Vuu3bp9m21mOjpmOI5ExPLprVg+Jbkk6DEoeoxJQcZD4UjQMG5d/eq6k2eOffCOhlDQKnAevfW0ElOGwCEV8fu39PTe/s76tFI+zhFgyDIvrql/8sKL73rnrZ3x4X+aPu+a1mnzamqaAyBEBiAOdhJyOciYkFWQ0shWoAA5B10Hnx98fsfw5TQjwdiwogHb7uvvzR7cbx47kO06bY4MWZZla8IKhc1QxDR8GU1PaUZW15OGP6UbOV/gJMGytvY/X3lFkLNiXZAcB2wHlJPPOuWp8nlROIpifuPLb2/54Xu7t9538/yGurfeXj9jxnSfP1A2/Lh8EGyR9+AKujL/StUGZRIpwxesiUZ2ne1b/NSqz5+/8CeXX5jI5gRj1faWK4F3m1TEMDb19t729oYckI8xhjhg5pbXNz598bKHtm978uihcCDQbBiTgpEpwWibP9zg90d1w9CEEAwZEZBNlLTMUdsezub6Mun+TLY/kx7IZROWmZGOLRUyRoZBugFCA8YJKI/SiNAtrRMxpXwIQ9nssmjtS5dfFtJEzrEZgYfCi+XUsjx+UESGYD2J9OynVl09acJLt12398D+ZGJkWscM6Tiuq8SKfSkq5hT39nZ75V6spFWzJ4iIwXAk5PPd/9c3nj10fN8Dt3fURnO2ZO87hQURbEURw7f+bPfd77xjIgUYA8RBM3detPbPlyxb2dn59T27GEODsZyUkiQWKLjoSQYrUirP8kWBTDAmGBPoNhvla9FQPrCkuIBdhodg2JvLXVbX8Ozll0V03ZTucvRUuctm5qqipBylYj7jo6+9/fu9h3fef8us2pp3Nm/smDbNMHzkYbd7+TqVu2m5poMq9xTIw7vyHUdRkdINf00kenJoZO6TK6+Z0r76pquSls1LVfjqtQmEvF6/09N778Z34tKOCA0ARi2rTtN/ef4SH+df27VjZ3wkphsBl+hWypuBty2P8oPhVHG/z3JbWESmBB5qPUckhIGsec+ECb+6cKlfiLRjC2S8fCMQ76jz4lh7SRTS9W09fUufWf2xBXN+e+3lu/bttc1Me/skx5HF2tH7j7PiX/rSw+OS78p3BsoHL1IS4601UaXUr7ftmddQt6i5MWvbxUCxYoRhYQunPDFhejR6VVPT2719JzJpH+dhITJKPn7yOAf86px5M8ORE6nUmUw2K6UskI0VASlwdVUVGcilcS9YLIIgVUzzzD8BwTDpOI4jvzVv3v9ccD4g2KSiPsPQhC0VlFesPaa1QOVGFEB3/W1DRsm/XHe5Y5qnT59ob59ExY1X0UOyxKqpf8Senu4xg82rzcsr7O1HpITQI+GIlPL8Z14ayZq777814jdsqdj4o+kRUBHpjOuCE9BQNvfInr2/P3nCJFWj6QyxL5er0bR72icvqa/vzWa3DQ0dTSXilmUq5VB+04SyCaDlYxpo7ABsAkTgjFlKjZjW4ljNj85dfHlbS9IyBWMc8NnDx08kU19YOI8xjxKPgQCWVLV+3/ff2/X1tzb99vrLP7Zw/ubt20IBo76+USqJ3qUMVToqipfNv/TlL1aOoi7vOSzttJlXauZIBxCjwcCCmtjPd+7rzGTvmznVxdQwzjackiioa/sGhn6399CFrU0hXbuubcLypsb+THb/aCKrZL1hAMLb/QOv9fSMmFadobcYgRpN14DlpMwpVWWcu3ezx3JdcbVYAgybVojxr86e/eiFS2fGInHT1Dm3HHnPX9/4wabtp3O5T82bGdCEJYutBWVfjqKwru/s7b937Vs3zpj635cuOdndPToyNGHCROmOgqu6eWS17af5l7/0xap1dSi5R09LeOFeHMdRKGY01CqgX763syUcvnhCS8a2eD7HWDkqgSGCovvWrf/Dzr2bBoYvbWsO6GJiIHjv5CmLa2J96czh0URWylpd1znvymb2xOMHEqOn0ulB27KVpxuy+jYSxSAVOQJDNJUaMS0/8gcmT/rV0gvunDpFksw6DiKGdO0/3t3+h72HVt12/aNXXpLI5oazucaA31aq3PKhIhKcWZZ948uvE8KLK67gyA4ePjhhwgQuBFYdDugN/KDEvqdC+xtUUlkqOw6pnOWDpFQ2k9IE/8YFi9492//Pb26cX1dzYVvTqGlppcJafuttqSjq9z/81qZ3TnbeNm/23850L3t29Wu33zApFjEd+9q2tqtaWt7o6X38+Ik3+3oHcqbOWUTTNGSFwnhpFpxnPzzPbngIiIyATEUZ6ShF7f7Ax6ZM/cj0afPranOOM5LNapwzREVAUr12ts8XDDCiL7295Tf7j6Qt66uL53/zwsXuzPZi4k0RRbh44LV3DvQPvnDL1e21NVt27oxFwkF/0HZcnzRmJ5ryqoxXPVwbnSemlmHsco6fh32Wb6RzHMfnD8bC4f5keskzqwlg010rWsLBjO1wLG3q7BDF/L4Xj5y8bfWrN3ZMfumOFbu7exb/6YXbOqY8t+LKUdOMGrqjlDuq7tDo6Nrus+vOnt03OjqYMx0ijTGNMw3zCA7LKBEkCSSRqaQtlYas2e87v67uxra2q9pa2kJBR8qMlGFdk0plbYchOkRhQ//Zjn0Prd8MjgOcXzJ5QsZ2dvT0b7/35nMa6tKO43oaW6lav++RzTv/bf2mby5b8h8Xn3fw5MnBvp6O6dNlWRyIAN60xhgAUmST0hh+I0FFQqTAZyjtAYmkiHOey2QSTLRFw3+54YrLnltz+5o3Xr/9OkMIU0rXhiiikK51joz+84bNRCpnOwd7BziAT4ieTJaU0hAf23Po3Kb6BU31jlTTIuGHa+d+bvasU6nUruHh7YPD++PxU+n0oGkmbccmlR+QTsARdcb9nMUMY3o4tKi29ty62kV1tRNDQUTMSSeeMzlDIFp9+ER9MHBea2POdjhixrI/c86cObWxzkTqktamWa3N392weUdXjypSLBEtqeoCvj/sPfRvGzY/cM7sbyxZ2DUwePbM6enTpyupypMa5VSNart6uC0heLanq2qN3KvCFUkmzzoGpVQoEqsJBp4/dPz2F9ddM7X9hZuuAkRLSo6IiLaUN61+7Z2us18/f9FvDx8byuaUVCDln1dcec/cmXvP9p7zzGpAeHDG1M/Mm3Vec0PacRBAZ8zgHBgqqeKWNZg1B3K5YcvMSUUEgmGQ84iu1eh6TNcb/D7OORDlpFRA7uAMBDCEODOa6Hj8ufPbmt+984aMu8kCgCIK6xoivnS8c83JM7/ete/GGVNXrbgi60gEsKWqDfheOHLytpdevXLyhBdXXGEptX371ontEyLhqFQSx5hmLB+tTZ4prkVJi+oTHMmDTJGqAqmij80kE4h428ypv73uso+vffPuv77x7A1XGJxnHSegab2p9OlE8u6ZHf952dI1Z7ol0X1TJ107acL1UyaCkk8dOQ6klrW1PHHo+BO7D948c9oT117KGBOIABDPmRzRx3lHLDIDImUpL/cxAymijHSkbSOCQDaUyeqcR/2GLVXGsafV1Xx20dxfbN39txNnVnRMGs2ZiEhAScu2HOfBdRsSmcyD82b+eNkSWxEROUS1fuPFIydue/n1Ja1Nz1x7KXK2c+f2uvraaCTmOLY7ea3S23t5z+hpmfGgcTx79sxYtR0bfnuI8liBYR3pMCbCkVjUr/9y54F/Xrfhmmntz1y/PKjrScsKG/pQJisY92ti6h+fm1UTXX/vrcrMZR1p2vbcZ15CguP335YB9R/v7hg2rT9ee1nCND/5+saOaPRbFy5ywUDKtAyRJ2sGhVAEjlKWlIoo58iArhFA2NB/u+fg19ZvmdNUv/aWa5ChVOQXoms0Mf/pF2bX12284/qslGFd4wA5KS2lDgzFo5o2qy6WldJyJAHU+Iw/HTx2/9o3l7Q2vXjD8lgwuGX7Nk1jUyZPdaVMXkl6ckdQPrFn7PhtMTb/gZW0a8/uPlC52QIBCS5sx07ERwBi/7Rojs7Yx19Zf/Xzr6xccUV7JDSUMyOGwRjajiRFScuWpjmSM+sD/pVHTvSOJoGx+c+89IVzZn/7wsURXQegvnRm5akzYJ1Y1tpwQ8fkoXRm2fN/mx2LvHDz1YcGhz/71uaEVAiUdWRvNjeSyb1127VLWhsZ0c7BkRHH2djd8+V3tj565cXxnJmx7am1sY/PnfmzrbteOn7qrnmz3j115kfb9nx28dxlE1rPbaongFHLVqQEYxFN+/G2vV98a9PyyROevfbSSDD43s4dCGry5Gl2PvQdw16kUqBfkD8Wqd7g6eFgVbbg9ib/6X12ISsFDLqmS2WPjozEs+bHzpn13M1X7xwcXvrsmk3dfXUBvyllzpGaEKtXXPmJWR22UjpjoOh3B4/F/L4fXHReyND/Ze2br53uZowxxGOjSQ4Auvad7XuBqC+dPTY0YmiCcc4Az2SypnT2xRP746MXNtV9cNbUiK67BfSudKYhFLx0Quuvdux76sCxmN+niCwpPzN/VjAQ+O7OfQ+uef3iZ1avOtF5Mp5CgKRlZ23H5WkIgk+/tvGLr2+8d870F29YHgkGt+3a6ZjZjo7pju24OwuPkRV6pzbimOlq6AGgonx0I42zOxaV84UrGZFKKV3TLcuKDw2qmto7Zk59J+i/a+1bFz235jdXXPLx+TMzjpO17HOb6pe0NIxadtjQ3zrdveH0mQWtzZ+aM+MrSxbt6+1vCQVTlh3x6QeH41LK85oatnT1rD3eGdI1ZllLG+tBqZZQcM+9N/sNY8ULr2zsG3j+2suFz8iapimVBtiZTDUFAy9cf8XiZ1783IbNixtqOmpjo6Y1o77mI3Nn/GLLzj2DI59aOOehBXOmRCMpy+aIiqjW7zsyOPKh197efKbn3y4+7xtLFtjI3tux3bayM2fNLib1izFR9U3JaMz+cN7WxwKbtGzmIFSOWKqqzpWRPREZho5II0ODg6n00rbmTXetuGpi6yf+9uaH123IWHaN3xi1rJGchQCOUpzhZRPbdvcPxX7z9If/+qZDEBBCkgKCAyOjQPD9JYsawsFvb9uzsbtXMTanNuZy9SwiUgoRclL25cxUzjSlEogpyx617IFc7gsbt/ZZ9nA68+m3NoMinXPTcf5p/oyHLlh48N6bH73i4snRSMZxpFI65zW6/uT+owueeXn3UPzPN17xnYsWZxRteW+LY5uzZs2WjkSP1oK312LcjZxKbeeFIVCAAPzhhx+uvgdA+QsEFflDKM5uKAIZIuBcAKlUMmUjqw+H7p8+mQnxs537nz52akYkvLChljFmK+VINTUW/eCcjstamkylntp78OBo8mPzZppS6gA/3LV/yLL/9/ILLUc+dfDYrtFRENrXFs2LGLpDigj8mnj+2On9I6NfOGd2SNfcuGY4l/u/+w73Z3OdydRtU9un1EReOXC037Jv7ZiUsp1an++mjvawridMy5SSM6zxGd2J1Kfe2PTdjVuXtjW/dMPly6e09yaSW7ds8vuN6dNnegtUHgUbu8N7RVIUq81EL+szLJuLVxYRFntEsPr+WcV1oIiEpiGykcEByzRrYrFvXbh4eVvTP63fctOqtffNm/ntJYs66mJZ2x41LY6wvL31yikTHlowmzNmSaVzNpDNbuoZmF0bNTj76OyOX+0/0mvmZkcjLQG/KSVSvmMtpAkG5GISIuIIcdMaSKVvnjpp5fXLhcYHkhmh1MLGupzjMABHqaFszsXgNYaRsayf7dj/1c07c7bz3UuXfGHhLL8/cKTzzP69u9rbJ7a1TbRtuwpvoNCgX9gMurhTSPk+A6UsI1a2VhRK5FSRPqex++qN3bLZ05HnGjMueCgcTCbjZi5r1TVc3t62+c4bfrLrwDe37fnT8dNfXzTvX86Z1RIJ5mxnOGciwOLmBkWUsx1NMAD44PQpkyIhS9HEaPhTc6Z/842N7RNaoz5jxDS5m69BtJVyktmUZTMERSQY68tkDakubG4QQvSnMz5N/HnFFRxx1LQVkQIQyCKGZjnyuSMnv7F196HegSunTfrB0oXntjYnbWfLjh093Wdmz5kdi9ValsXed9/mQtN5weRWDrQrdq2XngF2d3dWFp+8U2FLOJHG39BvvOIKpNMZ07JrautqYrEgZ/sHhr69dc+zh48HA/6Hzpn9kVkdU2MRBZS0bEcpjogIHFlIEznHyUmlMUyY9o+27V3QVH/PrKnpgvsKaNozh45v6+l/+Lz5DUG/JZVgbDRnjubMplCA5/M9JAkUkRvyBDSRMs2/nur+/s79O7t6pjbWf/f8c+6cPlkzjBNnz+7fvUvXxaw5cwUXUsqqUi4itpJgYExM4a2ElaqIBCVBk3fzpqo7UI+3qyGNu1sDATK0TDORSOqGr66+sTYUEETvdPd9f+e+Ncc7QRf3d0z+yMyOpc31IZ/uSMo6jq2UVMQZusrLEcKGYTtO2pHF0UyKKMCFLnjSsmS+sYsEMs7Qkkoq5d62IXhQCCI6EU+sPN75q4NHTwwMT6yr+cqC2Q/MnBKLRIYSyb17dvX39nRMn97a2mY5NhAUkFyV/TtK/bljdpn27pladS8c7OrqxHE2lXz/TRLLymveCa04Fu5QIpHMZrORaE1dfX1twE9Sbuvtf/TAsSePnrKyuUl1NXdMnXjz5AkL6mpjPh0QTSktKR1F0h01i1ix9bdSShFwhuSp7yGixpjBucGZUqorldnQ3ffn46fWdHaDZS9qafrM3Om3TZ1UGw2PpjOHjxw5cexwTU1s5qzZum7Yjl3Y4g3fN3KoUoIugwlV27kIsMur0aWC5v+7jZQ9kVFZXFlMdjNEyzJHRuK249TU1tfV19UGAgjUOZJYc7r7qaMnN/b0gyMbo5HLWxqvmtB8bkPtpHAwZuicc9fdSaVkvmKbZzi7LVAcQbB8R4AtVTxnHR9Nvts3sPbM2bfO9jvZXDQSunPyhA90TL6wtdEXCCQymSPHjp08ftTnM6ZPnxGL1Vi2lR8m5o1+sZxDVFlurdBbt0GymgsrJDuwq6tzzHOjyhJ2WV9t5XwPGrNBapWOuoLPyGQzIyNx6ahITU19fX1NKGwI7ljWkZHRN7p713Se3dg3mExnASEaDMyMhufWRGfVRCeFg01+X0TTgkJozO0gIUWQtp1Ry+7PZk8kUgfjif0jiUPxRCqdAYTWaPjqtuabJrVd3NzQHI0AY/3x+ImTJ8+cPqlrYtq0jvrGRulIKWV+jLrXzYwtj73vVwmBVPFTkCfNdXV1juWDjbe9VkXuFbHafs6VdKgSpZuUO9KGstnMyEg8m8v5/cHa+obampqo3y84I9vuz2SPjCS2DQ5tHRjeOzx6MplKm1a+PRYR3NG5xU27pXJZcSB4yGd0hEPza6MXNNSe11A7qzYWCwaA8WQme7avr+tM58jwYDAQaJ80qbauTkklpZNPxZXR88fZbGy8je9LswrH2ySrkKsoaHS5jSZvId/Tp+15gG6GhbDqVjk4NrykMVGqZVnxeDyRSCiCYDAUq62LRaPRYNCva64ZNi0rnjP7s2ZvJtufzQ2Zdtyyco7jRigGZ1FNq/MZTT5fS9Df6PfV+A1N1wC5lDKeTg8MDfX19g4PDTKE+vq65paWQDBYEHGBzUxISPj3o99x9e39m2xLLCKPRpchPMLynU8L85WoYmBD5fCrqgUH9I5fIE9OGRGVcjKZTDw+mkqlpFSabgRDoXA4EgqFgoFAwDAMTbiWetwvRbaUGdNMZbOJRCIej4/GR7LZrGAYjUYaGhsjkShjzHEcRYqVSF9l9njM1XuvGaspEI4jd6gKdrGr63T150KlsLvo0z2DW0oHo/ffxLnAKanalVScDYqISqpsLptKplKpVCaTsSwLAITQdN3QDMMwDE3TOeeMM5clQlLZjmWappkzTcu0TZNIaZoWDAai0WgkGg34A4wxKV1DXCzwYYkr8345nQqA7B0qgmNZJFDdtJMX3p2ujoLfF9VUtipV5TcCVToMKhuXW8anLPzZ1TippGPbpmnmcrlcNmdapm07LnvJ3fMbGeOMc45CaLqh+wyfz2f4fD5N0xljSil3gwMcS8Ev8mrfb6ve94e272ePx3slbzrKcHhRUfHvy/T9LJkXK3on/3msxzilyMImMIVBvFi+d3Nx5Rd1TRXpYuD5YEXea8yyLnGa8rOQsTpqxvFUHsaAPsBqGA7zSSWP9nqNQyl/QeM8rrFeocR7o9LwHvQgk+KZSwY+H82iB7OWbLnLB/t7Tzm/e1OxWRvLD+UlylZ0eINnuoRHxIjll41jF3pV3lSV2R5YPq+jYPTJE4oDVq0CVG4lB5XPCTxD54rmvojOMc8CdX/Aqvi+EDmVmIo4ZpsTzKfBvVuBlVgsWJo7ljddiOVzUopUZawsS4/JUWKZl6Qqu2GN00lf+qTwDP0tZUehSvqfoNIjVwI2byTqpcpVjPr1Ti4pP75n7wwsIv2CNo7Ln6SKdABWoh4qEnwrU2dYEZ95KtnkLXGXxV/e3mUqTLPP61OBiORBCHkDxwjLctaEVZNKY9yadzIFVgbcY0rqWLVVlMpnZFWZRItlN1u01oVYrhRtYKVSYTlhiCoutVpCrMrWSpXWqTiAgkqvlLHeC9s0UIXrJRLegQnVMnUVSu6ORkSv6lE5j7pIES7FNYhlufDigybvPEsPF61s/ZCnC4dg7OOtGEVS2o4bsZiEwMp3UYnQRZ5zY3khpQoQqXgeWOXxVrEh+Z3tsCJtUpnAqh7qVPtz2W45VIoJK3Z5oaLzKkv0FTYWy+Pq0lRLb2tJWXa9vNTs2YSi2jRRGGd8s4eVTIhlXogQ/n/5IiBWKayyM+CYFV8J+qBarF3OW8DSmNG8V8TixBGPn6HSzCIqLiUs1YwrNnQuTcCszPyMxVmVyS3vnKXSUG3PlLbCGHcsmz9U0Vc8Tt1pHE/iGQhQ8fxLXTSI1XoFqt9ApTHGMf8rH7pa2rwDS4P7KtYsopdFUnXtVjrT8e/Ye48F4Fpp54u/VQPWCBVDDN4vOVL6/P8DQbXKZzHD5j8AAAAASUVORK5CYII=";
 
-      <div class="card">
-        <label>Full Name</label>
-        <input id="cName" placeholder="Your name">
-        <label>WhatsApp Number</label>
-        <input id="cWhatsapp" placeholder="+1 784 ...">
-        <label>Email (optional)</label>
-        <input id="cEmail" type="email" placeholder="you@example.com">
-        <label>Delivery Location</label>
-        <input id="cLocation" placeholder="Beach, hotel, or yacht name">
-      </div>
-
-      <div class="card">
-        <label style="margin-top:0">Select Gear</label>
-        <div class="gear-grid" id="gearGrid"></div>
-      </div>
-
-      <div class="card">
-        <label style="margin-top:0">Date</label>
-        <input id="cDate" type="date">
-        <label>Start Time</label>
-        <input id="cStart" type="time">
-        <label>Duration</label>
-        <select id="cDuration">
-          <option value="hour">Per Hour</option>
-          <option value="half" selected>Half Day</option>
-          <option value="full">Full Day</option>
-        </select>
-        <label>Payment Method</label>
-        <select id="cPayment">
-          <option>Cash on Delivery</option>
-          <option>Bank Transfer</option>
-          <option>Other (confirm via WhatsApp)</option>
-        </select>
-      </div>
-
-      <div class="total-bar">
-        <div><div class="label">Estimated Total</div></div>
-        <div class="amt" id="totalAmt">$0 XCD</div>
-      </div>
-
-      <button class="btn" id="toWaiverBtn">Continue to Waiver →</button>
-    </div>
-
-    <div id="bookStep2" style="display:none">
-      <h1 class="page-title">Safety Waiver</h1>
-      <div class="page-sub">Required before any gear leaves our hands.</div>
-      <div class="card">
-        <label style="margin-top:0">Photo ID</label>
-        <div class="page-sub" style="margin-bottom:8px">Required before gear leaves our hands — driver's license, passport, or national ID.</div>
-        <input type="file" id="idPhoto" accept="image/*" capture="environment">
-        <div id="idPreviewWrap" style="display:none;margin-top:10px">
-          <img id="idPreview" style="width:100%;border-radius:10px;border:1px solid var(--border)">
-        </div>
-      </div>
-      <div class="card">
-        <div class="waiver-text">
-          I confirm I am participating in water recreation activities voluntarily and accept all associated risks. I release Aquatic Paradise Rentals, its staff, and agents from liability for injury, loss, or damage arising from my use of rental equipment, except where caused by gross negligence. I am responsible for damage to equipment beyond normal wear. I agree to return all equipment on time and in the condition received. I confirm I am 18+ (or have parental consent) and in good physical health to participate. I consent to a pre-rental safety briefing and PFD fitting.
-        </div>
-        <div class="check-row">
-          <input type="checkbox" id="agreeWaiver">
-          <span>I have read and agree to the terms above.</span>
-        </div>
-        <label>Signature</label>
-        <div class="sig-wrap">
-          <canvas id="sigpad"></canvas>
-          <div class="sig-actions"><button type="button" id="clearSig">Clear</button></div>
-        </div>
-      </div>
-      <div class="btn-row">
-        <button class="btn secondary" id="backToBook">← Back</button>
-        <button class="btn" id="submitBookingBtn">Submit Booking</button>
-      </div>
-    </div>
-
-    <div id="bookSuccess" class="success" style="display:none">
-      <div class="emoji">🏝️</div>
-      <h2>Booking Sent!</h2>
-      <p>We'll WhatsApp you shortly to confirm delivery time.</p>
-      <div class="booking-id" id="successId"></div>
-      <button class="btn" style="margin-top:24px" id="newBookingBtn">New Booking</button>
-    </div>
-  </div>
-
-  <!-- ══════════ ADMIN VIEW ══════════ -->
-  <div class="view hidden" id="view-admin">
-    <h1 class="page-title">Operations</h1>
-    <div class="page-sub">Live bookings, waivers, dispatch.</div>
-
-    <div id="configBanner" class="config-banner" style="display:none">
-      ⚠️ Backend not connected yet. Open this file and set <b>CONFIG.API_URL</b> to your deployed Apps Script Web App URL (see Code.gs instructions).
-    </div>
-
-    <div class="stat-row">
-      <div class="stat"><div class="n" id="statToday">0</div><div class="l">Today</div></div>
-      <div class="stat"><div class="n" id="statPending">0</div><div class="l">Unsigned</div></div>
-      <div class="stat"><div class="n" id="statRevenue">$0</div><div class="l">Rev (XCD)</div></div>
-    </div>
-
-    <div class="refresh-row">
-      <span style="font-size:11px;color:var(--muted)" id="lastSync">—</span>
-      <button class="refresh-btn" id="refreshBtn">↻ Refresh</button>
-    </div>
-
-    <div id="bookingsList"></div>
-  </div>
-</div>
-
-<div class="toast" id="toast"></div>
-
-<script>
-/* ════════════════════════════════════════════════════
-   CONFIG — paste your Apps Script Web App URL here
-   (Deploy Code.gs as a Web App, "Anyone" access)
-   ════════════════════════════════════════════════════ */
-const CONFIG = {
-  API_URL: 'https://script.google.com/macros/s/AKfycbxkWt66_EoH5gPs9XJIxOJZ6KYwhXEURYNNaeqQdSUrzte1dfGT3rUPqbYNcW6To_767Q/exec',
-  DRIVERS: ['Brandon','Steve','Jeff','Mick','Jago']
+/* ═══════════════════════════════════════════
+   CONFIG
+═══════════════════════════════════════════ */
+const BIZ={
+  name:"Aquatic Paradise Rentals",
+  tagline:"Bequia · St. Vincent & the Grenadines",
+  whatsapp:"17844963447",
+  currency:"XCD",
+  instagram:"@AquaticParadiseIsuprentals",
+  email:"aquaticparadiserentals@gmail.com",
 };
 
-const GEAR = [
-  { id:'PB', name:'Paddle Board', hour:35, half:80, full:140 },
-  { id:'KY1', name:'Single Kayak', hour:30, half:70, full:120 },
-  { id:'KY2', name:'Double Kayak', hour:45, half:95, full:160 },
-  { id:'SN', name:'Snorkel Set', hour:20, half:40, full:65 },
-  { id:'FL', name:'Floater', hour:10, half:18, full:30 },
-  { id:'GG', name:'GoPro Camera', hour:40, half:80, full:130 },
-  { id:'BS', name:'Beach Setup', hour:0, half:100, full:200 },
-  { id:'EXP', name:'Explorer Duo', hour:0, half:280, full:280 },
-  { id:'FAM', name:'Family Wave', hour:0, half:380, full:380 }
+/* ═══════════════════════════════════════════
+   AUTH — role-based access
+   Boss: full access + staff management
+   Staff: booking + check-in only
+═══════════════════════════════════════════ */
+const DEFAULT_USERS=[
+  {id:"boss",name:"Delroy (Boss)",role:"boss",pin:"1234",whatsapp:"17844963447",active:true},
+  {id:"staff1",name:"Staff Member",role:"staff",pin:"0000",whatsapp:"",active:true},
 ];
 
-let selectedGear = new Set();
-let bookings = [];
-let lastBookingPayload = null;
+/* ═══════════════════════════════════════════
+   REAL INVENTORY from stock-take
+═══════════════════════════════════════════ */
+const INIT_EQUIP=[
+  {id:1,code:"PB",name:"Inflatable Paddle Board",cat:"Boards",total:8,booked:0,rate:35,unit:"hr",condition:"Excellent"},
+  {id:2,code:"KY1",name:"Single Kayak",cat:"Boards",total:4,booked:0,rate:30,unit:"hr",condition:"Excellent"},
+  {id:3,code:"KY2",name:"Double Kayak",cat:"Boards",total:2,booked:0,rate:45,unit:"hr",condition:"Excellent"},
+  {id:4,code:"SN",name:"Snorkel Mask & Tube Set",cat:"Snorkel Gear",total:9,booked:0,rate:20,unit:"hr",condition:"Excellent — 1 tube missing"},
+  {id:5,code:"FIN",name:"Snorkeling Fins",cat:"Snorkel Gear",total:15,booked:0,rate:10,unit:"hr",condition:"Excellent"},
+  {id:6,code:"FL-G",name:"Floater Large (Green)",cat:"Floats",total:4,booked:0,rate:10,unit:"hr",condition:"Excellent"},
+  {id:7,code:"FL-W",name:"Floater Large (White)",cat:"Floats",total:4,booked:0,rate:10,unit:"hr",condition:"Excellent"},
+  {id:8,code:"LGFLT",name:"Lounge Floater",cat:"Floats",total:4,booked:0,rate:15,unit:"hr",condition:"Excellent"},
+  {id:9,code:"KFL",name:"Kayak Floater",cat:"Floats",total:2,booked:0,rate:8,unit:"hr",condition:"Excellent"},
+  {id:10,code:"KDF",name:"Kids Floats",cat:"Floats",total:6,booked:0,rate:0,unit:"hr",condition:"Excellent"},
+  {id:11,code:"LJ",name:"Life Jacket (Adult)",cat:"Safety",total:8,booked:0,rate:0,unit:"hr",condition:"Excellent"},
+  {id:12,code:"BUY",name:"Floating Buoy",cat:"Safety",total:7,booked:0,rate:0,unit:"hr",condition:"Excellent"},
+  {id:13,code:"GPC",name:"Waterproof Phone Case",cat:"Accessories",total:5,booked:0,rate:10,unit:"hr",condition:"Excellent"},
+  {id:14,code:"HMK",name:"Hammock",cat:"Accessories",total:1,booked:0,rate:15,unit:"hr",condition:"Excellent"},
+  {id:15,code:"CLR",name:"Cooler",cat:"Accessories",total:3,booked:0,rate:10,unit:"hr",condition:"Excellent"},
+];
 
-/* ── ROUTING ── */
-function setView(name){
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.view===name));
-  document.getElementById('view-book').classList.toggle('hidden', name!=='book');
-  document.getElementById('view-admin').classList.toggle('hidden', name!=='admin');
-  if(name==='admin') loadBookings();
-  location.hash = name;
+const INIT_PAYMENTS=[
+  {id:"cash",label:"Cash (XCD)",icon:"💵",active:true},
+  {id:"card",label:"Credit / Debit Card",icon:"💳",active:true},
+  {id:"wipay",label:"WiPay Caribbean",icon:"📱",active:true},
+  {id:"transfer",label:"Bank Transfer",icon:"🏦",active:true},
+];
+
+const WAIVER=`RENTAL WAIVER & LIABILITY AGREEMENT — ${BIZ.name}
+
+By signing below, I acknowledge and agree:
+
+1. ASSUMPTION OF RISK — I voluntarily assume all risks including personal injury, property damage, and drowning.
+2. RELEASE — I release ${BIZ.name}, its owners and staff from all claims arising from equipment use except gross negligence.
+3. EQUIPMENT — I received equipment in good condition and will return it the same. I accept full financial liability for damage, loss, or theft.
+4. AGE & HEALTH — I am 18+ (or have guardian consent) and in good physical health.
+5. SAFETY — I will follow all safety instructions and wear required safety equipment at all times.
+6. PAYMENT — All fees are due before equipment is released. Late returns incur additional charges.
+7. GOVERNING LAW — St. Vincent & the Grenadines.
+
+I have read, understood, and accept this waiver in full.`;
+
+const SLOTS=["06:00","07:00","08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00"];
+
+function todayStr(){return new Date().toISOString().split("T")[0];}
+function uid(){return Math.random().toString(36).slice(2,8).toUpperCase();}
+function fmt(n){return n===0?"FREE":`${BIZ.currency} $${Number(n).toFixed(2)}`;}
+function fmtDate(d){
+  try{return new Date(d+"T12:00").toLocaleDateString("en-VC",{weekday:"short",day:"2-digit",month:"short",year:"numeric"});}
+  catch{return d;}
 }
-document.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click', ()=>setView(b.dataset.view)));
-window.addEventListener('hashchange', ()=>setView(location.hash.slice(1)||'book'));
-
-/* ── GEAR GRID ── */
-function renderGear(){
-  const grid = document.getElementById('gearGrid');
-  grid.innerHTML = GEAR.map(g=>`
-    <label class="gear-opt" data-id="${g.id}">
-      <input type="checkbox" value="${g.id}">
-      <span class="name">${g.name}</span>
-      <span class="price">$${g.half}/half · $${g.full}/full</span>
-    </label>`).join('');
-  grid.querySelectorAll('.gear-opt').forEach(opt=>{
-    opt.addEventListener('click', e=>{
-      e.preventDefault();
-      const id = opt.dataset.id;
-      if(selectedGear.has(id)) selectedGear.delete(id); else selectedGear.add(id);
-      opt.classList.toggle('sel', selectedGear.has(id));
-      updateTotal();
-    });
-  });
+function addHours(time,h){
+  const[hr,mn]=time.split(":").map(Number);
+  const total=hr+h;
+  return `${String(total%24).padStart(2,"0")}:${String(mn).padStart(2,"0")}`;
 }
-function updateTotal(){
-  const dur = document.getElementById('cDuration').value;
-  let total = 0;
-  selectedGear.forEach(id=>{
-    const g = GEAR.find(x=>x.id===id);
-    total += g[dur] || g.half;
-  });
-  document.getElementById('totalAmt').textContent = `$${total} XCD`;
+function cleanPhone(p){return p.replace(/[^0-9]/g,"");}
+function nowTime(){return new Date().toLocaleTimeString("en-VC",{hour:"2-digit",minute:"2-digit"});}
+
+/* ═══════════════════════════════════════════
+   LOCAL STORAGE HELPERS
+═══════════════════════════════════════════ */
+function ls(key,def){
+  try{const v=localStorage.getItem(key);return v?JSON.parse(v):def;}
+  catch{return def;}
 }
-document.getElementById('cDuration').addEventListener('change', updateTotal);
+function lsSet(key,val){try{localStorage.setItem(key,JSON.stringify(val));}catch{}}
 
-document.getElementById('idPhoto').addEventListener('change', e=>{
-  const file = e.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = ev=>{
-    document.getElementById('idPreview').src = ev.target.result;
-    document.getElementById('idPreviewWrap').style.display = 'block';
-  };
-  reader.readAsDataURL(file);
-});
-
-/* ── SIGNATURE PAD ── */
-let sigCtx, drawing=false, sigHasContent=false;
-function initSigPad(){
-  const canvas = document.getElementById('sigpad');
-  const ratio = window.devicePixelRatio || 1;
-  canvas.width = canvas.offsetWidth*ratio;
-  canvas.height = canvas.offsetHeight*ratio;
-  sigCtx = canvas.getContext('2d');
-  sigCtx.scale(ratio,ratio);
-  sigCtx.strokeStyle = '#0B1E2D';
-  sigCtx.lineWidth = 2.2;
-  sigCtx.lineCap = 'round';
-  const pos = e=>{
-    const r = canvas.getBoundingClientRect();
-    const t = e.touches ? e.touches[0] : e;
-    return { x: t.clientX-r.left, y: t.clientY-r.top };
-  };
-  const start = e=>{ drawing=true; sigHasContent=true; const p=pos(e); sigCtx.beginPath(); sigCtx.moveTo(p.x,p.y); e.preventDefault(); };
-  const move = e=>{ if(!drawing) return; const p=pos(e); sigCtx.lineTo(p.x,p.y); sigCtx.stroke(); e.preventDefault(); };
-  const end = ()=>{ drawing=false; };
-  canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
-  canvas.addEventListener('touchstart', start, {passive:false}); canvas.addEventListener('touchmove', move, {passive:false}); canvas.addEventListener('touchend', end);
-  document.getElementById('clearSig').addEventListener('click', ()=>{
-    sigCtx.clearRect(0,0,canvas.width,canvas.height); sigHasContent=false;
-  });
-}
-
-/* ── STEP NAV ── */
-document.getElementById('toWaiverBtn').addEventListener('click', ()=>{
-  if(!document.getElementById('cName').value || !document.getElementById('cWhatsapp').value){
-    showToast('Name and WhatsApp are required'); return;
-  }
-  if(selectedGear.size===0){ showToast('Select at least one item'); return; }
-  document.getElementById('bookStep1').style.display='none';
-  document.getElementById('bookStep2').style.display='block';
-  if(!sigCtx) initSigPad();
-});
-document.getElementById('backToBook').addEventListener('click', ()=>{
-  document.getElementById('bookStep2').style.display='none';
-  document.getElementById('bookStep1').style.display='block';
-});
-
-/* ── SUBMIT ── */
-document.getElementById('submitBookingBtn').addEventListener('click', async ()=>{
-  if(!document.getElementById('idPhoto').files[0]){ showToast('Photo ID is required'); return; }
-  if(!document.getElementById('agreeWaiver').checked){ showToast('Please agree to the waiver'); return; }
-  if(!sigHasContent){ showToast('Signature required'); return; }
-
-  const gearNames = [...selectedGear].map(id=>GEAR.find(g=>g.id===id).name).join(', ');
-  const dur = document.getElementById('cDuration').value;
-  const total = parseFloat(document.getElementById('totalAmt').textContent.replace(/[^0-9.]/g,''));
-
-  const payload = {
-    action: 'create',
-    customerName: document.getElementById('cName').value,
-    whatsapp: document.getElementById('cWhatsapp').value,
-    email: document.getElementById('cEmail').value,
-    location: document.getElementById('cLocation').value,
-    gear: gearNames,
-    date: document.getElementById('cDate').value,
-    startTime: document.getElementById('cStart').value,
-    endTime: '',
-    paymentMethod: document.getElementById('cPayment').value,
-    priceXCD: total
-  };
-
-  const btn = document.getElementById('submitBookingBtn');
-  btn.textContent = 'Submitting…'; btn.disabled = true;
-
-  let bookingId = 'LOCAL-' + Date.now();
-  let serverOk = false;
-  try {
-    if(CONFIG.API_URL){
-      const res = await fetch(CONFIG.API_URL, { method:'POST', body: JSON.stringify(payload) });
-      const json = await res.json();
-      if(json.ok){ bookingId = json.bookingId; serverOk = true; }
-    }
-  } catch(err){ console.warn('Create failed, saving locally', err); }
-
-  // Only queue locally if the server save didn't happen (offline, not configured, or failed) —
-  // otherwise this booking would show twice in the admin list (once live, once "queued").
-  if(!serverOk) saveLocalQueue('bookings', payload);
-
-  // Capture waiver: timestamp, device, best-effort IP, signature
-  const signature = document.getElementById('sigpad').toDataURL('image/png');
-  let ip = 'unavailable';
-  try {
-    const ipRes = await fetch('https://api.ipify.org?format=json');
-    const ipJson = await ipRes.json();
-    ip = ipJson.ip;
-  } catch(e){ /* offline or blocked — timestamp + signature still stand as proof */ }
-
-  const waiverPayload = {
-    action: 'sign_waiver',
-    bookingId,
-    timestamp: new Date().toISOString(),
-    ip,
-    device: navigator.userAgent,
-    signature,
-    idPhoto: document.getElementById('idPreview').src || ''
-  };
-  let waiverOk = false;
-  try {
-    if(CONFIG.API_URL){
-      const wres = await fetch(CONFIG.API_URL, { method:'POST', body: JSON.stringify(waiverPayload) });
-      const wjson = await wres.json();
-      waiverOk = !!wjson.ok;
-    }
-  } catch(err){ console.warn('Waiver sync failed', err); }
-  if(!waiverOk) saveLocalQueue('waivers', waiverPayload);
-
-  document.getElementById('bookStep2').style.display='none';
-  document.getElementById('bookSuccess').style.display='block';
-  document.getElementById('successId').textContent = bookingId;
-  btn.textContent = 'Submit Booking'; btn.disabled = false;
-});
-
-document.getElementById('newBookingBtn').addEventListener('click', ()=>{
-  document.getElementById('bookSuccess').style.display='none';
-  document.getElementById('bookStep1').style.display='block';
-  selectedGear.clear();
-  document.querySelectorAll('.gear-opt').forEach(o=>o.classList.remove('sel'));
-  ['cName','cWhatsapp','cEmail','cLocation','cDate','cStart'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('agreeWaiver').checked = false;
-  document.getElementById('idPhoto').value = '';
-  document.getElementById('idPreviewWrap').style.display = 'none';
-  if(sigCtx) sigCtx.clearRect(0,0,9999,9999);
-  sigHasContent = false;
-  updateTotal();
-});
-
-/* ── LOCAL OFFLINE QUEUE (fallback if API_URL not set / offline) ── */
-function saveLocalQueue(key, item){
-  const list = JSON.parse(localStorage.getItem('apr_'+key) || '[]');
-  list.push({ ...item, _queuedAt: new Date().toISOString() });
-  localStorage.setItem('apr_'+key, JSON.stringify(list));
+/* ═══════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════ */
+function Toasts({toasts,dismiss}){
+  return(<div style={{position:"fixed",top:16,right:16,zIndex:9999,display:"flex",flexDirection:"column",gap:8,maxWidth:300}}>
+    {toasts.map(t=>(
+      <div key={t.id} onClick={()=>dismiss(t.id)} style={{
+        background:t.type==="error"?"#E0351B":t.type==="warn"?"#FBC62C":"#1B8A4C",
+        color:"#fff",padding:"12px 16px",borderRadius:12,cursor:"pointer",
+        fontSize:13,fontFamily:"var(--sans)",fontWeight:500,
+        boxShadow:"0 4px 20px rgba(0,0,0,.25)",animation:"slideIn .25s ease",
+        display:"flex",gap:10,alignItems:"center",
+      }}>
+        <span>{t.type==="error"?"❌":t.type==="warn"?"⚠️":"✅"}</span>
+        <span>{t.msg}</span>
+      </div>
+    ))}
+  </div>);
 }
 
-/* ── ADMIN: LOAD + RENDER ── */
-async function loadBookings(){
-  document.getElementById('configBanner').style.display = CONFIG.API_URL ? 'none' : 'block';
-  const list = document.getElementById('bookingsList');
-  list.innerHTML = '<div class="empty">Loading…</div>';
-
-  let serverBookings = [];
-  try {
-    if(CONFIG.API_URL){
-      const res = await fetch(CONFIG.API_URL);
-      const json = await res.json();
-      if(json.ok) serverBookings = json.bookings;
-    }
-  } catch(err){ console.warn('Load failed', err); }
-
-  const localQueued = JSON.parse(localStorage.getItem('apr_bookings') || '[]')
-    .map(b=>({ ...b, BookingID: 'QUEUED', CustomerName:b.customerName, WhatsApp:b.whatsapp, Gear:b.gear,
-      Date:b.date, StartTime:b.startTime, Location:b.location, PriceXCD:b.priceXCD,
-      Status:'Queued (offline)', WaiverSigned:false }));
-
-  bookings = [...serverBookings.reverse(), ...localQueued];
-  document.getElementById('lastSync').textContent = 'Synced ' + new Date().toLocaleTimeString();
-  renderBookings();
-}
-
-function renderBookings(){
-  const list = document.getElementById('bookingsList');
-  if(bookings.length===0){ list.innerHTML = '<div class="empty">No bookings yet.</div>'; updateStats(); return; }
-
-  list.innerHTML = bookings.map(b=>`
-    <div class="booking-card">
-      <div class="bk-top">
-        <div>
-          <div class="bk-name">${b.CustomerName||'—'}</div>
-          <div class="bk-id">${b.BookingID||''}</div>
+/* ═══════════════════════════════════════════
+   MODAL
+═══════════════════════════════════════════ */
+function Modal({title,children,onClose,wide}){
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(11,30,45,.75)",zIndex:8888,
+      display:"flex",alignItems:"center",justifyContent:"center",padding:16}}
+      onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{
+        background:"#fff",borderRadius:20,padding:28,width:"100%",
+        maxWidth:wide?820:520,maxHeight:"92vh",overflowY:"auto",
+        boxShadow:"0 24px 60px rgba(0,0,0,.4)",fontFamily:"var(--sans)",
+        animation:"fadeIn .25s ease",
+      }}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <h2 style={{fontFamily:"var(--serif)",fontSize:20,color:"var(--navy)",fontWeight:600}}>{title}</h2>
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:22,
+            color:"var(--muted)",lineHeight:1,padding:"0 4px"}}>×</button>
         </div>
-        <span class="badge ${b.Status||'Requested'}">${b.Status||'Requested'}</span>
+        {children}
       </div>
-      <div class="bk-meta">
-        <b>Gear:</b> ${b.Gear||'—'}<br>
-        <b>Date:</b> ${b.Date||'—'} ${b.StartTime||''}<br>
-        <b>Location:</b> ${b.Location||'—'}<br>
-        <b>Price:</b> $${b.PriceXCD||0} XCD &nbsp;·&nbsp; <b>WhatsApp:</b> ${b.WhatsApp||'—'}
-      </div>
-      <div class="waiver-flag ${b.WaiverSigned ? 'signed':'unsigned'}">
-        ${b.WaiverSigned ? '✓ Waiver signed' : '⚠ Waiver not signed'}
-      </div>
-      ${b.BookingID && b.BookingID!=='QUEUED' ? `
-      <div class="bk-actions">
-        <select onchange="updateBooking('${b.BookingID}','status',this.value)">
-          <option ${b.Status==='Requested'?'selected':''}>Requested</option>
-          <option ${b.Status==='Dispatched'?'selected':''}>Dispatched</option>
-          <option ${b.Status==='Completed'?'selected':''}>Completed</option>
-          <option ${b.Status==='Cancelled'?'selected':''}>Cancelled</option>
-        </select>
-        <select onchange="updateBooking('${b.BookingID}','driver',this.value)">
-          <option value="">Driver…</option>
-          ${CONFIG.DRIVERS.map(d=>`<option ${b.Driver===d?'selected':''}>${d}</option>`).join('')}
-        </select>
-      </div>` : ''}
     </div>
-  `).join('');
-  updateStats();
+  );
 }
 
-async function updateBooking(bookingId, field, value){
-  if(!CONFIG.API_URL){ showToast('Connect the backend first (see setup)'); return; }
-  const payload = { action:'update_status', bookingId };
-  payload[field] = value;
-  try {
-    await fetch(CONFIG.API_URL, { method:'POST', body: JSON.stringify(payload) });
-    showToast('Updated');
-    loadBookings();
-  } catch(err){ showToast('Update failed — check connection'); }
+/* ═══════════════════════════════════════════
+   FIELD / BTN helpers
+═══════════════════════════════════════════ */
+const LST={display:"block",fontSize:10.5,fontWeight:600,textTransform:"uppercase",
+  letterSpacing:".07em",color:"var(--muted)",marginBottom:6,marginTop:14};
+const IST={width:"100%",padding:"11px 13px",border:"1.5px solid var(--border)",
+  borderRadius:10,fontSize:15,color:"var(--text)",background:"#fdfdfb"};
+
+function Field({label,value,onChange,type="text",placeholder,required}){
+  return(<div>
+    <label style={LST}>{label}{required&&<span style={{color:"var(--coral)"}}> *</span>}</label>
+    <input type={type} value={value} placeholder={placeholder||""}
+      onChange={e=>onChange(e.target.value)}
+      style={IST} onFocus={e=>e.target.style.borderColor="var(--teal)"}
+      onBlur={e=>e.target.style.borderColor="var(--border)"}/>
+  </div>);
 }
-window.updateBooking = updateBooking;
-
-function updateStats(){
-  const today = new Date().toISOString().slice(0,10);
-  document.getElementById('statToday').textContent = bookings.filter(b=>b.Date===today).length;
-  document.getElementById('statPending').textContent = bookings.filter(b=>!b.WaiverSigned).length;
-  const rev = bookings.reduce((s,b)=>s+(parseFloat(b.PriceXCD)||0),0);
-  document.getElementById('statRevenue').textContent = '$'+rev;
+function Btn({children,onClick,secondary,danger,small,disabled,full}){
+  const bg=danger?"var(--coral)":secondary?"#fff":"var(--teal)";
+  const col=secondary?"var(--teal-d)":"#fff";
+  const bdr=secondary?"1.5px solid var(--teal)":"none";
+  return(<button onClick={onClick} disabled={disabled} style={{
+    padding:small?"9px 16px":"13px 22px",border:bdr,borderRadius:11,
+    background:disabled?"#ccc":bg,color:disabled?"#888":col,
+    fontWeight:600,fontSize:small?13:14.5,width:full?"100%":undefined,
+    opacity:disabled?.6:1,transition:"all .15s",
+  }}>{children}</button>);
 }
 
-document.getElementById('refreshBtn').addEventListener('click', loadBookings);
+/* ═══════════════════════════════════════════
+   LOGIN SCREEN
+═══════════════════════════════════════════ */
+function LoginScreen({users,onLogin}){
+  const[pin,setPin]=useState("");
+  const[err,setErr]=useState("");
+  const[sel,setSel]=useState(users.filter(u=>u.active)[0]?.id||"");
 
-/* ── TOAST ── */
-function showToast(msg){
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 2200);
+  function attempt(){
+    const user=users.find(u=>u.id===sel&&u.active);
+    if(!user){setErr("User not found.");return;}
+    if(user.pin===pin){onLogin(user);setPin("");}
+    else{setErr("Wrong PIN. Try again.");setPin("");}
+  }
+  function press(d){
+    if(d==="del")setPin(p=>p.slice(0,-1));
+    else if(pin.length<6)setPin(p=>p+d);
+    setErr("");
+  }
+
+  return(
+    <div style={{minHeight:"100vh",background:`linear-gradient(160deg,var(--navy2),var(--navy) 60%,var(--teal-d))`,
+      display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}>
+      <img src={LOGO_SRC} alt="APR Logo" style={{width:110,height:110,borderRadius:"50%",
+        border:"3px solid var(--gold)",marginBottom:20,objectFit:"cover",
+        boxShadow:"0 0 0 6px rgba(251,198,44,.2)"}}/>
+      <div style={{fontFamily:"var(--serif)",fontSize:26,fontWeight:600,color:"#fff",marginBottom:4}}>
+        Aquatic Paradise Rentals
+      </div>
+      <div style={{fontSize:12,color:"var(--gold)",textTransform:"uppercase",
+        letterSpacing:".14em",marginBottom:36}}>Staff Login</div>
+
+      <div style={{background:"rgba(255,255,255,.06)",backdropFilter:"blur(10px)",
+        borderRadius:20,padding:28,width:"100%",maxWidth:320,
+        border:"1px solid rgba(255,255,255,.1)"}}>
+
+        <label style={{...LST,color:"#B9CDD2"}}>Select Account</label>
+        <select value={sel} onChange={e=>{setSel(e.target.value);setPin("");setErr("");}}
+          style={{...IST,background:"rgba(255,255,255,.08)",color:"#fff",
+            borderColor:"rgba(255,255,255,.15)",marginBottom:20}}>
+          {users.filter(u=>u.active).map(u=>(
+            <option key={u.id} value={u.id} style={{background:"#0B1E2D"}}>{u.name}</option>
+          ))}
+        </select>
+
+        {/* PIN dots */}
+        <div style={{display:"flex",justifyContent:"center",gap:10,marginBottom:20}}>
+          {Array.from({length:6}).map((_,i)=>(
+            <div key={i} style={{width:14,height:14,borderRadius:"50%",
+              background:i<pin.length?"var(--gold)":"rgba(255,255,255,.2)",
+              transition:"background .15s"}}/>
+          ))}
+        </div>
+
+        {/* Numpad */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
+          {["1","2","3","4","5","6","7","8","9","","0","del"].map((d,i)=>(
+            <button key={i} onClick={()=>d&&press(d)} style={{
+              padding:14,borderRadius:12,border:"1px solid rgba(255,255,255,.1)",
+              background:d==="del"?"rgba(224,53,27,.3)":d?"rgba(255,255,255,.08)":"transparent",
+              color:d?"#fff":"transparent",fontSize:d==="del"?18:18,fontWeight:600,
+              cursor:d?"pointer":"default",fontFamily:"var(--sans)",
+            }}>{d==="del"?"⌫":d}</button>
+          ))}
+        </div>
+
+        {err&&<div style={{color:"#ffb3a7",fontSize:12,textAlign:"center",marginBottom:12}}>{err}</div>}
+
+        <button onClick={attempt} disabled={pin.length<4} style={{
+          width:"100%",padding:14,borderRadius:12,border:"none",
+          background:pin.length>=4?"var(--gold)":"rgba(255,255,255,.1)",
+          color:pin.length>=4?"var(--navy)":"rgba(255,255,255,.3)",
+          fontWeight:700,fontSize:15,fontFamily:"var(--sans)",transition:"all .2s",
+        }}>Enter</button>
+      </div>
+    </div>
+  );
 }
 
-/* ── INIT ── */
-renderGear();
-updateTotal();
-setView(location.hash.slice(1) || 'book');
+/* ═══════════════════════════════════════════
+   NOTIFICATION SYSTEM
+   Sends WhatsApp via wa.me link — opens in
+   browser/app. No API key needed.
+═══════════════════════════════════════════ */
+function buildBookingMsg(b,payments){
+  const pay=payments.find(p=>p.id===b.payment)?.label||b.payment;
+  return encodeURIComponent(
+`🌊 *${BIZ.name}*
+━━━━━━━━━━━━━━━━━━━
+*NEW BOOKING CONFIRMED*
+📋 ID: *${b.id}*
+👤 ${b.firstName} ${b.lastName}
+📱 ${b.phone}${b.email?"
+📧 "+b.email:""}
+🏄 ${b.equipName} × ${b.qty}
+📅 ${fmtDate(b.date)}
+🕐 ${b.startTime} → ${b.endTime}
+💰 ${fmt(b.total)} · ${pay}
+✅ Waiver signed ✅ Contract accepted
+${b.idPhotoName?"🪪 ID on file":""}
+━━━━━━━━━━━━━━━━━━━
+Thank you for choosing ${BIZ.name}! 🏝️`
+  );
+}
 
-/* ── PWA SERVICE WORKER ── */
-if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
+function notifyBoss(b,bossWhatsapp,payments){
+  const msg=buildBookingMsg(b,payments);
+  window.open(`https://wa.me/${cleanPhone(bossWhatsapp)}?text=${msg}`,"_blank");
+}
+function notifyCustomer(b,payments){
+  if(!b.phone)return;
+  const msg=buildBookingMsg(b,payments);
+  window.open(`https://wa.me/${cleanPhone(b.phone)}?text=${msg}`,"_blank");
+}
+
+/* ═══════════════════════════════════════════
+   BOOKING TAB
+═══════════════════════════════════════════ */
+function BookingTab({equipment,onBook,toast,payments,currentUser,bossWhatsapp}){
+  const blank={firstName:"",lastName:"",email:"",phone:"",
+    equipId:"",qty:1,date:todayStr(),startTime:"08:00",duration:1,
+    payment:payments[0]?.id||"cash",notes:"",
+    idPhotoName:"",idPhotoData:"",waiverSigned:false,contractSigned:false};
+  const[f,setF]=useState(blank);
+  const[step,setStep]=useState(1);
+  const fileRef=useRef();
+  const sel=equipment.find(e=>e.id===Number(f.equipId));
+  const avail=sel?sel.total-(sel.booked||0):0;
+  const total=sel?sel.rate*f.duration*f.qty:0;
+
+  function set(k,v){setF(p=>({...p,[k]:v}));}
+  function handlePhoto(e){
+    const file=e.target.files[0];if(!file)return;
+    const r=new FileReader();
+    r.onload=ev=>set("idPhotoData",ev.target.result);
+    r.readAsDataURL(file);
+    set("idPhotoName",file.name);
+  }
+  function submit(){
+    if(!f.firstName||!f.lastName)return toast("Enter customer name","error");
+    if(!f.phone)return toast("Phone number required","error");
+    if(!f.equipId)return toast("Select equipment","error");
+    if(f.qty>avail||f.qty<1)return toast(`Only ${avail} units available`,"error");
+    if(!f.idPhotoData)return toast("Photo ID required","error");
+    if(!f.waiverSigned)return toast("Customer must sign the waiver","error");
+    if(!f.contractSigned)return toast("Customer must accept the contract","error");
+    const endTime=addHours(f.startTime,f.duration);
+    const booking={id:uid(),...f,
+      equipId:Number(f.equipId),equipName:sel.name,
+      rate:sel.rate,total,endTime,
+      status:"confirmed",bookedBy:currentUser.name,
+      createdAt:new Date().toISOString()};
+    onBook(booking);
+    // Auto-notify boss + customer
+    const bossNum=bossWhatsapp||BIZ.whatsapp;
+    if(currentUser.role!=="boss"){
+      setTimeout(()=>notifyBoss(booking,bossNum,payments),300);
+    }
+    setTimeout(()=>notifyCustomer(booking,payments),1000);
+    setF(blank);setStep(1);
+    toast("Booking confirmed! WhatsApp opening... 📲");
+  }
+
+  const STEPS=["Customer","Equipment","Payment","Sign & Confirm"];
+  const stepIcons=["👤","🏄","💳","✍️"];
+
+  return(
+    <div className="anim">
+      {/* Step bar */}
+      <div style={{display:"flex",gap:2,marginBottom:20,borderRadius:12,overflow:"hidden",
+        border:"1px solid var(--border)"}}>
+        {STEPS.map((s,i)=>(
+          <div key={i} onClick={()=>i+1<step&&setStep(i+1)} style={{
+            flex:1,padding:"11px 6px",textAlign:"center",
+            background:step===i+1?"var(--teal)":step>i+1?"var(--teal-d)":"#fff",
+            color:step>=i+1?"#fff":"var(--muted)",
+            fontSize:11,fontWeight:600,cursor:i+1<step?"pointer":"default",
+            borderRight:"1px solid var(--border)",transition:"all .2s"}}>
+            <div style={{fontSize:15}}>{step>i+1?"✓":stepIcons[i]}</div>
+            {s}
+          </div>
+        ))}
+      </div>
+
+      <div style={{background:"#fff",borderRadius:16,padding:24,
+        boxShadow:"0 2px 16px rgba(11,30,45,.06)"}}>
+
+        {step===1&&(
+          <div>
+            <h3 style={{fontFamily:"var(--serif)",fontSize:20,color:"var(--navy)",marginBottom:16}}>
+              👤 Customer Details
+            </h3>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+              <Field label="First Name" value={f.firstName} onChange={v=>set("firstName",v)} required/>
+              <Field label="Last Name" value={f.lastName} onChange={v=>set("lastName",v)} required/>
+              <Field label="WhatsApp / Phone" value={f.phone} onChange={v=>set("phone",v)} required placeholder="17844961234"/>
+              <Field label="Email" value={f.email} onChange={v=>set("email",v)} type="email"/>
+            </div>
+            {/* ID Photo */}
+            <label style={{...LST,marginTop:20}}>Photo ID <span style={{color:"var(--coral)"}}>*</span></label>
+            <div style={{border:"2px dashed var(--border)",borderRadius:12,padding:20,
+              textAlign:"center",cursor:"pointer",background:"#fdfdfb",transition:"border-color .2s"}}
+              onClick={()=>fileRef.current.click()}
+              onMouseEnter={e=>e.currentTarget.style.borderColor="var(--teal)"}
+              onMouseLeave={e=>e.currentTarget.style.borderColor="var(--border)"}>
+              {f.idPhotoData
+                ?<img src={f.idPhotoData} alt="ID" style={{maxHeight:130,borderRadius:9,border:"2px solid var(--teal)"}}/>
+                :<div style={{color:"var(--muted)",fontSize:13}}>
+                  📷 Tap to capture / upload ID photo<br/>
+                  <span style={{fontSize:11}}>Passport · Driver's Licence · National ID</span>
+                </div>}
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" capture="environment"
+              style={{display:"none"}} onChange={handlePhoto}/>
+            {f.idPhotoName&&<div style={{fontSize:11,color:"var(--green)",marginTop:6}}>✓ {f.idPhotoName}</div>}
+            <div style={{marginTop:20,display:"flex",justifyContent:"flex-end"}}>
+              <Btn onClick={()=>{if(!f.firstName||!f.lastName||!f.phone)return toast("Fill required fields","error");setStep(2);}}>Next →</Btn>
+            </div>
+          </div>
+        )}
+
+        {step===2&&(
+          <div>
+            <h3 style={{fontFamily:"var(--serif)",fontSize:20,color:"var(--navy)",marginBottom:16}}>
+              🏄 Equipment & Schedule
+            </h3>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+              <div style={{gridColumn:"span 2"}}>
+                <label style={LST}>Equipment <span style={{color:"var(--coral)"}}>*</span></label>
+                <select value={f.equipId} onChange={e=>set("equipId",e.target.value)}
+                  style={{...IST}} onFocus={e=>e.target.style.borderColor="var(--teal)"}
+                  onBlur={e=>e.target.style.borderColor="var(--border)"}>
+                  <option value="">— Select equipment —</option>
+                  {equipment.map(e=>{
+                    const av=e.total-(e.booked||0);
+                    return(<option key={e.id} value={e.id} disabled={av===0}>
+                      [{e.code}] {e.name} — {e.rate===0?"FREE":`$${e.rate}/hr`} ({av} avail{av===0?" — FULL":""})
+                    </option>);
+                  })}
+                </select>
+                {sel&&avail<=2&&avail>0&&<div style={{fontSize:11,color:"var(--coral)",marginTop:4}}>⚠️ Only {avail} left</div>}
+                {sel&&avail===0&&<div style={{fontSize:11,color:"var(--coral)",marginTop:4}}>❌ Fully booked</div>}
+              </div>
+              <div>
+                <label style={LST}>Quantity <span style={{color:"var(--coral)"}}>*</span></label>
+                <input type="number" min={1} max={avail||1} value={f.qty}
+                  onChange={e=>set("qty",Math.min(avail,Math.max(1,Number(e.target.value))))}
+                  style={IST}/>
+              </div>
+              <div>
+                <label style={LST}>Duration (hours) <span style={{color:"var(--coral)"}}>*</span></label>
+                <input type="number" min={1} max={12} value={f.duration}
+                  onChange={e=>set("duration",Math.max(1,Number(e.target.value)))}
+                  style={IST}/>
+              </div>
+              <div>
+                <label style={LST}>Date <span style={{color:"var(--coral)"}}>*</span></label>
+                <input type="date" value={f.date} min={todayStr()}
+                  onChange={e=>set("date",e.target.value)} style={IST}/>
+              </div>
+              <div>
+                <label style={LST}>Start Time</label>
+                <select value={f.startTime} onChange={e=>set("startTime",e.target.value)} style={IST}>
+                  {SLOTS.map(s=><option key={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+            {sel&&(
+              <div style={{background:"linear-gradient(135deg,var(--navy2),var(--navy))",
+                color:"#fff",borderRadius:14,padding:16,marginTop:16}}>
+                <div style={{fontSize:11,color:"var(--gold)",textTransform:"uppercase",
+                  letterSpacing:".07em",marginBottom:4}}>Cost Summary</div>
+                <div style={{fontSize:13,opacity:.85,lineHeight:1.8}}>
+                  {sel.name} × {f.qty} × {f.duration} hr{f.duration>1?"s":""}
+                  {sel.rate>0?` @ $${sel.rate}/hr`:" — FREE"}
+                </div>
+                <div style={{fontFamily:"var(--serif)",fontSize:24,fontWeight:600,marginTop:4}}>
+                  {fmt(total)}
+                </div>
+              </div>
+            )}
+            <div style={{marginTop:20,display:"flex",justifyContent:"space-between"}}>
+              <Btn secondary onClick={()=>setStep(1)}>← Back</Btn>
+              <Btn onClick={()=>{if(!f.equipId)return toast("Select equipment","error");if(f.qty>avail)return toast("Not enough stock","error");setStep(3);}}>Next →</Btn>
+            </div>
+          </div>
+        )}
+
+        {step===3&&(
+          <div>
+            <h3 style={{fontFamily:"var(--serif)",fontSize:20,color:"var(--navy)",marginBottom:16}}>
+              💳 Payment Method
+            </h3>
+            {payments.filter(p=>p.active).map(p=>(
+              <label key={p.id} style={{display:"flex",alignItems:"center",gap:12,
+                padding:"14px 16px",border:`2px solid ${f.payment===p.id?"var(--teal)":"var(--border)"}`,
+                borderRadius:12,cursor:"pointer",marginBottom:10,
+                background:f.payment===p.id?"var(--teal-l)":"#fdfdfb",transition:"all .15s"}}>
+                <input type="radio" name="pay" value={p.id}
+                  checked={f.payment===p.id} onChange={()=>set("payment",p.id)}
+                  style={{accentColor:"var(--teal)"}}/>
+                <span style={{fontSize:20}}>{p.icon}</span>
+                <span style={{fontWeight:500}}>{p.label}</span>
+              </label>
+            ))}
+            <Field label="Notes (optional)" value={f.notes} onChange={v=>set("notes",v)}/>
+            <div style={{marginTop:20,display:"flex",justifyContent:"space-between"}}>
+              <Btn secondary onClick={()=>setStep(2)}>← Back</Btn>
+              <Btn onClick={()=>setStep(4)}>Next →</Btn>
+            </div>
+          </div>
+        )}
+
+        {step===4&&(
+          <div>
+            <h3 style={{fontFamily:"var(--serif)",fontSize:20,color:"var(--navy)",marginBottom:16}}>
+              ✍️ Waiver & Confirmation
+            </h3>
+            {/* Waiver */}
+            <div style={{border:"1px solid var(--border)",borderRadius:12,marginBottom:14,overflow:"hidden"}}>
+              <div style={{background:"var(--navy)",color:"#fff",padding:"10px 16px",
+                fontSize:13,fontWeight:600}}>⚠️ Liability Waiver</div>
+              <pre style={{padding:14,fontSize:11,lineHeight:1.75,maxHeight:160,
+                overflowY:"auto",whiteSpace:"pre-wrap",margin:0,
+                color:"var(--text)",background:"#fdfdfb"}}>{WAIVER}</pre>
+              <label style={{display:"flex",alignItems:"center",gap:10,padding:"12px 16px",
+                background:"#fff",cursor:"pointer",borderTop:"1px solid var(--border)"}}>
+                <input type="checkbox" checked={f.waiverSigned}
+                  onChange={e=>set("waiverSigned",e.target.checked)}
+                  style={{accentColor:"var(--teal)",width:16,height:16}}/>
+                <span style={{fontSize:13}}>I, <strong>{f.firstName} {f.lastName}</strong>, agree to this waiver</span>
+              </label>
+            </div>
+            {/* Contract checkbox */}
+            <label style={{display:"flex",alignItems:"flex-start",gap:10,
+              padding:14,border:"1px solid var(--border)",borderRadius:12,
+              cursor:"pointer",marginBottom:16,background:"#fdfdfb"}}>
+              <input type="checkbox" checked={f.contractSigned}
+                onChange={e=>set("contractSigned",e.target.checked)}
+                style={{accentColor:"var(--teal)",width:16,height:16,marginTop:2}}/>
+              <span style={{fontSize:13,lineHeight:1.6}}>
+                I accept the rental contract terms — equipment returned on time and in good condition.
+                I accept full liability for damage or loss.
+              </span>
+            </label>
+            {/* Summary */}
+            {sel&&(
+              <div style={{background:"linear-gradient(135deg,var(--navy2),var(--navy))",
+                color:"#fff",borderRadius:14,padding:18,marginBottom:16,fontSize:13,lineHeight:2}}>
+                <div style={{fontFamily:"var(--serif)",fontSize:18,marginBottom:6}}>Booking Summary</div>
+                👤 {f.firstName} {f.lastName} · {f.phone}<br/>
+                🏄 {sel.name} × {f.qty}<br/>
+                📅 {fmtDate(f.date)} · {f.startTime} → {addHours(f.startTime,f.duration)}<br/>
+                💳 {payments.find(p=>p.id===f.payment)?.label||f.payment}<br/>
+                <span style={{fontFamily:"var(--serif)",fontSize:20,fontWeight:600}}>{fmt(total)}</span>
+              </div>
+            )}
+            <div style={{display:"flex",justifyContent:"space-between"}}>
+              <Btn secondary onClick={()=>setStep(3)}>← Back</Btn>
+              <Btn onClick={submit}>✅ Confirm Booking</Btn>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   CHECK-IN TAB
+═══════════════════════════════════════════ */
+function CheckInTab({bookings,onCheckIn,onCheckOut,onCancel,setModal,payments}){
+  const[q,setQ]=useState("");
+  const today=bookings.filter(b=>b.date===todayStr());
+  const list=today.filter(b=>{
+    const s=(b.firstName+b.lastName+b.id+b.equipName).toLowerCase();
+    return s.includes(q.toLowerCase());
   });
+  const statusStyle=(s)=>{
+    const map={confirmed:{bg:"#FFF3D6",col:"#92670A"},
+      "checked-in":{bg:"#DCEEFF",col:"#0A5FA8"},
+      returned:{bg:"#E3F5EC",col:"#0A6A3A"},
+      cancelled:{bg:"#FBE0E0",col:"#A8200A"}};
+    return map[s]||{bg:"#eee",col:"#666"};
+  };
+  return(
+    <div className="anim">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <h2 style={{fontFamily:"var(--serif)",fontSize:22,color:"var(--navy)"}}>
+          Today's Rentals
+        </h2>
+        <span style={{fontSize:12,color:"var(--muted)"}}>
+          {new Date().toLocaleDateString("en-VC",{weekday:"long",day:"numeric",month:"short"})}
+        </span>
+      </div>
+      <input placeholder="Search name, ID, equipment…" value={q}
+        onChange={e=>setQ(e.target.value)}
+        style={{...IST,marginBottom:16}}/>
+      {list.length===0&&(
+        <div style={{textAlign:"center",padding:48,color:"var(--muted)",fontSize:14}}>
+          No bookings for today yet.
+        </div>
+      )}
+      {list.map(b=>{
+        const st=statusStyle(b.status);
+        return(
+          <div key={b.id} style={{background:"#fff",borderRadius:14,padding:18,
+            marginBottom:12,boxShadow:"0 2px 12px rgba(11,30,45,.06)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",
+              alignItems:"flex-start",flexWrap:"wrap",gap:8,marginBottom:10}}>
+              <div>
+                <div style={{fontWeight:700,color:"var(--navy)",fontSize:15}}>
+                  {b.equipName} × {b.qty}
+                </div>
+                <div style={{fontSize:12,color:"var(--muted)",marginTop:3}}>
+                  #{b.id} · {b.firstName} {b.lastName} · {b.startTime}–{b.endTime}
+                </div>
+                <div style={{fontSize:13,fontWeight:600,color:"var(--teal-d)",marginTop:2}}>
+                  {fmt(b.total)} · {b.phone}
+                </div>
+              </div>
+              <span style={{padding:"5px 12px",borderRadius:20,fontSize:11,
+                fontWeight:700,background:st.bg,color:st.col,textTransform:"capitalize"}}>
+                {b.status}
+              </span>
+            </div>
+            {/* Waiver/ID status */}
+            <div style={{fontSize:11,display:"flex",gap:12,marginBottom:10}}>
+              <span style={{color:b.waiverSigned?"var(--green)":"var(--coral)"}}>
+                {b.waiverSigned?"✓ Waiver":"⚠ No waiver"}
+              </span>
+              <span style={{color:b.idPhotoData?"var(--green)":"var(--muted)"}}>
+                {b.idPhotoData?"✓ ID on file":"No ID"}
+              </span>
+            </div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <button onClick={()=>setModal({type:"detail",data:b})} style={{
+                padding:"7px 14px",borderRadius:9,border:"1px solid var(--border)",
+                background:"#fff",fontSize:12,fontWeight:600,color:"var(--teal-d)"}}>
+                👁 View
+              </button>
+              {b.status==="confirmed"&&<>
+                <button onClick={()=>onCheckIn(b.id)} style={{padding:"7px 14px",
+                  borderRadius:9,border:"none",background:"var(--teal)",
+                  color:"#fff",fontSize:12,fontWeight:600}}>✅ Check In</button>
+                <button onClick={()=>onCancel(b.id)} style={{padding:"7px 14px",
+                  borderRadius:9,border:"none",background:"var(--coral)",
+                  color:"#fff",fontSize:12,fontWeight:600}}>✕ Cancel</button>
+              </>}
+              {b.status==="checked-in"&&(
+                <button onClick={()=>onCheckOut(b.id)} style={{padding:"7px 14px",
+                  borderRadius:9,border:"none",background:"var(--green)",
+                  color:"#fff",fontSize:12,fontWeight:600}}>📦 Return</button>
+              )}
+              {b.phone&&(
+                <a href={`https://wa.me/${cleanPhone(b.phone)}?text=${encodeURIComponent(
+                  "Hello "+b.firstName+"! Your booking #"+b.id+" for "+b.equipName+
+                  " at "+b.startTime+" is confirmed. See you soon! — "+BIZ.name+" 🌊")}`}
+                  target="_blank" rel="noreferrer"
+                  style={{padding:"7px 14px",borderRadius:9,border:"none",
+                    background:"#25D366",color:"#fff",fontSize:12,fontWeight:600,
+                    textDecoration:"none",display:"inline-block"}}>
+                  📲 WhatsApp
+                </a>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
+
+/* ═══════════════════════════════════════════
+   EQUIPMENT TAB
+═══════════════════════════════════════════ */
+function EquipTab({equipment,setEquipment,toast,currentUser}){
+  const[editing,setEditing]=useState(null);
+  function save(e){
+    setEquipment(p=>p.map(x=>x.id===e.id?e:x));
+    setEditing(null);toast("Updated ✅");
+  }
+  return(
+    <div className="anim">
+      <h2 style={{fontFamily:"var(--serif)",fontSize:22,color:"var(--navy)",marginBottom:16}}>
+        Fleet Inventory
+      </h2>
+      <div style={{display:"grid",gap:12,gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))"}}>
+        {equipment.map(e=>{
+          const avail=e.total-(e.booked||0);
+          const pct=e.total>0?avail/e.total:0;
+          const border=avail===0?"var(--coral)":avail<=2?"var(--gold)":"var(--border)";
+          return(
+            <div key={e.id} style={{background:"#fff",borderRadius:14,padding:18,
+              border:`1.5px solid ${border}`,boxShadow:"0 1px 8px rgba(11,30,45,.05)"}}>
+              {editing?.id===e.id?(
+                <div>
+                  <div style={{fontWeight:700,color:"var(--teal)",marginBottom:12,fontSize:13}}>
+                    Editing [{e.code}]
+                  </div>
+                  {["name","total","rate"].map(k=>(
+                    <div key={k} style={{marginBottom:8}}>
+                      <label style={LST}>{k==="rate"?"Rate/hr (0=FREE)":k.charAt(0).toUpperCase()+k.slice(1)}</label>
+                      <input type={k==="name"?"text":"number"} value={editing[k]}
+                        onChange={ev=>setEditing(p=>({...p,[k]:k==="name"?ev.target.value:Number(ev.target.value)}))}
+                        style={{...IST}}/>
+                    </div>
+                  ))}
+                  <div style={{display:"flex",gap:8,marginTop:10}}>
+                    <Btn small onClick={()=>save(editing)}>Save</Btn>
+                    <Btn small secondary onClick={()=>setEditing(null)}>Cancel</Btn>
+                  </div>
+                </div>
+              ):(
+                <>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                    <div>
+                      <div style={{fontSize:11,color:"var(--muted)",fontWeight:600,letterSpacing:".06em"}}>[{e.code}]</div>
+                      <div style={{fontWeight:700,color:"var(--navy)",fontSize:14}}>{e.name}</div>
+                      <div style={{fontSize:12,color:"var(--muted)",marginTop:2}}>
+                        {e.rate===0?"FREE":`$${e.rate}/hr`} · {e.cat}
+                      </div>
+                    </div>
+                    {currentUser.role==="boss"&&(
+                      <button onClick={()=>setEditing({...e})}
+                        style={{background:"none",border:"1px solid var(--border)",
+                          borderRadius:8,padding:"4px 10px",fontSize:11,
+                          color:"var(--teal-d)",cursor:"pointer"}}>Edit</button>
+                    )}
+                  </div>
+                  <div style={{marginBottom:6}}>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
+                      <span>Available: <strong>{avail}</strong> / {e.total}</span>
+                      <span style={{fontWeight:700,color:avail===0?"var(--coral)":avail<=2?"var(--gold)":"var(--green)"}}>
+                        {avail===0?"FULL":avail<=2?"LOW":"OK"}
+                      </span>
+                    </div>
+                    <div style={{height:6,background:"var(--border)",borderRadius:3,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${pct*100}%`,transition:"width .4s",
+                        background:avail===0?"var(--coral)":avail<=2?"var(--gold)":"var(--teal)"}}/>
+                    </div>
+                  </div>
+                  {e.condition&&<div style={{fontSize:11,color:"var(--muted)"}}>Condition: {e.condition}</div>}
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   REPORTS TAB
+═══════════════════════════════════════════ */
+function ReportTab({bookings,equipment,payments}){
+  const[range,setRange]=useState("today");
+  const now=new Date();
+  function inRange(b){
+    const d=new Date(b.date+"T12:00");
+    if(range==="today")return b.date===todayStr();
+    if(range==="week")return(now-d)<=7*864e5;
+    if(range==="month")return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();
+    return true;
+  }
+  const filtered=bookings.filter(inRange);
+  const active=filtered.filter(b=>b.status!=="cancelled");
+  const revenue=active.reduce((s,b)=>s+b.total,0);
+  const byEquip={};
+  active.forEach(b=>{
+    if(!byEquip[b.equipName])byEquip[b.equipName]={count:0,rev:0};
+    byEquip[b.equipName].count+=b.qty;
+    byEquip[b.equipName].rev+=b.total;
+  });
+
+  function Stat({label,val,color}){
+    return(
+      <div style={{background:"#fff",borderRadius:14,padding:18,
+        borderLeft:`4px solid ${color}`,boxShadow:"0 2px 8px rgba(11,30,45,.05)"}}>
+        <div style={{fontFamily:"var(--serif)",fontSize:24,fontWeight:600,color}}>{val}</div>
+        <div style={{fontSize:11,color:"var(--muted)",marginTop:4,textTransform:"uppercase",
+          letterSpacing:".05em"}}>{label}</div>
+      </div>
+    );
+  }
+  function downloadCSV(){
+    const rows=[["ID","Customer","Phone","Equipment","Qty","Date","Start","End","Duration",
+      "Total","Payment","Status","Waiver","ID Photo","Booked By"],
+      ...bookings.map(b=>[b.id,b.firstName+" "+b.lastName,b.phone,b.equipName,
+        b.qty,b.date,b.startTime,b.endTime,b.duration,b.total,b.payment,b.status,
+        b.waiverSigned?"Yes":"No",b.idPhotoName?"Yes":"No",b.bookedBy||""])];
+    const csv=rows.map(r=>r.join(",")).join("\n");
+    const a=document.createElement("a");
+    a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);
+    a.download=`APR_Report_${todayStr()}.csv`;a.click();
+  }
+
+  return(
+    <div className="anim">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
+        <h2 style={{fontFamily:"var(--serif)",fontSize:22,color:"var(--navy)"}}>Reports</h2>
+        <div style={{display:"flex",gap:8}}>
+          <select value={range} onChange={e=>setRange(e.target.value)}
+            style={{...IST,width:"auto",padding:"8px 12px"}}>
+            <option value="today">Today</option>
+            <option value="week">Last 7 days</option>
+            <option value="month">This month</option>
+            <option value="all">All time</option>
+          </select>
+          <button onClick={downloadCSV} style={{padding:"8px 14px",borderRadius:10,
+            border:"1px solid var(--border)",background:"#fff",fontSize:13,
+            fontWeight:600,color:"var(--teal-d)",cursor:"pointer"}}>
+            📥 Export CSV
+          </button>
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginBottom:20}}>
+        <Stat label="Revenue" val={fmt(revenue)} color="var(--teal)"/>
+        <Stat label="Bookings" val={filtered.length} color="var(--navy)"/>
+        <Stat label="Active" val={filtered.filter(b=>b.status==="checked-in").length} color="var(--gold)"/>
+        <Stat label="Returned" val={filtered.filter(b=>b.status==="returned").length} color="var(--green)"/>
+        <Stat label="Cancelled" val={filtered.filter(b=>b.status==="cancelled").length} color="var(--coral)"/>
+      </div>
+      <div style={{background:"#fff",borderRadius:14,padding:20,
+        boxShadow:"0 2px 8px rgba(11,30,45,.05)"}}>
+        <div style={{fontWeight:700,color:"var(--navy)",marginBottom:12,fontSize:14}}>
+          Revenue by Equipment
+        </div>
+        {Object.keys(byEquip).length===0
+          ?<div style={{color:"var(--muted)",fontSize:13}}>No data for this period.</div>
+          :Object.entries(byEquip).sort((a,b)=>b[1].rev-a[1].rev).map(([name,d])=>(
+            <div key={name} style={{display:"flex",justifyContent:"space-between",
+              padding:"9px 0",borderBottom:"1px solid var(--border)",fontSize:13}}>
+              <span style={{color:"var(--text)"}}>{name} ({d.count} rented)</span>
+              <span style={{fontWeight:600,color:"var(--teal-d)"}}>{fmt(d.rev)}</span>
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   RENTALS LIST TAB
+═══════════════════════════════════════════ */
+function RentalsTab({bookings,setModal}){
+  const[q,setQ]=useState("");
+  const[filter,setFilter]=useState("all");
+  const list=bookings.filter(b=>{
+    const s=(b.firstName+b.lastName+b.id+b.equipName).toLowerCase();
+    return s.includes(q.toLowerCase())&&(filter==="all"||b.status===filter);
+  });
+  const statusStyle=(s)=>{
+    const map={confirmed:{bg:"#FFF3D6",col:"#92670A"},
+      "checked-in":{bg:"#DCEEFF",col:"#0A5FA8"},
+      returned:{bg:"#E3F5EC",col:"#0A6A3A"},
+      cancelled:{bg:"#FBE0E0",col:"#A8200A"}};
+    return map[s]||{bg:"#eee",col:"#666"};
+  };
+  return(
+    <div className="anim">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
+        <h2 style={{fontFamily:"var(--serif)",fontSize:22,color:"var(--navy)"}}>
+          All Rentals ({list.length})
+        </h2>
+      </div>
+      <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+        <input placeholder="Search name, ID, equipment…" value={q}
+          onChange={e=>setQ(e.target.value)} style={{...IST,flex:1,minWidth:160}}/>
+        <select value={filter} onChange={e=>setFilter(e.target.value)}
+          style={{...IST,width:"auto"}}>
+          <option value="all">All</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="checked-in">Active</option>
+          <option value="returned">Returned</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+      {list.length===0&&<div style={{textAlign:"center",padding:48,color:"var(--muted)"}}>No rentals found.</div>}
+      {list.map(b=>{
+        const st=statusStyle(b.status);
+        return(
+          <div key={b.id} onClick={()=>setModal({type:"detail",data:b})}
+            style={{background:"#fff",borderRadius:12,padding:"14px 18px",
+              marginBottom:10,cursor:"pointer",boxShadow:"0 1px 6px rgba(11,30,45,.05)",
+              display:"flex",justifyContent:"space-between",alignItems:"center",
+              flexWrap:"wrap",gap:8,transition:"box-shadow .15s"}}
+            onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(11,30,45,.1)"}
+            onMouseLeave={e=>e.currentTarget.style.boxShadow="0 1px 6px rgba(11,30,45,.05)"}>
+            <div>
+              <div style={{fontWeight:600,color:"var(--navy)",fontSize:14}}>
+                {b.equipName} × {b.qty} — {b.firstName} {b.lastName}
+              </div>
+              <div style={{fontSize:12,color:"var(--muted)",marginTop:3}}>
+                #{b.id} · {fmtDate(b.date)} · {b.startTime}–{b.endTime} · {fmt(b.total)}
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              {b.waiverSigned&&<span title="Waiver signed" style={{fontSize:14,color:"var(--green)"}}>✓W</span>}
+              {b.idPhotoData&&<span title="ID on file" style={{fontSize:14,color:"var(--teal)"}}>🪪</span>}
+              <span style={{padding:"4px 10px",borderRadius:20,fontSize:11,
+                fontWeight:700,background:st.bg,color:st.col}}>{b.status}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   STAFF MANAGEMENT (Boss only)
+═══════════════════════════════════════════ */
+function StaffTab({users,setUsers,toast}){
+  const[newName,setNewName]=useState("");
+  const[newPin,setNewPin]=useState("");
+  const[newRole,setNewRole]=useState("staff");
+  const[newWA,setNewWA]=useState("");
+
+  function addUser(){
+    if(!newName.trim())return toast("Name required","error");
+    if(newPin.length<4)return toast("PIN must be 4-6 digits","error");
+    if(!/^\d+$/.test(newPin))return toast("PIN must be digits only","error");
+    const id="user_"+Date.now();
+    setUsers(p=>[...p,{id,name:newName.trim(),role:newRole,pin:newPin,whatsapp:newWA,active:true}]);
+    setNewName("");setNewPin("");setNewWA("");
+    toast("Staff member added ✅");
+  }
+  function toggleUser(id){
+    setUsers(p=>p.map(u=>u.id===id?{...u,active:!u.active}:u));
+  }
+  function removeUser(id){
+    if(!confirm("Remove this staff member?"))return;
+    setUsers(p=>p.filter(u=>u.id!==id));
+    toast("Removed","warn");
+  }
+  function updatePin(id,pin){
+    if(pin.length<4||!/^\d+$/.test(pin))return toast("PIN: 4-6 digits only","error");
+    setUsers(p=>p.map(u=>u.id===id?{...u,pin}:u));
+    toast("PIN updated ✅");
+  }
+
+  return(
+    <div className="anim">
+      <h2 style={{fontFamily:"var(--serif)",fontSize:22,color:"var(--navy)",marginBottom:16}}>
+        Staff Management
+      </h2>
+
+      {/* Current staff */}
+      {users.map(u=>(
+        <div key={u.id} style={{background:"#fff",borderRadius:14,padding:18,
+          marginBottom:12,border:"1px solid var(--border)",
+          boxShadow:"0 1px 6px rgba(11,30,45,.05)"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+            <div>
+              <div style={{fontWeight:700,color:"var(--navy)",fontSize:14}}>{u.name}</div>
+              <div style={{fontSize:12,color:"var(--muted)",marginTop:2}}>
+                Role: <span style={{
+                  background:u.role==="boss"?"var(--gold)":"var(--teal-l)",
+                  color:u.role==="boss"?"var(--navy)":"var(--teal-d)",
+                  padding:"2px 8px",borderRadius:20,fontWeight:600,fontSize:11
+                }}>{u.role}</span>
+                {u.whatsapp&&<span style={{marginLeft:10}}>📱 {u.whatsapp}</span>}
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              <span style={{fontSize:12,fontWeight:600,
+                color:u.active?"var(--green)":"var(--muted)"}}>
+                {u.active?"● Active":"○ Inactive"}
+              </span>
+              <button onClick={()=>toggleUser(u.id)} style={{padding:"5px 12px",
+                borderRadius:8,border:"1px solid var(--border)",background:"#fff",
+                fontSize:11,fontWeight:600,cursor:"pointer",color:"var(--teal-d)"}}>
+                {u.active?"Deactivate":"Activate"}
+              </button>
+              {u.id!=="boss"&&(
+                <button onClick={()=>removeUser(u.id)} style={{padding:"5px 12px",
+                  borderRadius:8,border:"none",background:"var(--coral)",
+                  color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer"}}>
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+          {/* PIN change */}
+          <div style={{marginTop:12,display:"flex",gap:8,alignItems:"flex-end"}}>
+            <div style={{flex:1}}>
+              <label style={LST}>Change PIN</label>
+              <input type="password" placeholder="New PIN (4-6 digits)"
+                maxLength={6} style={{...IST}}
+                onKeyDown={e=>{if(e.key==="Enter")updatePin(u.id,e.target.value);}}
+                id={`pin-${u.id}`}/>
+            </div>
+            <button onClick={()=>{
+              const el=document.getElementById(`pin-${u.id}`);
+              if(el)updatePin(u.id,el.value);
+            }} style={{padding:"11px 16px",borderRadius:10,border:"none",
+              background:"var(--teal)",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>
+              Update
+            </button>
+          </div>
+        </div>
+      ))}
+
+      {/* Add new */}
+      <div style={{background:"var(--teal-l)",borderRadius:14,padding:20,
+        border:"1px solid var(--border)",marginTop:8}}>
+        <div style={{fontWeight:700,color:"var(--navy)",marginBottom:14,fontSize:14}}>
+          ➕ Add Staff Member
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          <Field label="Full Name" value={newName} onChange={setNewName} required/>
+          <div>
+            <label style={LST}>Role</label>
+            <select value={newRole} onChange={e=>setNewRole(e.target.value)} style={IST}>
+              <option value="staff">Staff (Booking + Check-in)</option>
+              <option value="boss">Boss (Full Access)</option>
+            </select>
+          </div>
+          <div>
+            <label style={LST}>PIN (4-6 digits) <span style={{color:"var(--coral)"}}>*</span></label>
+            <input type="password" value={newPin} onChange={e=>setNewPin(e.target.value.replace(/[^0-9]/g,""))}
+              maxLength={6} placeholder="e.g. 1234" style={IST}/>
+          </div>
+          <Field label="WhatsApp Number" value={newWA} onChange={setNewWA} placeholder="17844961234"/>
+        </div>
+        <div style={{marginTop:14}}>
+          <Btn onClick={addUser}>Add Staff Member</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   SETTINGS TAB (Boss only)
+═══════════════════════════════════════════ */
+function SettingsTab({payments,setPayments,toast}){
+  const[newLabel,setNewLabel]=useState("");
+  const[newIcon,setNewIcon]=useState("💰");
+  function toggle(id){setPayments(p=>p.map(pm=>pm.id===id?{...pm,active:!pm.active}:pm));}
+  function add(){
+    if(!newLabel.trim())return toast("Enter method name","error");
+    setPayments(p=>[...p,{id:"c_"+Date.now(),label:newLabel.trim(),icon:newIcon||"💰",active:true,custom:true}]);
+    setNewLabel("");setNewIcon("💰");toast("Added ✅");
+  }
+  function remove(id){setPayments(p=>p.filter(pm=>pm.id!==id));}
+
+  return(
+    <div className="anim">
+      <h2 style={{fontFamily:"var(--serif)",fontSize:22,color:"var(--navy)",marginBottom:16}}>Settings</h2>
+      <div style={{background:"#fff",borderRadius:16,padding:24,
+        boxShadow:"0 2px 12px rgba(11,30,45,.06)"}}>
+        <div style={{fontWeight:700,color:"var(--navy)",marginBottom:6,fontSize:15}}>
+          💳 Payment Methods
+        </div>
+        <div style={{fontSize:12,color:"var(--muted)",marginBottom:16}}>
+          Toggle on/off. Only active methods show in the booking form.
+        </div>
+        {payments.map(pm=>(
+          <div key={pm.id} style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",
+            borderRadius:12,border:`1.5px solid ${pm.active?"var(--teal)":"var(--border)"}`,
+            marginBottom:10,background:pm.active?"var(--teal-l)":"#fdfdfb",transition:"all .2s"}}>
+            <span style={{fontSize:20}}>{pm.icon}</span>
+            <span style={{flex:1,fontWeight:500}}>{pm.label}</span>
+            {pm.custom&&(
+              <button onClick={()=>remove(pm.id)}
+                style={{background:"none",border:"none",color:"var(--coral)",
+                  fontSize:16,cursor:"pointer"}}>🗑️</button>
+            )}
+            {/* Toggle */}
+            <div onClick={()=>toggle(pm.id)} style={{width:42,height:23,borderRadius:12,cursor:"pointer",
+              background:pm.active?"var(--teal)":"var(--border)",transition:"background .2s",position:"relative"}}>
+              <div style={{position:"absolute",top:3,left:pm.active?21:2,width:17,height:17,
+                borderRadius:"50%",background:"#fff",transition:"left .2s",
+                boxShadow:"0 1px 4px rgba(0,0,0,.2)"}}/>
+            </div>
+          </div>
+        ))}
+        <div style={{borderTop:"1px solid var(--border)",paddingTop:16,marginTop:8}}>
+          <div style={{fontWeight:600,color:"var(--navy)",fontSize:13,marginBottom:10}}>Add Custom Method</div>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+            <input value={newIcon} onChange={e=>setNewIcon(e.target.value)}
+              style={{...IST,width:56,textAlign:"center",fontSize:22}} maxLength={2}/>
+            <input value={newLabel} onChange={e=>setNewLabel(e.target.value)}
+              placeholder="Method name…" style={{...IST,flex:1,minWidth:140}}/>
+            <Btn onClick={add}>Add</Btn>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   BOOKING DETAIL MODAL
+═══════════════════════════════════════════ */
+function BookingDetailModal({booking:b,payments,onClose}){
+  const pay=payments.find(p=>p.id===b.payment)?.label||b.payment;
+  const msg=buildBookingMsg(b,payments);
+  const waLink=`https://wa.me/${cleanPhone(b.phone||BIZ.whatsapp)}?text=${msg}`;
+  return(
+    <div style={{fontSize:13,lineHeight:1.9}}>
+      {b.idPhotoData&&(
+        <div style={{marginBottom:16}}>
+          <div style={{fontWeight:600,color:"var(--navy)",marginBottom:8,fontSize:13}}>
+            🪪 Photo ID (on file)
+          </div>
+          <img src={b.idPhotoData} alt="ID" style={{maxWidth:"100%",maxHeight:200,
+            borderRadius:10,border:"2px solid var(--teal)"}}/>
+        </div>
+      )}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px 20px",marginBottom:16}}>
+        {[["Name",b.firstName+" "+b.lastName],["Phone",b.phone],
+          b.email&&["Email",b.email],["Equipment",b.equipName+" × "+b.qty],
+          ["Date",fmtDate(b.date)],["Time",b.startTime+" → "+b.endTime],
+          ["Duration",b.duration+" hr"],["Payment",pay],
+          ["Total",fmt(b.total)],["Status",b.status],
+          ["Waiver",b.waiverSigned?"✅ Signed":"❌ Not signed"],
+          ["Contract",b.contractSigned?"✅ Accepted":"❌ Not accepted"],
+          b.bookedBy&&["Booked by",b.bookedBy],
+          b.notes&&["Notes",b.notes],
+        ].filter(Boolean).map(([k,v])=>(
+          <div key={k}><strong style={{color:"var(--muted)",fontSize:11,textTransform:"uppercase",
+            letterSpacing:".05em"}}>{k}</strong><br/>
+            <span style={{color:"var(--text)"}}>{v}</span>
+          </div>
+        ))}
+      </div>
+      {b.phone&&(
+        <a href={waLink} target="_blank" rel="noreferrer"
+          style={{display:"block",textAlign:"center",padding:"12px",
+            background:"#25D366",color:"#fff",borderRadius:11,
+            fontWeight:600,textDecoration:"none",fontSize:14}}>
+          📲 Send Confirmation via WhatsApp
+        </a>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   MAIN APP
+═══════════════════════════════════════════ */
+function App(){
+  const[users,setUsers]=useState(()=>ls("apr_users",DEFAULT_USERS));
+  const[currentUser,setCurrentUser]=useState(null);
+  const[bookings,setBookings]=useState(()=>ls("apr_bookings",[]));
+  const[equipment,setEquipment]=useState(()=>ls("apr_equip",INIT_EQUIP));
+  const[payments,setPayments]=useState(()=>ls("apr_payments",INIT_PAYMENTS));
+  const[tab,setTab]=useState("book");
+  const[toasts,setToasts]=useState([]);
+  const[modal,setModal]=useState(null);
+
+  // Persist everything
+  useEffect(()=>lsSet("apr_users",users),[users]);
+  useEffect(()=>lsSet("apr_bookings",bookings),[bookings]);
+  useEffect(()=>lsSet("apr_equip",equipment),[equipment]);
+  useEffect(()=>lsSet("apr_payments",payments),[payments]);
+
+  function toast(msg,type="ok"){
+    const id=Date.now();
+    setToasts(p=>[...p,{id,msg,type}]);
+    setTimeout(()=>setToasts(p=>p.filter(t=>t.id!==id)),4000);
+  }
+  function dismiss(id){setToasts(p=>p.filter(t=>t.id!==id));}
+
+  function addBooking(b){
+    setBookings(p=>[b,...p]);
+    setEquipment(p=>p.map(e=>e.id===b.equipId?{...e,booked:(e.booked||0)+b.qty}:e));
+  }
+  function checkIn(id){
+    setBookings(p=>p.map(b=>b.id===id?{...b,status:"checked-in",checkInTime:nowTime()}:b));
+    toast("Checked in ✅");
+  }
+  function checkOut(id){
+    const b=bookings.find(x=>x.id===id);
+    setBookings(p=>p.map(bk=>bk.id===id?{...bk,status:"returned",returnTime:nowTime()}:bk));
+    if(b)setEquipment(p=>p.map(e=>e.id===b.equipId?{...e,booked:Math.max(0,(e.booked||0)-b.qty)}:e));
+    toast("Equipment returned ✅");
+  }
+  function cancelBooking(id){
+    const b=bookings.find(x=>x.id===id);
+    setBookings(p=>p.map(bk=>bk.id===id?{...bk,status:"cancelled"}:bk));
+    if(b)setEquipment(p=>p.map(e=>e.id===b.equipId?{...e,booked:Math.max(0,(e.booked||0)-b.qty)}:e));
+    toast("Cancelled","warn");
+  }
+
+  // Low-stock warnings
+  useEffect(()=>{
+    equipment.forEach(e=>{
+      const avail=e.total-(e.booked||0);
+      if(avail===1)toast(`⚠️ Low stock: ${e.name} — 1 left!`,"warn");
+      if(avail===0)toast(`❌ ${e.name} is fully booked!`,"error");
+    });
+  },[equipment]);
+
+  if(!currentUser){
+    return <LoginScreen users={users} onLogin={u=>{setCurrentUser(u);setTab("book");}}/>;
+  }
+
+  const bossUser=users.find(u=>u.role==="boss");
+  const isBoss=currentUser.role==="boss";
+
+  // Tabs by role
+  const allTabs=[
+    {id:"book",label:"New Booking",icon:"📋"},
+    {id:"checkin",label:"Check-In",icon:"✅"},
+    {id:"equip",label:"Equipment",icon:"🏄"},
+    {id:"reports",label:"Reports",icon:"📊",bossOnly:true},
+    {id:"rentals",label:"Rentals",icon:"📁"},
+    {id:"staff",label:"Staff",icon:"👥",bossOnly:true},
+    {id:"settings",label:"Settings",icon:"⚙️",bossOnly:true},
+  ];
+  const tabs=allTabs.filter(t=>!t.bossOnly||isBoss);
+
+  return(
+    <div style={{minHeight:"100vh",background:"var(--bg)"}}>
+      {/* HEADER */}
+      <header style={{background:`linear-gradient(180deg,var(--navy2),var(--navy))`,
+        position:"sticky",top:0,zIndex:40,
+        borderBottom:"1px solid rgba(251,198,44,.15)"}}>
+        <div style={{maxWidth:1100,margin:"0 auto",padding:"12px 16px 0",
+          paddingTop:`max(12px,env(safe-area-inset-top))`}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
+            <img src={LOGO_SRC} alt="APR" style={{width:42,height:42,borderRadius:"50%",
+              objectFit:"cover",border:"2px solid var(--gold)",flexShrink:0}}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontFamily:"var(--serif)",fontSize:17,fontWeight:600,
+                color:"#fff",letterSpacing:".01em",lineHeight:1.1}}>
+                Aquatic Paradise Rentals
+              </div>
+              <div style={{fontSize:9.5,color:"var(--gold)",textTransform:"uppercase",
+                letterSpacing:".12em",marginTop:2}}>
+                {isBoss?"Boss · Full Access":"Staff · "+currentUser.name}
+              </div>
+            </div>
+            {/* Logout */}
+            <button onClick={()=>{setCurrentUser(null);setTab("book");}}
+              style={{padding:"7px 14px",borderRadius:9,border:"1px solid rgba(255,255,255,.15)",
+                background:"rgba(255,255,255,.06)",color:"rgba(255,255,255,.75)",
+                fontSize:12,fontWeight:600,cursor:"pointer"}}>
+              Log out
+            </button>
+          </div>
+          {/* Tab bar */}
+          <div style={{display:"flex",gap:2,overflowX:"auto",paddingBottom:0}}>
+            {tabs.map(t=>(
+              <button key={t.id} onClick={()=>setTab(t.id)} style={{
+                padding:"10px 14px",border:"none",cursor:"pointer",
+                borderRadius:"8px 8px 0 0",whiteSpace:"nowrap",
+                background:tab===t.id?"var(--bg)":"transparent",
+                color:tab===t.id?"var(--teal)":"rgba(255,255,255,.65)",
+                fontFamily:"var(--sans)",fontSize:12,fontWeight:tab===t.id?700:400,
+                transition:"all .15s",
+              }}>
+                {t.icon} {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </header>
+
+      {/* CONTENT */}
+      <main style={{maxWidth:1100,margin:"0 auto",padding:"24px 16px 80px"}}>
+        {/* Notification banner for staff */}
+        {!isBoss&&(
+          <div style={{background:"var(--teal-l)",border:"1px solid var(--teal)",
+            borderRadius:12,padding:"10px 14px",marginBottom:16,fontSize:12,
+            color:"var(--teal-d)",display:"flex",alignItems:"center",gap:8}}>
+            👤 Logged in as <strong>{currentUser.name}</strong> (Staff) · 
+            Bookings will auto-notify the boss via WhatsApp
+          </div>
+        )}
+
+        {tab==="book"&&<BookingTab equipment={equipment} onBook={addBooking}
+          toast={toast} payments={payments.filter(p=>p.active)}
+          currentUser={currentUser} bossWhatsapp={bossUser?.whatsapp||BIZ.whatsapp}/>}
+        {tab==="checkin"&&<CheckInTab bookings={bookings} onCheckIn={checkIn}
+          onCheckOut={checkOut} onCancel={cancelBooking} setModal={setModal} payments={payments}/>}
+        {tab==="equip"&&<EquipTab equipment={equipment} setEquipment={setEquipment}
+          toast={toast} currentUser={currentUser}/>}
+        {isBoss&&tab==="reports"&&<ReportTab bookings={bookings}
+          equipment={equipment} payments={payments}/>}
+        {tab==="rentals"&&<RentalsTab bookings={bookings} setModal={setModal}/>}
+        {isBoss&&tab==="staff"&&<StaffTab users={users} setUsers={setUsers} toast={toast}/>}
+        {isBoss&&tab==="settings"&&<SettingsTab payments={payments}
+          setPayments={setPayments} toast={toast}/>}
+      </main>
+
+      {/* MODALS */}
+      {modal?.type==="detail"&&(
+        <Modal title={`Booking #${modal.data.id}`} onClose={()=>setModal(null)} wide>
+          <BookingDetailModal booking={modal.data} payments={payments} onClose={()=>setModal(null)}/>
+        </Modal>
+      )}
+
+      <Toasts toasts={toasts} dismiss={dismiss}/>
+    </div>
+  );
+}
+
+const root=ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App/>);
 </script>
 </body>
 </html>
