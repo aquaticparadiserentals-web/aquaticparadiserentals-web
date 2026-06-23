@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#0B1E2D"/>
+<title>APR · Staff Console</title>
+<style>
+:root {
+  --teal:#03939E; --gold:#FBC62C; --coral:#E0351B; --navy:#0B1E2D;
+  --green:#0a7a42; --red:#c0392b; --radius:12px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf2;min-height:100vh}
+
+/* ── PIN GATE ── */
+#pinGate{position:fixed;inset:0;background:linear-gradient(135deg,#0B1E2D 0%,#0d2d3a 100%);display:flex;align-items:center;justify-content:center;z-index:1000;flex-direction:column;gap:0}
+.pin-card{background:#162030;border-radius:20px;padding:36px 32px;width:90%;max-width:360px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.5);border:1px solid rgba(251,198,44,0.2)}
+.pin-logo{width:80px;height:80px;border-radius:50%;border:3px solid var(--gold);margin:0 auto 18px}
+.pin-card h2{font-size:1.2rem;font-weight:800;color:#fff;margin-bottom:4px}
+.pin-card p{font-size:0.8rem;color:rgba(255,255,255,0.5);margin-bottom:24px}
+.pin-dots{display:flex;justify-content:center;gap:14px;margin-bottom:24px}
+.pin-dot{width:16px;height:16px;border-radius:50%;background:rgba(255,255,255,0.15);transition:background 0.15s}
+.pin-dot.filled{background:var(--gold)}
+.pin-dot.error{background:var(--coral)}
+.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pin-btn{padding:18px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);border-radius:12px;color:#fff;font-size:1.2rem;font-weight:700;cursor:pointer;transition:all 0.15s;user-select:none}
+.pin-btn:active{background:var(--teal);transform:scale(0.95)}
+.pin-btn.del{color:var(--coral)}
+.pin-btn.clr{color:rgba(255,255,255,0.4);font-size:0.8rem}
+.pin-error{color:var(--coral);font-size:0.8rem;margin-top:12px;min-height:18px;font-weight:600}
+.pin-attempts{font-size:0.72rem;color:rgba(255,255,255,0.3);margin-top:6px}
+
+/* ── MAIN APP ── */
+#appShell{display:none}
+
+/* HEADER */
+.app-header{background:#0B1E2D;padding:0;border-bottom:2px solid var(--gold);position:sticky;top:0;z-index:100}
+.app-header-inner{display:flex;align-items:center;gap:12px;padding:10px 16px;max-width:800px;margin:0 auto}
+.app-logo{width:44px;height:44px;border-radius:50%;border:2px solid var(--gold);flex-shrink:0}
+.app-title{flex:1}
+.app-title h1{font-size:1rem;font-weight:800;color:#fff}
+.app-title p{font-size:0.68rem;color:var(--gold);text-transform:uppercase;letter-spacing:0.08em}
+.lock-btn{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);padding:7px 12px;border-radius:8px;font-size:0.72rem;cursor:pointer;transition:all 0.2s}
+.lock-btn:hover{background:var(--coral);color:#fff;border-color:var(--coral)}
+.online-pill{font-size:0.65rem;padding:3px 8px;border-radius:10px;font-weight:700;margin-left:6px}
+.online-pill.on{background:#0a7a42;color:#fff}
+.online-pill.off{background:var(--coral);color:#fff}
+
+/* NAV */
+.app-nav{background:#0B1E2D;border-top:1px solid rgba(255,255,255,0.06)};
+.app-nav-inner{display:flex;max-width:800px;margin:0 auto;overflow-x:auto}
+.anav-tab{flex:1;min-width:70px;padding:10px 6px;text-align:center;font-size:0.68rem;font-weight:700;color:rgba(255,255,255,0.45);cursor:pointer;border-bottom:3px solid transparent;transition:all 0.2s;white-space:nowrap;text-transform:uppercase;letter-spacing:0.05em}
+.anav-tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+
+/* MAIN */
+.app-main{max-width:800px;margin:0 auto;padding:16px;padding-bottom:80px}
+.asection{display:none}
+.asection.active{display:block}
+
+/* CARDS */
+.dash-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:18px}
+.kpi-card{background:#162030;border-radius:var(--radius);padding:16px;border-left:4px solid var(--teal)}
+.kpi-card.gold{border-left-color:var(--gold)}
+.kpi-card.coral{border-left-color:var(--coral)}
+.kpi-card.green{border-left-color:#0a7a42}
+.kpi-label{font-size:0.7rem;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px}
+.kpi-val{font-size:1.6rem;font-weight:800;color:#fff}
+.kpi-sub{font-size:0.7rem;color:rgba(255,255,255,0.4);margin-top:2px}
+
+.sec-title{font-size:0.85rem;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:0.08em;margin:20px 0 10px;display:flex;align-items:center;gap:8px}
+.sec-title::after{content:'';flex:1;height:1px;background:rgba(251,198,44,0.2)}
+
+/* BOOKINGS */
+.booking-card{background:#162030;border-radius:var(--radius);padding:14px;margin-bottom:10px;border-left:4px solid var(--teal);transition:all 0.2s}
+.booking-card.new{border-left-color:var(--gold);animation:pulse 2s infinite}
+.booking-card.done{border-left-color:var(--green);opacity:0.7}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(251,198,44,0.3)}50%{box-shadow:0 0 0 6px rgba(251,198,44,0)}}
+.bk-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.bk-ref{font-size:0.75rem;font-weight:700;color:var(--gold);letter-spacing:0.1em}
+.bk-status{font-size:0.65rem;padding:3px 8px;border-radius:8px;font-weight:700}
+.bk-status.pending{background:rgba(251,198,44,0.2);color:var(--gold)}
+.bk-status.confirmed{background:rgba(10,122,66,0.2);color:#4ade80}
+.bk-status.done{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.4)}
+.bk-name{font-size:0.95rem;font-weight:700;color:#fff;margin-bottom:2px}
+.bk-detail{font-size:0.78rem;color:rgba(255,255,255,0.55);line-height:1.5}
+.bk-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.bk-btn{padding:6px 12px;border-radius:8px;border:none;font-size:0.72rem;font-weight:700;cursor:pointer;transition:all 0.15s}
+.bk-btn.confirm{background:var(--green);color:#fff}
+.bk-btn.done-btn{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.5)}
+.bk-btn.wa{background:#25D366;color:#fff}
+.bk-btn:hover{opacity:0.85;transform:scale(1.03)}
+.bk-total{font-weight:800;color:var(--teal);font-size:0.88rem;margin-top:4px}
+
+/* INVENTORY */
+.inv-filter{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.inv-chip{padding:6px 14px;border-radius:20px;background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.5);font-size:0.75rem;font-weight:700;cursor:pointer;border:1px solid rgba(255,255,255,0.1);transition:all 0.2s}
+.inv-chip.active{background:var(--teal);color:#fff;border-color:var(--teal)}
+.inv-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.inv-unit{background:#162030;border-radius:10px;padding:12px 10px;display:flex;align-items:center;gap:10px;border:1px solid rgba(255,255,255,0.06)}
+.inv-unit.out{border-color:rgba(224,53,27,0.4);background:#1a1215}
+.inv-code{font-size:0.78rem;font-weight:800;color:var(--gold);letter-spacing:0.05em;min-width:52px}
+.inv-name{font-size:0.75rem;color:rgba(255,255,255,0.7);flex:1}
+.toggle-pill{position:relative;width:42px;height:22px;flex-shrink:0}
+.toggle-pill input{opacity:0;width:0;height:0;position:absolute}
+.toggle-track{position:absolute;inset:0;background:#4a1010;border-radius:11px;cursor:pointer;transition:background 0.2s}
+.toggle-thumb{position:absolute;height:16px;width:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:transform 0.2s}
+.toggle-pill input:checked + .toggle-track{background:#0a7a42}
+.toggle-pill input:checked ~ .toggle-thumb{transform:translateX(20px)}
+
+/* SAFETY CHECKLIST */
+.checklist-intro{background:#162030;border-radius:var(--radius);padding:14px;margin-bottom:14px;font-size:0.82rem;color:rgba(255,255,255,0.65);line-height:1.6}
+.check-item{background:#162030;border-radius:10px;padding:13px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer;border:1px solid rgba(255,255,255,0.06);transition:all 0.2s}
+.check-item.checked{border-color:rgba(10,122,66,0.5);background:#0d2018}
+.check-item input[type=checkbox]{width:20px;height:20px;accent-color:var(--green);flex-shrink:0}
+.check-item label{font-size:0.85rem;color:#e8edf2;cursor:pointer;flex:1}
+.check-item.checked label{color:rgba(255,255,255,0.5);text-decoration:line-through}
+.check-item.required label::after{content:' *';color:var(--coral)}
+.safety-submit{width:100%;padding:14px;background:var(--green);border:none;border-radius:var(--radius);color:#fff;font-size:0.95rem;font-weight:800;cursor:pointer;margin-top:8px;opacity:0.5;pointer-events:none;transition:all 0.2s}
+.safety-submit.ready{opacity:1;pointer-events:all}
+.safety-submit:hover.ready{background:#0a6a38}
+
+/* TEAM */
+.team-card{background:#162030;border-radius:var(--radius);padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:14px}
+.team-avatar{width:46px;height:46px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;border:2px solid rgba(255,255,255,0.1)}
+.team-info{flex:1}
+.team-name{font-weight:700;color:#fff;font-size:0.92rem}
+.team-role{font-size:0.73rem;color:rgba(255,255,255,0.45);margin-top:2px}
+.team-wa{background:#25D366;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:0.75rem;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+.team-wa:hover{background:#1ebe5c}
+
+/* SETTINGS */
+.setting-card{background:#162030;border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.setting-card h3{font-size:0.85rem;font-weight:800;color:var(--gold);margin-bottom:12px}
+.setting-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06)}
+.setting-row:last-child{border-bottom:none}
+.setting-label{font-size:0.82rem;color:rgba(255,255,255,0.7)}
+.setting-val{font-size:0.82rem;color:var(--teal);font-weight:600}
+.pin-change-form{display:flex;gap:8px;margin-top:12px}
+.pin-input{flex:1;padding:10px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;font-size:0.9rem}
+.pin-change-btn{padding:10px 16px;background:var(--teal);border:none;border-radius:8px;color:#fff;font-weight:700;cursor:pointer;font-size:0.85rem}
+
+/* LOG */
+.log-entry{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:0.78rem}
+.log-time{color:rgba(255,255,255,0.35);min-width:50px;flex-shrink:0}
+.log-msg{color:rgba(255,255,255,0.65)}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#162030;color:#fff;padding:11px 22px;border-radius:25px;font-size:0.83rem;font-weight:600;opacity:0;pointer-events:none;transition:all 0.3s;z-index:9999;white-space:nowrap;border:1px solid rgba(255,255,255,0.15)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.ok{background:var(--green);border-color:var(--green)}
+.toast.err{background:var(--coral);border-color:var(--coral)}
+
+/* REFRESH BTN */
+.refresh-btn{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);padding:7px 12px;border-radius:8px;font-size:0.72rem;cursor:pointer;transition:all 0.2s}
+.refresh-btn:hover{background:var(--teal);color:#fff}
+
+@media(max-width:400px){
+  .dash-grid{grid-template-columns:1fr 1fr}
+  .inv-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ PIN GATE ═══ -->
+<div id="pinGate">
+  <div class="pin-card">
+    <img class="pin-logo" src="./logo.jpg" alt="APR"/>
+    <h2>Staff Access</h2>
+    <p>Enter your 4-digit PIN to access the console</p>
+    <div class="pin-dots" id="pinDots">
+      <div class="pin-dot" id="d0"></div>
+      <div class="pin-dot" id="d1"></div>
+      <div class="pin-dot" id="d2"></div>
+      <div class="pin-dot" id="d3"></div>
+    </div>
+    <div class="pin-pad">
+      <button class="pin-btn" onclick="pinPress('1')">1</button>
+      <button class="pin-btn" onclick="pinPress('2')">2</button>
+      <button class="pin-btn" onclick="pinPress('3')">3</button>
+      <button class="pin-btn" onclick="pinPress('4')">4</button>
+      <button class="pin-btn" onclick="pinPress('5')">5</button>
+      <button class="pin-btn" onclick="pinPress('6')">6</button>
+      <button class="pin-btn" onclick="pinPress('7')">7</button>
+      <button class="pin-btn" onclick="pinPress('8')">8</button>
+      <button class="pin-btn" onclick="pinPress('9')">9</button>
+      <button class="pin-btn clr" onclick="pinClear()">CLR</button>
+      <button class="pin-btn" onclick="pinPress('0')">0</button>
+      <button class="pin-btn del" onclick="pinDel()">⌫</button>
+    </div>
+    <div class="pin-error" id="pinError"></div>
+    <div class="pin-attempts" id="pinAttempts"></div>
+  </div>
+</div>
+
+<!-- ═══ APP SHELL ═══ -->
+<div id="appShell">
+
+<header class="app-header">
+  <div class="app-header-inner">
+    <img class="app-logo" src="./logo.jpg" alt="APR"/>
+    <div class="app-title">
+      <h1>APR Staff Console</h1>
+      <p>Operations Dashboard</p>
+    </div>
+    <span class="online-pill" id="onlinePill">●</span>
+    <button class="lock-btn" onclick="lockApp()">🔒 Lock</button>
+  </div>
+  <div class="app-nav">
+    <div class="app-nav-inner">
+      <div class="anav-tab active" onclick="switchATab('today')">📊 Today</div>
+      <div class="anav-tab" onclick="switchATab('bookings')">📋 Bookings</div>
+      <div class="anav-tab" onclick="switchATab('inventory')">🏄 Fleet</div>
+      <div class="anav-tab" onclick="switchATab('safety')">🛡️ Safety</div>
+      <div class="anav-tab" onclick="switchATab('team')">👥 Team</div>
+      <div class="anav-tab" onclick="switchATab('settings')">⚙️ Settings</div>
+    </div>
+  </div>
+</header>
+
+<div class="app-main">
+
+<!-- ═ TODAY ═ -->
+<div class="asection active" id="asec-today">
+  <div class="dash-grid">
+    <div class="kpi-card gold">
+      <div class="kpi-label">Today's Bookings</div>
+      <div class="kpi-val" id="kpiBookings">–</div>
+      <div class="kpi-sub">from backend</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">Revenue Today</div>
+      <div class="kpi-val" id="kpiRevenue">–</div>
+      <div class="kpi-sub">XCD</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Fleet Available</div>
+      <div class="kpi-val" id="kpiAvail">–</div>
+      <div class="kpi-sub">of total units</div>
+    </div>
+    <div class="kpi-card coral">
+      <div class="kpi-label">Pending</div>
+      <div class="kpi-val" id="kpiPending">–</div>
+      <div class="kpi-sub">need confirmation</div>
+    </div>
+  </div>
+
+  <div class="sec-title">Quick Actions</div>
+  <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px">
+    <a href="index.html" style="display:block;background:var(--teal);color:#fff;padding:13px 16px;border-radius:var(--radius);font-weight:700;font-size:0.88rem;text-decoration:none;text-align:center">📋 Open Booking Page</a>
+    <a href="https://wa.me/17844963447" style="display:block;background:#25D366;color:#fff;padding:13px 16px;border-radius:var(--radius);font-weight:700;font-size:0.88rem;text-decoration:none;text-align:center">💬 Business WhatsApp</a>
+    <button onclick="switchATab('safety');window.scrollTo(0,0)" style="background:#162030;border:1px solid rgba(255,255,255,0.1);color:#fff;padding:13px 16px;border-radius:var(--radius);font-weight:700;font-size:0.88rem;cursor:pointer;text-align:center">🛡️ Run Safety Checklist</button>
+    <button onclick="fetchBookings()" style="background:#162030;border:1px solid rgba(251,198,44,0.3);color:var(--gold);padding:13px 16px;border-radius:var(--radius);font-weight:700;font-size:0.88rem;cursor:pointer">🔄 Refresh Bookings</button>
+  </div>
+
+  <div class="sec-title">Activity Log</div>
+  <div id="activityLog" style="background:#162030;border-radius:var(--radius);padding:12px;max-height:220px;overflow-y:auto">
+    <div class="log-entry"><span class="log-time">now</span><span class="log-msg">Staff console opened</span></div>
+  </div>
+</div>
+
+<!-- ═ BOOKINGS ═ -->
+<div class="asection" id="asec-bookings">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <div class="sec-title" style="margin:0">Live Bookings</div>
+    <button class="refresh-btn" onclick="fetchBookings()">🔄 Refresh</button>
+  </div>
+  <div id="bookingsContainer">
+    <div style="text-align:center;padding:30px;color:rgba(255,255,255,0.35)">Loading bookings…</div>
+  </div>
+</div>
+
+<!-- ═ INVENTORY / FLEET ═ -->
+<div class="asection" id="asec-inventory">
+  <div class="sec-title">Fleet Status</div>
+  <div class="inv-filter">
+    <div class="inv-chip active" onclick="filterInv('ALL')">All</div>
+    <div class="inv-chip" onclick="filterInv('PB')">Paddle Boards</div>
+    <div class="inv-chip" onclick="filterInv('KY')">Kayaks</div>
+    <div class="inv-chip" onclick="filterInv('SN')">Snorkel</div>
+    <div class="inv-chip" onclick="filterInv('FL')">Floaters</div>
+    <div class="inv-chip" onclick="filterInv('LJ')">Life Jackets</div>
+  </div>
+  <div class="inv-grid" id="invGrid"></div>
+  <div class="sec-title" style="margin-top:18px">Summary</div>
+  <div class="dash-grid" id="invSummary"></div>
+</div>
+
+<!-- ═ SAFETY ═ -->
+<div class="asection" id="asec-safety">
+  <div class="checklist-intro">
+    ⚠️ Complete this pre-dispatch safety checklist for <strong>every rental</strong>. Items marked * are mandatory — dispatch cannot proceed without them.
+  </div>
+  <div id="safetyChecklist"></div>
+  <button class="safety-submit" id="safetySubmitBtn" onclick="completeSafetyCheck()">
+    ✅ Mark Dispatch Safe — Proceed
+  </button>
+  <div style="margin-top:16px;background:#162030;border-radius:var(--radius);padding:14px">
+    <div class="sec-title" style="margin:0 0 10px">Recent Safety Checks</div>
+    <div id="safetyLog" style="font-size:0.78rem;color:rgba(255,255,255,0.45)">No recent checks this session</div>
+  </div>
+</div>
+
+<!-- ═ TEAM ═ -->
+<div class="asection" id="asec-team">
+  <div class="sec-title">Ground Team</div>
+  <div id="teamList"></div>
+  <div class="sec-title">Operations</div>
+  <div class="setting-card">
+    <div class="setting-row">
+      <span class="setting-label">Business WhatsApp</span>
+      <a href="https://wa.me/17844963447" class="team-wa">Open ↗</a>
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">Business Email</span>
+      <a href="mailto:aquaticparadiserentals@gmail.com" style="color:var(--teal);font-size:0.78rem;font-weight:600">Email</a>
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">Instagram</span>
+      <a href="https://instagram.com/AquaticParadiseIsuprentals" target="_blank" style="color:var(--teal);font-size:0.78rem;font-weight:600">@APR ↗</a>
+    </div>
+  </div>
+</div>
+
+<!-- ═ SETTINGS ═ -->
+<div class="asection" id="asec-settings">
+  <div class="sec-title">System Info</div>
+  <div class="setting-card">
+    <div class="setting-row"><span class="setting-label">Backend URL</span><span class="setting-val" style="font-size:0.65rem;max-width:180px;word-break:break-all;color:rgba(255,255,255,0.35)">GAS Connected</span></div>
+    <div class="setting-row"><span class="setting-label">App Version</span><span class="setting-val">v2.0</span></div>
+    <div class="setting-row"><span class="setting-label">Session Start</span><span class="setting-val" id="sessionTime">–</span></div>
+    <div class="setting-row"><span class="setting-label">Connection</span><span class="online-pill on" id="connStatus">Online</span></div>
+  </div>
+
+  <div class="sec-title">Security</div>
+  <div class="setting-card">
+    <h3>🔐 Change PIN</h3>
+    <p style="font-size:0.75rem;color:rgba(255,255,255,0.4);margin-bottom:10px">Enter new 4-digit PIN twice to change</p>
+    <div class="pin-change-form">
+      <input class="pin-input" type="password" maxlength="4" inputmode="numeric" placeholder="New PIN" id="newPin1"/>
+      <input class="pin-input" type="password" maxlength="4" inputmode="numeric" placeholder="Confirm" id="newPin2"/>
+      <button class="pin-change-btn" onclick="changePin()">Save</button>
+    </div>
+    <p id="pinChangeMsg" style="font-size:0.75rem;margin-top:8px;min-height:16px"></p>
+  </div>
+
+  <div class="sec-title">Offline Queue</div>
+  <div class="setting-card">
+    <div class="setting-row"><span class="setting-label">Queued bookings</span><span class="setting-val" id="queueCount">0</span></div>
+    <button onclick="syncQueue()" style="margin-top:10px;background:var(--teal);border:none;border-radius:8px;color:#fff;padding:9px 16px;font-size:0.8rem;font-weight:700;cursor:pointer">Sync Now</button>
+  </div>
+
+  <div class="sec-title">Danger Zone</div>
+  <div class="setting-card">
+    <button onclick="lockApp()" style="width:100%;padding:12px;background:rgba(224,53,27,0.15);border:1px solid var(--coral);border-radius:8px;color:var(--coral);font-weight:700;cursor:pointer;font-size:0.88rem">🔒 Lock &amp; Exit Console</button>
+  </div>
+</div>
+
+</div><!-- app-main -->
+</div><!-- appShell -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+const BACKEND = 'https://script.google.com/macros/s/AKfycbxkWt66_EoH5gPs9XJIxOJZ6KYwhXEURYNNaeqQdSUrzte1dfGT3rUPqbYNcW6To_767Q/exec';
+const DEFAULT_PIN = '1784';
+let pinBuffer = '';
+let attempts = 0;
+const MAX_ATTEMPTS = 5;
+
+// ── PIN LOGIC ──
+function getStoredPin() { return localStorage.getItem('apr_pin') || DEFAULT_PIN; }
+
+function pinPress(d) {
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += d;
+  updatePinDots();
+  if (pinBuffer.length === 4) setTimeout(checkPin, 100);
+}
+
+function pinDel() { pinBuffer = pinBuffer.slice(0,-1); updatePinDots(); }
+function pinClear() { pinBuffer = ''; updatePinDots(); }
+
+function updatePinDots() {
+  for (let i=0;i<4;i++) {
+    const d = document.getElementById('d'+i);
+    d.className = 'pin-dot' + (i < pinBuffer.length ? ' filled' : '');
+  }
+}
+
+function checkPin() {
+  if (pinBuffer === getStoredPin()) {
+    attempts = 0;
+    document.getElementById('pinGate').style.display='none';
+    document.getElementById('appShell').style.display='block';
+    document.getElementById('sessionTime').textContent = new Date().toLocaleTimeString();
+    onLogin();
+    addLog('🔐 Staff logged in');
+  } else {
+    attempts++;
+    const remaining = MAX_ATTEMPTS - attempts;
+    document.getElementById('pinError').textContent = attempts >= MAX_ATTEMPTS
+      ? '🔒 Too many attempts. Try again in 5 minutes.'
+      : `❌ Incorrect PIN. ${remaining} attempt${remaining!==1?'s':''} left.`;
+    if (remaining > 0) document.getElementById('pinAttempts').textContent = '';
+
+    for (let i=0;i<4;i++) document.getElementById('d'+i).className='pin-dot error';
+    setTimeout(() => {
+      pinBuffer = '';
+      updatePinDots();
+      document.getElementById('pinError').textContent = '';
+    }, 1200);
+
+    if (attempts >= MAX_ATTEMPTS) {
+      document.querySelectorAll('.pin-btn').forEach(b => b.disabled=true);
+      setTimeout(() => {
+        attempts=0;
+        document.querySelectorAll('.pin-btn').forEach(b=>b.disabled=false);
+        document.getElementById('pinError').textContent='';
+        document.getElementById('pinAttempts').textContent='';
+      }, 300000);
+    }
+  }
+}
+
+function lockApp() {
+  document.getElementById('appShell').style.display='none';
+  document.getElementById('pinGate').style.display='flex';
+  pinBuffer=''; attempts=0;
+  updatePinDots();
+  document.getElementById('pinError').textContent='';
+}
+
+function changePin() {
+  const p1 = document.getElementById('newPin1').value;
+  const p2 = document.getElementById('newPin2').value;
+  const msg = document.getElementById('pinChangeMsg');
+  if (!p1 || p1.length < 4) { msg.style.color=var_coral(); msg.textContent='PIN must be 4 digits'; return; }
+  if (p1 !== p2) { msg.style.color=var_coral(); msg.textContent="PINs don't match"; return; }
+  if (!/^\d{4}$/.test(p1)) { msg.style.color=var_coral(); msg.textContent='Digits only'; return; }
+  localStorage.setItem('apr_pin', p1);
+  msg.style.color='#4ade80'; msg.textContent='✅ PIN updated!';
+  document.getElementById('newPin1').value='';
+  document.getElementById('newPin2').value='';
+  setTimeout(()=>msg.textContent='',3000);
+}
+function var_coral(){return '#E0351B'}
+
+// ── ON LOGIN ──
+function onLogin() {
+  updateOnline();
+  renderInventory();
+  renderSafety();
+  renderTeam();
+  fetchBookings();
+  updateQueueCount();
+  setInterval(updateOnline,10000);
+}
+
+// ── ONLINE STATUS ──
+function updateOnline() {
+  const pill = document.getElementById('onlinePill');
+  const conn = document.getElementById('connStatus');
+  const on = navigator.onLine;
+  pill.className='online-pill '+(on?'on':'off');
+  pill.textContent = on?'● Online':'● Offline';
+  if(conn) { conn.textContent=on?'Online':'Offline'; conn.className='online-pill '+(on?'on':'off'); }
+}
+
+// ── FETCH BOOKINGS ──
+let allBookings = [];
+let bookingStates = JSON.parse(localStorage.getItem('apr_bk_states')||'{}');
+
+async function fetchBookings() {
+  try {
+    const res = await fetch(BACKEND+'?action=getBookings&limit=50');
+    const data = await res.json();
+    if (data.ok && data.bookings) {
+      allBookings = data.bookings;
+      renderBookings();
+      updateKPIs();
+      addLog('📋 Bookings refreshed: '+allBookings.length+' total');
+      showToast('Bookings refreshed','ok');
+    }
+  } catch(e) {
+    showToast('Offline — showing cached data','err');
+    renderBookings();
+    updateKPIs();
+  }
+}
+
+function renderBookings() {
+  const el = document.getElementById('bookingsContainer');
+  if (!allBookings.length) {
+    el.innerHTML='<div style="text-align:center;padding:40px;color:rgba(255,255,255,0.35)">No bookings yet today.<br/><br/><a href="index.html" style="color:var(--teal)">Open booking form →</a></div>';
+    return;
+  }
+  el.innerHTML = allBookings.slice().reverse().map(b => {
+    const state = bookingStates[b.ref] || 'pending';
+    const statusClass = state==='done'?'done':state==='confirmed'?'confirmed':'pending';
+    const statusLabel = state==='done'?'Done':state==='confirmed'?'Confirmed':'Pending';
+    const waMsg = encodeURIComponent(`Hi ${b.fname||'there'}! 👋 Your booking with Aquatic Paradise Rentals is confirmed. Gear: ${b.gear||'N/A'}. Duration: ${b.duration||'N/A'}. Total: XCD ${b.total||'0'}. See you at the beach! 🌊`);
+    const phone = (b.phone||'').replace(/\D/g,'');
+    return `<div class="booking-card ${state==='pending'?'new':''} ${state==='done'?'done':''}" id="bkc-${b.ref}">
+      <div class="bk-header">
+        <span class="bk-ref">${b.ref||'N/A'}</span>
+        <span class="bk-status ${statusClass}">${statusLabel}</span>
+      </div>
+      <div class="bk-name">${b.fname||''} ${b.lname||''}</div>
+      <div class="bk-detail">📱 ${b.phone||'N/A'}</div>
+      <div class="bk-detail">🏄 ${b.gear||'N/A'} · ${b.duration||'N/A'}</div>
+      <div class="bk-detail">📅 ${b.datetime||'N/A'}</div>
+      <div class="bk-detail">👥 Group: ${b.groupSize||'1'}</div>
+      ${b.notes?'<div class="bk-detail">📝 '+b.notes+'</div>':''}
+      <div class="bk-total">XCD ${b.total||0}</div>
+      <div class="bk-actions">
+        ${state!=='confirmed'&&state!=='done'?`<button class="bk-btn confirm" onclick="setBkState('${b.ref}','confirmed')">✅ Confirm</button>`:''}
+        ${state!=='done'?`<button class="bk-btn done-btn" onclick="setBkState('${b.ref}','done')">☑ Done</button>`:''}
+        ${phone?`<a class="bk-btn wa" href="https://wa.me/${phone}?text=${waMsg}" target="_blank">💬 WhatsApp</a>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setBkState(ref, state) {
+  bookingStates[ref] = state;
+  localStorage.setItem('apr_bk_states', JSON.stringify(bookingStates));
+  renderBookings();
+  updateKPIs();
+  addLog(`📋 Booking ${ref} → ${state}`);
+}
+
+function updateKPIs() {
+  const today = new Date().toDateString();
+  const todayBk = allBookings.filter(b => {
+    try { return new Date(b.datetime).toDateString()===today || !b.datetime; } catch { return true; }
+  });
+  const pending = allBookings.filter(b => !bookingStates[b.ref] || bookingStates[b.ref]==='pending').length;
+  const rev = todayBk.reduce((s,b)=>s+(parseFloat(b.total)||0),0);
+  document.getElementById('kpiBookings').textContent = todayBk.length;
+  document.getElementById('kpiRevenue').textContent = rev.toFixed(0);
+  document.getElementById('kpiPending').textContent = pending;
+}
+
+// ── INVENTORY ──
+const FLEET = [
+  ...Array.from({length:8},(_,i)=>({code:`PB-0${i+1}`,name:'Paddle Board',type:'PB'})),
+  ...Array.from({length:6},(_,i)=>({code:`KY-0${i+1}`,name:'Kayak',type:'KY'})),
+  ...Array.from({length:10},(_,i)=>({code:`SN-${String(i+1).padStart(2,'0')}`,name:'Snorkel Set',type:'SN'})),
+  ...Array.from({length:8},(_,i)=>({code:`FL-0${i+1}`,name:'Floater',type:'FL'})),
+  ...Array.from({length:12},(_,i)=>({code:`LJ-${String(i+1).padStart(2,'0')}`,name:'Life Jacket',type:'LJ'})),
+];
+
+let invState = JSON.parse(localStorage.getItem('apr_inv')||'{}');
+let invFilter = 'ALL';
+
+function renderInventory() {
+  const units = invFilter==='ALL' ? FLEET : FLEET.filter(u=>u.type===invFilter);
+  document.getElementById('invGrid').innerHTML = units.map(u => {
+    const out = invState[u.code] === 'out';
+    return `<div class="inv-unit ${out?'out':''}" id="iu-${u.code}">
+      <span class="inv-code">${u.code}</span>
+      <span class="inv-name">${u.name}</span>
+      <label class="toggle-pill">
+        <input type="checkbox" ${!out?'checked':''} onchange="toggleUnit('${u.code}',this.checked)"/>
+        <div class="toggle-track"></div>
+        <div class="toggle-thumb"></div>
+      </label>
+    </div>`;
+  }).join('');
+
+  // Summary
+  const types = [
+    {label:'Paddle Boards',type:'PB',total:8},
+    {label:'Kayaks',type:'KY',total:6},
+    {label:'Snorkel Sets',type:'SN',total:10},
+    {label:'Floaters',type:'FL',total:8},
+    {label:'Life Jackets',type:'LJ',total:12},
+  ];
+  const avail = types.map(t=>{
+    const out = FLEET.filter(u=>u.type===t.type&&invState[u.code]==='out').length;
+    return `<div class="kpi-card ${out===t.total?'coral':out===0?'green':''}">
+      <div class="kpi-label">${t.label}</div>
+      <div class="kpi-val">${t.total-out}<span style="font-size:0.9rem;opacity:0.5">/${t.total}</span></div>
+      <div class="kpi-sub">available</div>
+    </div>`;
+  }).join('');
+  document.getElementById('invSummary').innerHTML = avail;
+
+  const totalOut = FLEET.filter(u=>invState[u.code]==='out').length;
+  document.getElementById('kpiAvail').textContent = (FLEET.length-totalOut)+'/'+FLEET.length;
+}
+
+function toggleUnit(code, available) {
+  invState[code] = available ? 'in' : 'out';
+  localStorage.setItem('apr_inv', JSON.stringify(invState));
+  const el = document.getElementById('iu-'+code);
+  if (el) el.className = 'inv-unit'+(available?'':' out');
+  renderInventory();
+  addLog(`${available?'✅':'🔴'} ${code} marked ${available?'available':'out'}`);
+}
+
+function filterInv(type) {
+  invFilter = type;
+  document.querySelectorAll('.inv-chip').forEach(c=>c.classList.remove('active'));
+  event.target.classList.add('active');
+  renderInventory();
+}
+
+// ── SAFETY CHECKLIST ──
+const SAFETY_ITEMS = [
+  {id:'pfd',label:'Life jacket / PFD present and correct size for each guest',required:true},
+  {id:'whistle',label:'Safety whistle attached to each PFD',required:true},
+  {id:'gear_check',label:'Gear inspected — no cracks, splits, or damage visible',required:true},
+  {id:'photo',label:'Pre-rental photo taken of gear and guest group',required:true},
+  {id:'brief',label:'Safety briefing completed — paddling, dismounting, return signals',required:true},
+  {id:'weather',label:'Weather and sea conditions assessed — suitable for rental',required:true},
+  {id:'medical',label:'Guest medical / swimming ability confirmed',required:false},
+  {id:'code',label:'Gear codes (PB-XX, KY-XX etc.) logged for this rental',required:false},
+  {id:'contact',label:'Guest WhatsApp number recorded',required:false},
+  {id:'return',label:'Return time confirmed with guest',required:false},
+];
+
+let safetyChecked = {};
+let safetyLog = [];
+
+function renderSafety() {
+  safetyChecked = {};
+  document.getElementById('safetyChecklist').innerHTML = SAFETY_ITEMS.map(item => `
+    <div class="check-item ${item.required?'required':''}" id="ci-${item.id}">
+      <input type="checkbox" id="cb-${item.id}" onchange="toggleSafety('${item.id}',this.checked)"/>
+      <label for="cb-${item.id}">${item.label}</label>
+    </div>
+  `).join('');
+  checkSafetyReady();
+}
+
+function toggleSafety(id, checked) {
+  safetyChecked[id] = checked;
+  document.getElementById('ci-'+id)?.classList.toggle('checked', checked);
+  checkSafetyReady();
+}
+
+function checkSafetyReady() {
+  const allRequired = SAFETY_ITEMS.filter(i=>i.required).every(i=>safetyChecked[i.id]);
+  document.getElementById('safetySubmitBtn')?.classList.toggle('ready', allRequired);
+}
+
+function completeSafetyCheck() {
+  const ts = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  safetyLog.unshift(`${ts} — Pre-dispatch safety check PASSED ✅`);
+  const el = document.getElementById('safetyLog');
+  if (el) el.innerHTML = safetyLog.map(e=>`<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05)">${e}</div>`).join('');
+  addLog('🛡️ Safety check completed at '+ts);
+  renderSafety();
+  showToast('Dispatch cleared ✅','ok');
+}
+
+// ── TEAM ──
+const TEAM = [
+  {name:'Operations Manager',role:'Ground Operations Lead',wa:'17844963447',emoji:'👷'},
+  {name:'Beach Staff 1',role:'Gear Dispatch & Guest Relations',wa:'17841234567',emoji:'🏄'},
+  {name:'Beach Staff 2',role:'Gear Dispatch & Safety',wa:'17841234568',emoji:'🌊'},
+];
+
+function renderTeam() {
+  document.getElementById('teamList').innerHTML = TEAM.map(t=>`
+    <div class="team-card">
+      <div class="team-avatar">${t.emoji}</div>
+      <div class="team-info">
+        <div class="team-name">${t.name}</div>
+        <div class="team-role">${t.role}</div>
+      </div>
+      <a class="team-wa" href="https://wa.me/${t.wa}">💬 Chat</a>
+    </div>
+  `).join('');
+}
+
+// ── ACTIVITY LOG ──
+function addLog(msg) {
+  const el = document.getElementById('activityLog');
+  if (!el) return;
+  const ts = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const entry = document.createElement('div');
+  entry.className='log-entry';
+  entry.innerHTML=`<span class="log-time">${ts}</span><span class="log-msg">${msg}</span>`;
+  el.insertBefore(entry, el.firstChild);
+  if (el.children.length > 30) el.removeChild(el.lastChild);
+}
+
+// ── OFFLINE QUEUE ──
+async function syncQueue() {
+  const q = JSON.parse(localStorage.getItem('apr_queue')||'[]');
+  if (!q.length) { showToast('No queued bookings','ok'); return; }
+  const remaining = [];
+  for (const payload of q) {
+    try {
+      const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const d = await res.json();
+      if (!d.ok) remaining.push(payload);
+    } catch { remaining.push(payload); }
+  }
+  localStorage.setItem('apr_queue',JSON.stringify(remaining));
+  updateQueueCount();
+  showToast(`Synced ${q.length-remaining.length} of ${q.length} queued bookings`,'ok');
+  addLog(`🔄 Synced ${q.length-remaining.length} queued bookings`);
+}
+
+function updateQueueCount() {
+  const el = document.getElementById('queueCount');
+  if (el) el.textContent = JSON.parse(localStorage.getItem('apr_queue')||'[]').length;
+}
+
+// ── TAB SWITCH ──
+function switchATab(tab) {
+  ['today','bookings','inventory','safety','team','settings'].forEach(t => {
+    document.getElementById('asec-'+t)?.classList.toggle('active', t===tab);
+  });
+  document.querySelectorAll('.anav-tab').forEach((el,i) => {
+    el.classList.toggle('active', ['today','bookings','inventory','safety','team','settings'][i]===tab);
+  });
+  if (tab==='bookings') fetchBookings();
+}
+
+// ── TOAST ──
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent=msg; t.className='toast show'+(type?' '+type:'');
+  setTimeout(()=>t.className='toast',3000);
+}
+</script>
+</body>
+</html>

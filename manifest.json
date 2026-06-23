@@ -1,15 +1,24 @@
 {
   "name": "Aquatic Paradise Rentals",
-  "short_name": "APR",
-  "description": "Book water sports gear in Bequia, SVG — or manage operations.",
-  "start_url": "/",
-  "scope": "/",
+  "short_name": "APR Bequia",
+  "description": "Book water sports gear rental in Bequia, St. Vincent & the Grenadines",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0B1E2D",
   "theme_color": "#03939E",
   "orientation": "portrait",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
-  ]
+    {
+      "src": "./logo.jpg",
+      "sizes": "any",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
+  ],
+  "categories": [
+    "travel",
+    "lifestyle",
+    "sports"
+  ],
+  "lang": "en"
 }
