@@ -595,7 +595,7 @@ function renderBookings() {
     const statusClass = state==='done'?'done':state==='confirmed'?'confirmed':'pending';
     const statusLabel = state==='done'?'Done':state==='confirmed'?'Confirmed':'Pending';
     const waMsg = encodeURIComponent(`Hi ${b.fname||'there'}! 👋 Your booking with Aquatic Paradise Rentals is confirmed. Gear: ${b.gear||'N/A'}. Duration: ${b.duration||'N/A'}. Total: XCD ${b.total||'0'}. See you at the beach! 🌊`);
-    const phone = (b.phone||'').replace(/\D/g,'');
+    const phone = String(b.phone||'').replace(/\D/g,'');
     return `<div class="booking-card ${state==='pending'?'new':''} ${state==='done'?'done':''}" id="bkc-${b.ref}">
       <div class="bk-header">
         <span class="bk-ref">${b.ref||'N/A'}</span>
