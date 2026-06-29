@@ -1,59 +1,32 @@
 /**
- * AQUATIC PARADISE RENTALS — Booking App Backend
- * Owner: Delroy Stapleton (internal record only — never expose in API responses)
- * Deploy: Extensions > Apps Script in your "APR Master Log" Google Sheet,
- *         paste this whole file in, then Deploy > New deployment > Web app
- *         (Execute as: Me, Who has access: Anyone) and copy the URL into
- *         CONFIG.API_URL in index.html.
+ * AQUATIC PARADISE RENTALS — Booking Backend
+ * Deploy: Extensions > Apps Script in your "APR Master Log" Google Sheet
+ *         Deploy > New deployment > Web app
+ *         Execute as: Me | Who has access: Anyone
  *
- * Sheet tabs required (create if missing, exact names):
- *   BOOKINGS  — header row: Timestamp | BookingID | CustomerName | WhatsApp | Email |
- *               Gear | Date | StartTime | EndTime | Location | PaymentMethod |
- *               PriceXCD | Status | Driver | WaiverSigned | WaiverTimestamp |
- *               WaiverIP | WaiverDevice | SignatureDataURL | Notes
+ * Sheet tab: BOOKINGS (auto-created on first booking)
+ * Columns: ref | fname | lname | phone | email | datetime | groupSize |
+ *          gear | duration | total | referral | notes | waiverAccepted |
+ *          waiverTimestamp | source | Timestamp
  */
 
 var SHEET_NAME = 'BOOKINGS';
-var OWNER_NOTE = 'Delroy Stapleton'; // internal metadata only, never returned to client
+var NOTIFY_EMAIL = 'aquaticparadiserentals@gmail.com';
 
 function _sheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(SHEET_NAME);
   if (!sh) {
     sh = ss.insertSheet(SHEET_NAME);
-    sh.appendRow(['Timestamp','BookingID','CustomerName','WhatsApp','Email','Gear','Date',
-      'StartTime','EndTime','Location','PaymentMethod','PriceXCD','Status','Driver',
-      'WaiverSigned','WaiverTimestamp','WaiverIP','WaiverDevice','SignatureDataURL','IDPhotoURL','Notes','_Owner']);
+    sh.appendRow([
+      'ref','fname','lname','phone','email','datetime','groupSize',
+      'gear','duration','total','referral','notes',
+      'waiverAccepted','waiverTimestamp','source','Timestamp'
+    ]);
+    sh.getRange('1:1').setFontWeight('bold');
+    ['D:D','F:F','N:N'].forEach(function(r){ sh.getRange(r).setNumberFormat('@'); });
   }
-  // Runs every time (not just on first creation) so it also repairs a sheet that
-  // was already created by an older version of this script. Plain-text format on
-  // these columns stops Sheets from auto-converting dates/phone numbers.
-  ['A:A','D:D','G:G','H:H','P:P'].forEach(function(rng){ sh.getRange(rng).setNumberFormat('@'); });
   return sh;
-}
-
-// Google Sheets treats values starting with = + - @ as the start of a formula
-// when written programmatically, which is what mangled the WhatsApp number and
-// dates earlier. Prepending a literal apostrophe forces plain-text, same as if
-// a person typed an apostrophe first in the UI — Sheets hides the apostrophe
-// and just shows the text. Also closes a formula-injection security gap on
-// this public-facing form.
-function _saveImageToDrive(dataUrl, filename) {
-  try {
-    var matches = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
-    if (!matches) return '';
-    var mime = matches[1];
-    var bytes = Utilities.base64Decode(matches[2]);
-    var blob = Utilities.newBlob(bytes, mime, filename);
-    var folderName = 'APR Waiver ID Photos';
-    var folders = DriveApp.getFoldersByName(folderName);
-    var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
-    var file = folder.createFile(blob);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    return file.getUrl();
-  } catch (err) {
-    return '';
-  }
 }
 
 function _safe(val) {
@@ -68,81 +41,119 @@ function _json(obj) {
 }
 
 function doGet(e) {
-  var sh = _sheet();
-  var data = sh.getDataRange().getValues();
-  var headers = data[0];
-  var ownerIdx = headers.indexOf('_Owner');
-  var rows = data.slice(1).map(function(r) {
-    var obj = {};
-    headers.forEach(function(h, i) {
-      if (h === '_Owner') return; // never expose owner field
-      obj[h] = r[i];
-    });
-    obj._row = data.indexOf(r) + 1;
-    return obj;
-  });
-  return _json({ ok: true, bookings: rows });
+  try {
+    var p = e.parameter || {};
+    if (p.data) {
+      return _json(saveBooking(JSON.parse(p.data)));
+    }
+    if (p.action === 'getBookings') {
+      return _json({ ok: true, bookings: getBookings(parseInt(p.limit) || 50) });
+    }
+    return _json({ ok: true, message: 'APR Backend v3' });
+  } catch(err) {
+    return _json({ ok: false, error: err.message });
+  }
 }
 
 function doPost(e) {
   try {
-    var body = JSON.parse(e.postData.contents);
-    var action = body.action;
-
-    if (action === 'create') {
-      var sh = _sheet();
-      var id = 'APR-' + Utilities.formatDate(new Date(), 'GMT', 'yyMMdd-HHmmss');
-      sh.appendRow([
-        new Date(), id, _safe(body.customerName), _safe(body.whatsapp), _safe(body.email),
-        _safe(body.gear), _safe(body.date), _safe(body.startTime), _safe(body.endTime),
-        _safe(body.location), _safe(body.paymentMethod), body.priceXCD || 0,
-        'Requested', '', false, '', '', '', '', '', OWNER_NOTE
-      ]);
-      return _json({ ok: true, bookingId: id });
+    var payload = {};
+    if (e.postData && e.postData.contents) {
+      payload = JSON.parse(e.postData.contents);
+    } else if (e.parameter && e.parameter.data) {
+      payload = JSON.parse(e.parameter.data);
+    } else {
+      throw new Error('No data received');
     }
-
-    if (action === 'sign_waiver') {
-      var sh = _sheet();
-      var data = sh.getDataRange().getValues();
-      var headers = data[0];
-      var idIdx = headers.indexOf('BookingID');
-      for (var i = 1; i < data.length; i++) {
-        if (data[i][idIdx] === body.bookingId) {
-          var row = i + 1;
-          sh.getRange(row, headers.indexOf('WaiverSigned') + 1).setValue(true);
-          sh.getRange(row, headers.indexOf('WaiverTimestamp') + 1).setValue(_safe(body.timestamp || new Date().toISOString()));
-          sh.getRange(row, headers.indexOf('WaiverIP') + 1).setValue(_safe(body.ip || 'unavailable'));
-          sh.getRange(row, headers.indexOf('WaiverDevice') + 1).setValue(_safe(body.device || ''));
-          sh.getRange(row, headers.indexOf('SignatureDataURL') + 1).setValue(body.signature || '');
-          if (body.idPhoto) {
-            var idUrl = _saveImageToDrive(body.idPhoto, body.bookingId + '-ID');
-            sh.getRange(row, headers.indexOf('IDPhotoURL') + 1).setValue(idUrl || '');
-          }
-          return _json({ ok: true });
-        }
-      }
-      return _json({ ok: false, error: 'Booking not found' });
-    }
-
-    if (action === 'update_status') {
-      var sh = _sheet();
-      var data = sh.getDataRange().getValues();
-      var headers = data[0];
-      var idIdx = headers.indexOf('BookingID');
-      for (var i = 1; i < data.length; i++) {
-        if (data[i][idIdx] === body.bookingId) {
-          var row = i + 1;
-          if (body.status) sh.getRange(row, headers.indexOf('Status') + 1).setValue(body.status);
-          if (body.driver !== undefined) sh.getRange(row, headers.indexOf('Driver') + 1).setValue(body.driver);
-          if (body.notes !== undefined) sh.getRange(row, headers.indexOf('Notes') + 1).setValue(body.notes);
-          return _json({ ok: true });
-        }
-      }
-      return _json({ ok: false, error: 'Booking not found' });
-    }
-
-    return _json({ ok: false, error: 'Unknown action' });
-  } catch (err) {
-    return _json({ ok: false, error: err.toString() });
+    if (payload.action === 'update_status') return _json(updateStatus(payload));
+    if (payload.action === 'getBookings') return _json({ ok: true, bookings: getBookings(50) });
+    return _json(saveBooking(payload));
+  } catch(err) {
+    return _json({ ok: false, error: err.message });
   }
+}
+
+function saveBooking(p) {
+  var sh = _sheet();
+  sh.appendRow([
+    _safe(p.ref),
+    _safe(p.fname),
+    _safe(p.lname),
+    _safe(p.phone),
+    _safe(p.email),
+    _safe(p.datetime),
+    _safe(p.groupSize),
+    _safe(p.gear),
+    _safe(p.duration),
+    p.total || 0,
+    _safe(p.referral),
+    _safe(p.notes),
+    p.waiverAccepted ? true : false,
+    _safe(p.waiverTimestamp),
+    _safe(p.source || 'PWA'),
+    new Date().toISOString()
+  ]);
+  try { sendNotification(p); } catch(e) { Logger.log('Email err: ' + e.message); }
+  return { ok: true, ref: p.ref };
+}
+
+var FIELDS = ['ref','fname','lname','phone','email','datetime','groupSize',
+  'gear','duration','total','referral','notes','waiverAccepted','waiverTimestamp','source','Timestamp'];
+
+function getBookings(limit) {
+  var sh = _sheet();
+  var data = sh.getDataRange().getValues();
+  if (data.length <= 1) return [];
+  return data.slice(1).reverse().slice(0, limit).map(function(row) {
+    var obj = {};
+    FIELDS.forEach(function(f, i) { obj[f] = row[i]; });
+    return obj;
+  });
+}
+
+function updateStatus(p) {
+  var sh = _sheet();
+  var data = sh.getDataRange().getValues();
+  var refIdx = data[0].indexOf('ref');
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][refIdx] === p.ref) return { ok: true };
+  }
+  return { ok: false, error: 'Booking not found' };
+}
+
+// ── ONE-TIME SETUP: Run this once from Apps Script to fix sheet headers ──
+function setupSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(SHEET_NAME);
+  if (!sh) sh = ss.insertSheet(SHEET_NAME);
+  // Clear and reset header row
+  sh.getRange('1:1').clearContent();
+  sh.getRange(1, 1, 1, 16).setValues([[
+    'ref','fname','lname','phone','email','datetime','groupSize',
+    'gear','duration','total','referral','notes',
+    'waiverAccepted','waiverTimestamp','source','Timestamp'
+  ]]);
+  sh.getRange('1:1').setFontWeight('bold');
+  ['D:D','F:F','N:N'].forEach(function(r){ sh.getRange(r).setNumberFormat('@'); });
+  SpreadsheetApp.getUi().alert('✅ Sheet headers updated! You can delete old test rows manually.');
+}
+
+function sendNotification(p) {
+  var subject = '🏄 New APR Booking: ' + (p.ref || '');
+  var body = [
+    'New booking received!', '',
+    'Ref:       ' + (p.ref || ''),
+    'Name:      ' + (p.fname || '') + ' ' + (p.lname || ''),
+    'Phone:     ' + (p.phone || ''),
+    'Email:     ' + (p.email || ''),
+    'Date/Time: ' + (p.datetime || ''),
+    'Group:     ' + (p.groupSize || ''),
+    'Gear:      ' + (p.gear || ''),
+    'Duration:  ' + (p.duration || ''),
+    'Total:     XCD ' + (p.total || ''),
+    'Referral:  ' + (p.referral || ''),
+    'Notes:     ' + (p.notes || ''),
+    '', 'Submitted: ' + new Date().toISOString()
+  ].join('\n');
+  GmailApp.sendEmail(NOTIFY_EMAIL, subject, body);
 }

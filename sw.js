@@ -1,10 +1,13 @@
-// APR Service Worker v2.0
-const CACHE = 'apr-v2';
+// APR Service Worker v3.0
+const CACHE = 'apr-v3';
 const ASSETS = [
   './',
   './index.html',
   './admin.html',
   './manifest.json',
+  './logo.jpg',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
 ];
 
 self.addEventListener('install', e => {
@@ -22,7 +25,6 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Always go network-first for the backend API
   if (e.request.url.includes('script.google.com')) {
     e.respondWith(
       fetch(e.request).catch(() =>
@@ -33,7 +35,6 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
-  // Cache-first for app assets
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
       const clone = res.clone();
