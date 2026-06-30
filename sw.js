@@ -1,14 +1,12 @@
-// APR Service Worker v3.0
-const CACHE = 'apr-v3';
+// APR Service Worker v4.0
+const CACHE = 'apr-v4';
 const ASSETS = [
-  './',
-  './index.html',
-  './admin.html',
   './manifest.json',
   './logo.jpg',
   './icons/icon-192.png',
   './icons/icon-512.png',
 ];
+const HTML_FILES = ['./', './index.html', './admin.html'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -35,6 +33,24 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
+
+  const isHTML = e.request.mode === 'navigate' ||
+    HTML_FILES.some(f => e.request.url.endsWith(f.replace('./', '')));
+
+  if (isHTML) {
+    // Network-first for HTML so updates show up immediately.
+    // Falls back to cache only when offline.
+    e.respondWith(
+      fetch(e.request).then(res => {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return res;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Cache-first for static assets (images, manifest)
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
       const clone = res.clone();
