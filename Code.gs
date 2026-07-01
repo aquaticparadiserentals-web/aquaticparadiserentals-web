@@ -12,6 +12,9 @@
 
 var SHEET_NAME = 'BOOKINGS';
 var NOTIFY_EMAIL = 'aquaticparadiserentals@gmail.com';
+// Shared secret required to read booking/customer data (PII). Booking *submission*
+// stays open since customers must be able to book without a login.
+var APP_TOKEN = '2Si_80O9OJ0DGmc8p6G5pDeG';
 
 function _sheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -47,6 +50,7 @@ function doGet(e) {
       return _json(saveBooking(JSON.parse(p.data)));
     }
     if (p.action === 'getBookings') {
+      if (p.token !== APP_TOKEN) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, bookings: getBookings(parseInt(p.limit) || 50) });
     }
     return _json({ ok: true, message: 'APR Backend v3' });
@@ -65,8 +69,14 @@ function doPost(e) {
     } else {
       throw new Error('No data received');
     }
-    if (payload.action === 'update_status') return _json(updateStatus(payload));
-    if (payload.action === 'getBookings') return _json({ ok: true, bookings: getBookings(50) });
+    if (payload.action === 'update_status') {
+      if (payload.token !== APP_TOKEN) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(updateStatus(payload));
+    }
+    if (payload.action === 'getBookings') {
+      if (payload.token !== APP_TOKEN) return _json({ ok: false, error: 'Unauthorized' });
+      return _json({ ok: true, bookings: getBookings(50) });
+    }
     return _json(saveBooking(payload));
   } catch(err) {
     return _json({ ok: false, error: err.message });

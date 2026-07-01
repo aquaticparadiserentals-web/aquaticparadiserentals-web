@@ -214,6 +214,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
       <div class="anav-tab" onclick="switchATab('inventory')">🏄 Fleet</div>
       <div class="anav-tab" onclick="switchATab('safety')">🛡️ Safety</div>
       <div class="anav-tab" onclick="switchATab('team')">👥 Team</div>
+      <div class="anav-tab" onclick="switchATab('drivers')">🚚 Drivers</div>
       <div class="anav-tab" onclick="switchATab('settings')">⚙️ Settings</div>
       <div class="anav-tab" onclick="switchATab('rates')">💰 Rates</div>
     </div>
@@ -369,8 +370,20 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
 
 <!-- ═ TEAM ═ -->
 <div class="asection" id="asec-team">
-  <div class="sec-title">Ground Team</div>
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div class="sec-title" style="margin:0">Ground Team</div>
+    <button class="refresh-btn" onclick="notifyAllStaff()">🔔 Notify All</button>
+  </div>
   <div id="teamList"></div>
+
+  <div class="sec-title">Add Staff</div>
+  <div class="card" style="margin-bottom:16px">
+    <input type="text" id="newStaffName" placeholder="Full name" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:8px;box-sizing:border-box"/>
+    <input type="text" id="newStaffRole" placeholder="Role (e.g. Gear Dispatch)" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:8px;box-sizing:border-box"/>
+    <input type="tel" id="newStaffPhone" placeholder="WhatsApp number, e.g. +1 784 XXX XXXX" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:10px;box-sizing:border-box"/>
+    <button onclick="addStaff()" style="width:100%;padding:10px;background:#03939E;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.88rem;cursor:pointer">➕ Add Staff Member</button>
+  </div>
+
   <div class="sec-title">Operations</div>
   <div class="setting-card">
     <div class="setting-row">
@@ -385,6 +398,20 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
       <span class="setting-label">Instagram</span>
       <a href="https://instagram.com/AquaticParadiseIsuprentals" target="_blank" style="color:var(--teal);font-size:0.78rem;font-weight:600">@APR ↗</a>
     </div>
+  </div>
+</div>
+
+<!-- ═ DRIVERS ═ -->
+<div class="asection" id="asec-drivers">
+  <div class="sec-title">Delivery Drivers</div>
+  <div id="driverList"></div>
+
+  <div class="sec-title">Add Driver</div>
+  <div class="card" style="margin-bottom:16px">
+    <input type="text" id="newDriverName" placeholder="Full name" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:8px;box-sizing:border-box"/>
+    <input type="text" id="newDriverVehicle" placeholder="Vehicle (e.g. Pickup truck)" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:8px;box-sizing:border-box"/>
+    <input type="tel" id="newDriverPhone" placeholder="WhatsApp number, e.g. +1 784 XXX XXXX" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:10px;box-sizing:border-box"/>
+    <button onclick="addDriver()" style="width:100%;padding:10px;background:#03939E;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.88rem;cursor:pointer">➕ Add Driver</button>
   </div>
 </div>
 
@@ -443,15 +470,65 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
 
 <div class="toast" id="toast"></div>
 
+<!-- ═ DELIVERY NOTIFY MODAL ═ -->
+<div id="deliveryModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:900;align-items:center;justify-content:center">
+  <div style="background:#162030;border-radius:16px;padding:22px;width:90%;max-width:360px;color:#fff">
+    <div style="font-weight:800;font-size:1rem;margin-bottom:6px">🚚 Notify Driver</div>
+    <div style="font-size:0.78rem;color:rgba(255,255,255,0.5);margin-bottom:14px">Booking <span id="deliveryRefLabel"></span></div>
+    <select id="deliveryDriverSelect" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:#0B1E2D;color:#fff;font-size:0.85rem;margin-bottom:14px"></select>
+    <div style="display:flex;gap:8px">
+      <button onclick="closeDeliveryModal()" style="flex:1;padding:10px;background:rgba(255,255,255,0.08);border:none;border-radius:8px;color:#fff;font-weight:700;cursor:pointer">Cancel</button>
+      <button onclick="confirmDelivery()" style="flex:1;padding:10px;background:var(--teal);border:none;border-radius:8px;color:#fff;font-weight:700;cursor:pointer">Send 🔔</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const BACKEND = 'https://script.google.com/macros/s/AKfycbzr1KHela518-pgQ3dJyvv77tm9z2JWo_TTovRNys6RwYNBIUfdyJKxGF_ETzNk9m47Ww/exec';
+// Must match APP_TOKEN in Code.gs — gates access to customer PII (bookings).
+const APP_TOKEN = '2Si_80O9OJ0DGmc8p6G5pDeG';
 const DEFAULT_PIN = '1784';
 let pinBuffer = '';
 let attempts = 0;
+let currentUser = null;
 const MAX_ATTEMPTS = 5;
+const LOCKOUT_MS = 5 * 60 * 1000;
+const IDLE_LOCK_MS = 20 * 60 * 1000;
+let idleTimer = null;
+
+// ── HASHING (PINs are never stored in plaintext) ──
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// ── MIGRATE LEGACY SHARED PIN → per-person "Owner" account ──
+async function migrateLegacyAuth() {
+  if (localStorage.getItem('apr_people')) return;
+  const legacyPin = localStorage.getItem('apr_pin') || DEFAULT_PIN;
+  const people = [{ id:'owner', name:'Owner', pinHash: await sha256(legacyPin) }];
+  localStorage.setItem('apr_people', JSON.stringify(people));
+  localStorage.removeItem('apr_pin');
+}
+migrateLegacyAuth();
+
+function getPeople() { return JSON.parse(localStorage.getItem('apr_people')||'[]'); }
+function savePeople(list) { localStorage.setItem('apr_people', JSON.stringify(list)); }
+
+async function setPersonPin(id, name, pin) {
+  const people = getPeople();
+  const hash = await sha256(pin);
+  const existing = people.find(p=>p.id===id);
+  if (existing) { existing.pinHash = hash; existing.name = name; }
+  else people.push({ id, name, pinHash: hash });
+  savePeople(people);
+}
 
 // ── PIN LOGIC ──
-function getStoredPin() { return localStorage.getItem('apr_pin') || DEFAULT_PIN; }
+function isLockedOut() {
+  const until = parseInt(localStorage.getItem('apr_lockout_until')||'0');
+  return until > Date.now();
+}
 
 function pinPress(d) {
   if (pinBuffer.length >= 4) return;
@@ -470,14 +547,24 @@ function updatePinDots() {
   }
 }
 
-function checkPin() {
-  if (pinBuffer === getStoredPin()) {
+async function checkPin() {
+  if (isLockedOut()) {
+    document.getElementById('pinError').textContent = '🔒 Locked. Try again later.';
+    pinBuffer=''; updatePinDots();
+    return;
+  }
+  const hash = await sha256(pinBuffer);
+  const match = getPeople().find(p => p.pinHash === hash);
+  if (match) {
     attempts = 0;
+    localStorage.removeItem('apr_lockout_until');
+    currentUser = match;
     document.getElementById('pinGate').style.display='none';
     document.getElementById('appShell').style.display='block';
     document.getElementById('sessionTime').textContent = new Date().toLocaleTimeString();
     onLogin();
-    addLog('🔐 Staff logged in');
+    addLog('🔐 ' + match.name + ' logged in');
+    resetIdleTimer();
   } else {
     attempts++;
     const remaining = MAX_ATTEMPTS - attempts;
@@ -494,18 +581,22 @@ function checkPin() {
     }, 1200);
 
     if (attempts >= MAX_ATTEMPTS) {
+      localStorage.setItem('apr_lockout_until', String(Date.now() + LOCKOUT_MS));
       document.querySelectorAll('.pin-btn').forEach(b => b.disabled=true);
       setTimeout(() => {
         attempts=0;
         document.querySelectorAll('.pin-btn').forEach(b=>b.disabled=false);
         document.getElementById('pinError').textContent='';
         document.getElementById('pinAttempts').textContent='';
-      }, 300000);
+      }, LOCKOUT_MS);
     }
   }
 }
 
 function lockApp() {
+  if (currentUser) addLog('🔒 ' + currentUser.name + ' locked the console');
+  currentUser = null;
+  clearTimeout(idleTimer);
   document.getElementById('appShell').style.display='none';
   document.getElementById('pinGate').style.display='flex';
   pinBuffer=''; attempts=0;
@@ -513,14 +604,24 @@ function lockApp() {
   document.getElementById('pinError').textContent='';
 }
 
-function changePin() {
+function resetIdleTimer() {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    showToast('Session locked after inactivity', 'warn');
+    lockApp();
+  }, IDLE_LOCK_MS);
+}
+['click','keydown','touchstart'].forEach(ev => document.addEventListener(ev, () => { if (currentUser) resetIdleTimer(); }));
+
+async function changePin() {
   const p1 = document.getElementById('newPin1').value;
   const p2 = document.getElementById('newPin2').value;
   const msg = document.getElementById('pinChangeMsg');
   if (!p1 || p1.length < 4) { msg.style.color=var_coral(); msg.textContent='PIN must be 4 digits'; return; }
   if (p1 !== p2) { msg.style.color=var_coral(); msg.textContent="PINs don't match"; return; }
   if (!/^\d{4}$/.test(p1)) { msg.style.color=var_coral(); msg.textContent='Digits only'; return; }
-  localStorage.setItem('apr_pin', p1);
+  if (!currentUser) { msg.style.color=var_coral(); msg.textContent='Not logged in'; return; }
+  await setPersonPin(currentUser.id, currentUser.name, p1);
   msg.style.color='#4ade80'; msg.textContent='✅ PIN updated!';
   document.getElementById('newPin1').value='';
   document.getElementById('newPin2').value='';
@@ -530,10 +631,12 @@ function var_coral(){return '#E0351B'}
 
 // ── ON LOGIN ──
 function onLogin() {
+  renderLog();
   updateOnline();
   renderInventory();
   renderSafety();
   renderTeam();
+  renderDrivers();
   fetchBookings();
   updateQueueCount();
   loadBrotherNum();
@@ -558,7 +661,7 @@ async function fetchBookings() {
   const el = document.getElementById('bookingsContainer');
   el.innerHTML='<div style="text-align:center;padding:30px;color:rgba(255,255,255,0.35)">⏳ Loading bookings…</div>';
   try {
-    const res = await fetch(BACKEND+'?action=getBookings&limit=50',{signal:AbortSignal.timeout(10000)});
+    const res = await fetch(BACKEND+'?action=getBookings&limit=50&token='+encodeURIComponent(APP_TOKEN),{signal:AbortSignal.timeout(10000)});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
     if (data.ok && data.bookings) {
@@ -612,6 +715,7 @@ function renderBookings() {
         ${state!=='confirmed'&&state!=='done'?`<button class="bk-btn confirm" onclick="setBkState('${b.ref}','confirmed')">✅ Confirm</button>`:''}
         ${state!=='done'?`<button class="bk-btn done-btn" onclick="setBkState('${b.ref}','done')">☑ Done</button>`:''}
         ${phone?`<a class="bk-btn wa" href="https://wa.me/${phone}?text=${waMsg}" target="_blank">💬 WhatsApp</a>`:''}
+        <button class="bk-btn" onclick="notifyDelivery('${b.ref}')">🚚 Notify Driver</button>
       </div>
     </div>`;
   }).join('');
@@ -753,36 +857,167 @@ function completeSafetyCheck() {
   showToast('Dispatch cleared ✅','ok');
 }
 
-// ── TEAM ──
-const TEAM = [
-  {name:'Operations Manager',role:'Ground Operations Lead',wa:'17844963447',emoji:'👷'},
-  {name:'Beach Staff 1',role:'Gear Dispatch & Guest Relations',wa:'17841234567',emoji:'🏄'},
-  {name:'Beach Staff 2',role:'Gear Dispatch & Safety',wa:'17841234568',emoji:'🌊'},
+// ── TEAM (STAFF) — persisted, editable ──
+const DEFAULT_TEAM = [
+  {id:'staff-ops',name:'Operations Manager',role:'Ground Operations Lead',wa:'17844963447',emoji:'👷'},
+  {id:'staff-dravin',name:'Dravin',role:'Gear Dispatch & Guest Relations',wa:'17845325218',emoji:'🏄'},
+  {id:'staff-shammar',name:'Shammar',role:'Gear Dispatch & Safety',wa:'17844340530',emoji:'🌊'},
 ];
 
+function getStaff() {
+  const stored = localStorage.getItem('apr_staff');
+  if (!stored) { localStorage.setItem('apr_staff', JSON.stringify(DEFAULT_TEAM)); return DEFAULT_TEAM.slice(); }
+  return JSON.parse(stored);
+}
+function saveStaff(list) { localStorage.setItem('apr_staff', JSON.stringify(list)); }
+
+function notifyLink(wa, msg) { return `https://wa.me/${wa}?text=${encodeURIComponent(msg)}`; }
+
 function renderTeam() {
-  document.getElementById('teamList').innerHTML = TEAM.map(t=>`
+  const staff = getStaff();
+  document.getElementById('teamList').innerHTML = staff.map(t=>`
     <div class="team-card">
-      <div class="team-avatar">${t.emoji}</div>
+      <div class="team-avatar">${t.emoji||'🙂'}</div>
       <div class="team-info">
         <div class="team-name">${t.name}</div>
-        <div class="team-role">${t.role}</div>
+        <div class="team-role">${t.role||''}</div>
       </div>
       <a class="team-wa" href="https://wa.me/${t.wa}">💬 Chat</a>
+      <a class="team-wa" style="background:var(--gold);color:#0B1E2D" href="${notifyLink(t.wa,'🔔 APR Alert: Please check the staff console for an update — '+t.name)}">🔔 Notify</a>
+      <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer" onclick="removeStaff('${t.id}')">🗑️</button>
     </div>
   `).join('');
 }
 
+function addStaff() {
+  const name = document.getElementById('newStaffName').value.trim();
+  const role = document.getElementById('newStaffRole').value.trim();
+  const phoneRaw = document.getElementById('newStaffPhone').value.trim();
+  const wa = phoneRaw.replace(/\D/g,'');
+  if (!name || !wa) { showToast('Name and phone required', 'warn'); return; }
+  const staff = getStaff();
+  staff.push({id:'staff-'+Date.now(), name, role, wa, emoji:'🙂'});
+  saveStaff(staff);
+  document.getElementById('newStaffName').value='';
+  document.getElementById('newStaffRole').value='';
+  document.getElementById('newStaffPhone').value='';
+  renderTeam();
+  addLog('👥 Staff added: '+name);
+  showToast('Staff added ✅','ok');
+}
+
+function removeStaff(id) {
+  saveStaff(getStaff().filter(t=>t.id!==id));
+  renderTeam();
+  addLog('👥 Staff removed');
+}
+
+function notifyAllStaff() {
+  const staff = getStaff();
+  if (!staff.length) { showToast('No staff to notify','warn'); return; }
+  staff.forEach((t,i) => setTimeout(()=>window.open(notifyLink(t.wa,'🔔 APR Alert: Please check the staff console for an update.'),'_blank'), i*400));
+  addLog('🔔 Notified all staff ('+staff.length+')');
+}
+
+// ── DRIVERS — persisted, editable ──
+function getDrivers() { return JSON.parse(localStorage.getItem('apr_drivers')||'[]'); }
+function saveDrivers(list) { localStorage.setItem('apr_drivers', JSON.stringify(list)); }
+
+function renderDrivers() {
+  const drivers = getDrivers();
+  const el = document.getElementById('driverList');
+  if (!el) return;
+  el.innerHTML = drivers.length ? drivers.map(d=>`
+    <div class="team-card">
+      <div class="team-avatar">🚚</div>
+      <div class="team-info">
+        <div class="team-name">${d.name}</div>
+        <div class="team-role">${d.vehicle||'Driver'}</div>
+      </div>
+      <a class="team-wa" href="https://wa.me/${d.wa}">💬 Chat</a>
+      <a class="team-wa" style="background:var(--gold);color:#0B1E2D" href="${notifyLink(d.wa,'🔔 APR Alert: Please check the staff console for an update — '+d.name)}">🔔 Notify</a>
+      <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer" onclick="removeDriver('${d.id}')">🗑️</button>
+    </div>
+  `).join('') : '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.35)">No drivers added yet</div>';
+}
+
+function addDriver() {
+  const name = document.getElementById('newDriverName').value.trim();
+  const vehicle = document.getElementById('newDriverVehicle').value.trim();
+  const phoneRaw = document.getElementById('newDriverPhone').value.trim();
+  const wa = phoneRaw.replace(/\D/g,'');
+  if (!name || !wa) { showToast('Name and phone required', 'warn'); return; }
+  const drivers = getDrivers();
+  drivers.push({id:'driver-'+Date.now(), name, vehicle, wa});
+  saveDrivers(drivers);
+  document.getElementById('newDriverName').value='';
+  document.getElementById('newDriverVehicle').value='';
+  document.getElementById('newDriverPhone').value='';
+  renderDrivers();
+  populateDeliveryDriverSelect();
+  addLog('🚚 Driver added: '+name);
+  showToast('Driver added ✅','ok');
+}
+
+function removeDriver(id) {
+  saveDrivers(getDrivers().filter(d=>d.id!==id));
+  renderDrivers();
+  populateDeliveryDriverSelect();
+  addLog('🚚 Driver removed');
+}
+
+// ── DELIVERY NOTIFICATIONS ──
+function populateDeliveryDriverSelect() {
+  const sel = document.getElementById('deliveryDriverSelect');
+  if (!sel) return;
+  const drivers = getDrivers();
+  sel.innerHTML = drivers.length
+    ? drivers.map(d=>`<option value="${d.id}">${d.name}</option>`).join('')
+    : '<option value="">No drivers added — add one in the Drivers tab</option>';
+}
+
+function notifyDelivery(ref) {
+  const b = allBookings.find(x=>x.ref===ref);
+  if (!b) return;
+  const drivers = getDrivers();
+  if (!drivers.length) { showToast('Add a driver first (Drivers tab)', 'warn'); return; }
+  document.getElementById('deliveryRefLabel').textContent = ref;
+  document.getElementById('deliveryModal').dataset.ref = ref;
+  populateDeliveryDriverSelect();
+  document.getElementById('deliveryModal').style.display='flex';
+}
+
+function closeDeliveryModal() { document.getElementById('deliveryModal').style.display='none'; }
+
+function confirmDelivery() {
+  const ref = document.getElementById('deliveryModal').dataset.ref;
+  const driverId = document.getElementById('deliveryDriverSelect').value;
+  const driver = getDrivers().find(d=>d.id===driverId);
+  const b = allBookings.find(x=>x.ref===ref);
+  if (!driver || !b) { showToast('Select a driver', 'warn'); return; }
+  const msg = `🚚 New delivery — APR\nRef: ${b.ref}\nGuest: ${b.fname||''} ${b.lname||''}\nPhone: ${b.phone||''}\nGear: ${b.gear||''}\nWhen: ${b.datetime||''}\nNotes: ${b.notes||''}`;
+  window.open(notifyLink(driver.wa, msg), '_blank');
+  addLog('🚚 Delivery notification sent to '+driver.name+' for '+ref);
+  showToast('Driver notified ✅','ok');
+  closeDeliveryModal();
+}
+
 // ── ACTIVITY LOG ──
 function addLog(msg) {
+  const ts = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const who = currentUser ? currentUser.name+': ' : '';
+  const log = JSON.parse(localStorage.getItem('apr_activity_log')||'[]');
+  log.unshift({ts, msg: who+msg});
+  localStorage.setItem('apr_activity_log', JSON.stringify(log.slice(0,100)));
+  renderLog();
+}
+
+function renderLog() {
   const el = document.getElementById('activityLog');
   if (!el) return;
-  const ts = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-  const entry = document.createElement('div');
-  entry.className='log-entry';
-  entry.innerHTML=`<span class="log-time">${ts}</span><span class="log-msg">${msg}</span>`;
-  el.insertBefore(entry, el.firstChild);
-  if (el.children.length > 30) el.removeChild(el.lastChild);
+  const log = JSON.parse(localStorage.getItem('apr_activity_log')||'[]');
+  el.innerHTML = log.slice(0,30).map(e=>`<div class="log-entry"><span class="log-time">${e.ts}</span><span class="log-msg">${e.msg}</span></div>`).join('')
+    || '<div class="log-entry"><span class="log-time">now</span><span class="log-msg">Staff console opened</span></div>';
 }
 
 // ── OFFLINE QUEUE ──
@@ -857,15 +1092,17 @@ function exportCSV() {
 }
 
 // ── TAB SWITCH ──
+const ATABS = ['today','bookings','inventory','safety','team','drivers','settings','rates'];
 function switchATab(tab) {
-  ['today','bookings','inventory','safety','team','settings','rates'].forEach(t => {
+  ATABS.forEach(t => {
     document.getElementById('asec-'+t)?.classList.toggle('active', t===tab);
   });
   document.querySelectorAll('.anav-tab').forEach((el,i) => {
-    el.classList.toggle('active', ['today','bookings','inventory','safety','team','settings','rates'][i]===tab);
+    el.classList.toggle('active', ATABS[i]===tab);
   });
   if (tab==='bookings') fetchBookings();
   if (tab==='safety') renderSafety();
+  if (tab==='drivers') renderDrivers();
 }
 
 // ── TOAST ──
