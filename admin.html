@@ -474,8 +474,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
 <div id="deliveryModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:900;align-items:center;justify-content:center">
   <div style="background:#162030;border-radius:16px;padding:22px;width:90%;max-width:360px;color:#fff">
     <div style="font-weight:800;font-size:1rem;margin-bottom:6px">🚚 Notify Driver</div>
-    <div style="font-size:0.78rem;color:rgba(255,255,255,0.5);margin-bottom:14px">Booking <span id="deliveryRefLabel"></span></div>
-    <select id="deliveryDriverSelect" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:#0B1E2D;color:#fff;font-size:0.85rem;margin-bottom:14px"></select>
+    <div style="font-size:0.78rem;color:rgba(255,255,255,0.5);margin-bottom:10px">Booking <span id="deliveryRefLabel"></span></div>
+    <div id="deliveryAlreadySent" style="font-size:0.72rem;color:var(--gold);margin-bottom:8px;min-height:14px"></div>
+    <select id="deliveryDriverSelect" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:#0B1E2D;color:#fff;font-size:0.85rem;margin-bottom:10px"></select>
+    <input type="text" id="deliveryLocation" maxlength="200" placeholder="Delivery location / address (optional)" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:#0B1E2D;color:#fff;font-size:0.85rem;margin-bottom:14px;box-sizing:border-box"/>
     <div style="display:flex;gap:8px">
       <button onclick="closeDeliveryModal()" style="flex:1;padding:10px;background:rgba(255,255,255,0.08);border:none;border-radius:8px;color:#fff;font-weight:700;cursor:pointer">Cancel</button>
       <button onclick="confirmDelivery()" style="flex:1;padding:10px;background:var(--teal);border:none;border-radius:8px;color:#fff;font-weight:700;cursor:pointer">Send 🔔</button>
@@ -496,38 +498,90 @@ const LOCKOUT_MS = 5 * 60 * 1000;
 const IDLE_LOCK_MS = 20 * 60 * 1000;
 let idleTimer = null;
 
+// ── SAFE LOCAL STORAGE (corrupt/missing data must never crash the app) ──
+function safeParseJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return (parsed === null || parsed === undefined) ? fallback : parsed;
+  } catch (err) {
+    console.error('safeParseJSON failed for key "'+key+'":', err);
+    return fallback;
+  }
+}
+function safeSetJSON(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch (err) {
+    console.error('safeSetJSON failed for key "'+key+'":', err);
+    return false;
+  }
+}
+
 // ── HASHING (PINs are never stored in plaintext) ──
+// Any crypto failure returns null rather than throwing, so callers can
+// fail closed (deny access) instead of letting a broken hash slip through.
 async function sha256(str) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  try {
+    if (typeof str !== 'string') return null;
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  } catch (err) {
+    console.error('sha256 failed:', err);
+    return null;
+  }
 }
 
 // ── MIGRATE LEGACY SHARED PIN → per-person "Owner" account ──
 async function migrateLegacyAuth() {
-  if (localStorage.getItem('apr_people')) return;
-  const legacyPin = localStorage.getItem('apr_pin') || DEFAULT_PIN;
-  const people = [{ id:'owner', name:'Owner', pinHash: await sha256(legacyPin) }];
-  localStorage.setItem('apr_people', JSON.stringify(people));
-  localStorage.removeItem('apr_pin');
+  try {
+    if (localStorage.getItem('apr_people')) return;
+    const legacyPin = localStorage.getItem('apr_pin') || DEFAULT_PIN;
+    const hash = await sha256(legacyPin);
+    if (!hash) return; // hashing failed — do not create a broken account
+    const people = [{ id:'owner', name:'Owner', pinHash: hash }];
+    safeSetJSON('apr_people', people);
+    localStorage.removeItem('apr_pin');
+  } catch (err) {
+    console.error('migrateLegacyAuth failed:', err);
+  }
 }
 migrateLegacyAuth();
 
-function getPeople() { return JSON.parse(localStorage.getItem('apr_people')||'[]'); }
-function savePeople(list) { localStorage.setItem('apr_people', JSON.stringify(list)); }
+function getPeople() {
+  const list = safeParseJSON('apr_people', []);
+  return Array.isArray(list) ? list : [];
+}
+function savePeople(list) { safeSetJSON('apr_people', Array.isArray(list) ? list : []); }
 
 async function setPersonPin(id, name, pin) {
-  const people = getPeople();
-  const hash = await sha256(pin);
-  const existing = people.find(p=>p.id===id);
-  if (existing) { existing.pinHash = hash; existing.name = name; }
-  else people.push({ id, name, pinHash: hash });
-  savePeople(people);
+  try {
+    if (!id || typeof pin !== 'string' || !/^\d{4}$/.test(pin)) return false;
+    const hash = await sha256(pin);
+    if (!hash) return false;
+    const people = getPeople();
+    const existing = people.find(p=>p.id===id);
+    if (existing) { existing.pinHash = hash; existing.name = name || existing.name; }
+    else people.push({ id, name: name || 'Staff', pinHash: hash });
+    savePeople(people);
+    return true;
+  } catch (err) {
+    console.error('setPersonPin failed:', err);
+    return false;
+  }
 }
 
 // ── PIN LOGIC ──
 function isLockedOut() {
-  const until = parseInt(localStorage.getItem('apr_lockout_until')||'0');
-  return until > Date.now();
+  try {
+    const until = parseInt(localStorage.getItem('apr_lockout_until')||'0', 10);
+    return !isNaN(until) && until > Date.now();
+  } catch (err) {
+    console.error('isLockedOut failed:', err);
+    return true; // fail-safe: if we can't confirm lockout state, deny access
+  }
 }
 
 function pinPress(d) {
@@ -548,13 +602,22 @@ function updatePinDots() {
 }
 
 async function checkPin() {
-  if (isLockedOut()) {
-    document.getElementById('pinError').textContent = '🔒 Locked. Try again later.';
-    pinBuffer=''; updatePinDots();
-    return;
+  // Whole check is wrapped: any unexpected error (crypto unavailable, storage
+  // read failure, etc.) falls through to the "access denied" branch below —
+  // it must never silently grant entry.
+  let match = null;
+  try {
+    if (isLockedOut()) {
+      document.getElementById('pinError').textContent = '🔒 Locked. Try again later.';
+      pinBuffer=''; updatePinDots();
+      return;
+    }
+    const hash = await sha256(pinBuffer);
+    match = hash ? getPeople().find(p => p && p.pinHash === hash) : null;
+  } catch (err) {
+    console.error('checkPin failed:', err);
+    match = null; // fail-safe: any error during auth = access denied
   }
-  const hash = await sha256(pinBuffer);
-  const match = getPeople().find(p => p.pinHash === hash);
   if (match) {
     attempts = 0;
     localStorage.removeItem('apr_lockout_until');
@@ -655,7 +718,7 @@ function updateOnline() {
 
 // ── FETCH BOOKINGS ──
 let allBookings = [];
-let bookingStates = JSON.parse(localStorage.getItem('apr_bk_states')||'{}');
+let bookingStates = safeParseJSON('apr_bk_states', {});
 
 async function fetchBookings() {
   const el = document.getElementById('bookingsContainer');
@@ -663,27 +726,29 @@ async function fetchBookings() {
   try {
     const res = await fetch(BACKEND+'?action=getBookings&limit=50&token='+encodeURIComponent(APP_TOKEN),{signal:AbortSignal.timeout(10000)});
     if(!res.ok) throw new Error('HTTP '+res.status);
-    const data = await res.json();
-    if (data.ok && data.bookings) {
+    let data;
+    try { data = await res.json(); } catch (parseErr) { throw new Error('Malformed response from server'); }
+    if (data && data.ok && Array.isArray(data.bookings)) {
       allBookings = data.bookings;
       renderBookings();
       updateKPIs();
       addLog('📋 Bookings refreshed: '+allBookings.length+' total');
       showToast('Bookings refreshed','ok');
     } else {
-      throw new Error(data.error||'No data');
+      throw new Error((data && data.error) || 'No data');
     }
   } catch(e) {
-    const cached = allBookings.length;
+    const cached = Array.isArray(allBookings) ? allBookings.length : 0;
+    const safeErrMsg = escapeHtml((e && e.message) || 'Network error');
     el.innerHTML=`<div style="text-align:center;padding:30px">
       <div style="color:#ef4444;font-size:0.9rem;margin-bottom:12px">⚠️ Could not reach backend</div>
-      <div style="color:rgba(255,255,255,0.45);font-size:0.78rem;margin-bottom:16px">${e.message||'Network error'}<br/>Check internet connection or Google Apps Script deployment</div>
+      <div style="color:rgba(255,255,255,0.45);font-size:0.78rem;margin-bottom:16px">${safeErrMsg}<br/>Check internet connection or Google Apps Script deployment</div>
       ${cached?'<div style="color:rgba(255,255,255,0.45);font-size:0.75rem;margin-bottom:12px">Showing '+cached+' cached bookings</div>':''}
       <button onclick="fetchBookings()" style="background:var(--teal);color:#fff;border:none;padding:10px 20px;border-radius:8px;font-weight:700;cursor:pointer">🔄 Retry</button>
       <div style="margin-top:14px"><a href="index.html" style="color:var(--teal);font-size:0.8rem">📋 Open Booking Form →</a></div>
     </div>`;
     if(cached){ renderBookings(); updateKPIs(); }
-    addLog('⚠️ Booking fetch failed: '+e.message);
+    addLog('⚠️ Booking fetch failed: '+((e&&e.message)||'unknown error'));
   }
 }
 
@@ -694,28 +759,32 @@ function renderBookings() {
     return;
   }
   el.innerHTML = allBookings.slice().reverse().map(b => {
-    const state = bookingStates[b.ref] || 'pending';
+    b = b || {};
+    const ref = String(b.ref === undefined || b.ref === null || b.ref === '' ? 'N/A' : b.ref);
+    const refAttr = escapeHtml(ref).replace(/'/g,'&#39;');
+    const state = bookingStates[ref] || 'pending';
     const statusClass = state==='done'?'done':state==='confirmed'?'confirmed':'pending';
     const statusLabel = state==='done'?'Done':state==='confirmed'?'Confirmed':'Pending';
-    const waMsg = encodeURIComponent(`Hi ${b.fname||'there'}! 👋 Your booking with Aquatic Paradise Rentals is confirmed. Gear: ${b.gear||'N/A'}. Duration: ${b.duration||'N/A'}. Total: XCD ${b.total||'0'}. See you at the beach! 🌊`);
+    const fname = b.fname || 'N/A';
+    const waMsg = encodeURIComponent(`Hi ${fname!=='N/A'?fname:'there'}! 👋 Your booking with Aquatic Paradise Rentals is confirmed. Gear: ${b.gear||'N/A'}. Duration: ${b.duration||'N/A'}. Total: XCD ${b.total||'0'}. See you at the beach! 🌊`);
     const phone = String(b.phone||'').replace(/\D/g,'');
-    return `<div class="booking-card ${state==='pending'?'new':''} ${state==='done'?'done':''}" id="bkc-${b.ref}">
+    return `<div class="booking-card ${state==='pending'?'new':''} ${state==='done'?'done':''}" id="bkc-${escapeHtml(ref)}">
       <div class="bk-header">
-        <span class="bk-ref">${b.ref||'N/A'}</span>
+        <span class="bk-ref">${escapeHtml(ref)}</span>
         <span class="bk-status ${statusClass}">${statusLabel}</span>
       </div>
-      <div class="bk-name">${b.fname||''} ${b.lname||''}</div>
-      <div class="bk-detail">📱 ${b.phone||'N/A'}</div>
-      <div class="bk-detail">🏄 ${b.gear||'N/A'} · ${b.duration||'N/A'}</div>
-      <div class="bk-detail">📅 ${b.datetime||'N/A'}</div>
-      <div class="bk-detail">👥 Group: ${b.groupSize||'1'}</div>
-      ${b.notes?'<div class="bk-detail">📝 '+b.notes+'</div>':''}
-      <div class="bk-total">XCD ${b.total||0}</div>
+      <div class="bk-name">${escapeHtml(b.fname||'N/A')} ${escapeHtml(b.lname||'')}</div>
+      <div class="bk-detail">📱 ${escapeHtml(b.phone||'N/A')}</div>
+      <div class="bk-detail">🏄 ${escapeHtml(b.gear||'N/A')} · ${escapeHtml(b.duration||'N/A')}</div>
+      <div class="bk-detail">📅 ${escapeHtml(b.datetime||'N/A')}</div>
+      <div class="bk-detail">👥 Group: ${escapeHtml(b.groupSize||'1')}</div>
+      ${b.notes&&b.notes!=='N/A'?'<div class="bk-detail">📝 '+escapeHtml(b.notes)+'</div>':''}
+      <div class="bk-total">XCD ${escapeHtml(b.total||0)}</div>
       <div class="bk-actions">
-        ${state!=='confirmed'&&state!=='done'?`<button class="bk-btn confirm" onclick="setBkState('${b.ref}','confirmed')">✅ Confirm</button>`:''}
-        ${state!=='done'?`<button class="bk-btn done-btn" onclick="setBkState('${b.ref}','done')">☑ Done</button>`:''}
-        ${phone?`<a class="bk-btn wa" href="https://wa.me/${phone}?text=${waMsg}" target="_blank">💬 WhatsApp</a>`:''}
-        <button class="bk-btn" onclick="notifyDelivery('${b.ref}')">🚚 Notify Driver</button>
+        ${state!=='confirmed'&&state!=='done'?`<button class="bk-btn confirm" onclick="setBkState('${refAttr}','confirmed')">✅ Confirm</button>`:''}
+        ${state!=='done'?`<button class="bk-btn done-btn" onclick="setBkState('${refAttr}','done')">☑ Done</button>`:''}
+        ${phone?`<a class="bk-btn wa" href="https://wa.me/${encodeURIComponent(phone)}?text=${waMsg}" target="_blank">💬 WhatsApp</a>`:''}
+        <button class="bk-btn" onclick="notifyDelivery('${refAttr}')">🚚 Notify Driver</button>
       </div>
     </div>`;
   }).join('');
@@ -750,7 +819,7 @@ const FLEET = [
   ...Array.from({length:12},(_,i)=>({code:`LJ-${String(i+1).padStart(2,'0')}`,name:'Life Jacket',type:'LJ'})),
 ];
 
-let invState = JSON.parse(localStorage.getItem('apr_inv')||'{}');
+let invState = safeParseJSON('apr_inv', {});
 let invFilter = 'ALL';
 
 function renderInventory() {
@@ -865,102 +934,169 @@ const DEFAULT_TEAM = [
 ];
 
 function getStaff() {
-  const stored = localStorage.getItem('apr_staff');
-  if (!stored) { localStorage.setItem('apr_staff', JSON.stringify(DEFAULT_TEAM)); return DEFAULT_TEAM.slice(); }
-  return JSON.parse(stored);
+  const stored = safeParseJSON('apr_staff', null);
+  if (!stored || !Array.isArray(stored)) { safeSetJSON('apr_staff', DEFAULT_TEAM); return DEFAULT_TEAM.slice(); }
+  return stored;
 }
-function saveStaff(list) { localStorage.setItem('apr_staff', JSON.stringify(list)); }
+function saveStaff(list) { safeSetJSON('apr_staff', Array.isArray(list) ? list : []); }
 
-function notifyLink(wa, msg) { return `https://wa.me/${wa}?text=${encodeURIComponent(msg)}`; }
+function notifyLink(wa, msg) {
+  const digits = String(wa||'').replace(/\D/g,'');
+  const safeMsg = (msg === undefined || msg === null || msg === '') ? 'N/A' : String(msg);
+  return `https://wa.me/${encodeURIComponent(digits)}?text=${encodeURIComponent(safeMsg)}`;
+}
+function mapsLink(location) {
+  const loc = (location === undefined || location === null || String(location).trim() === '') ? '' : String(location).trim();
+  if (!loc) return '';
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}`;
+}
+
+// ── SHARED INPUT VALIDATION ──
+// Explicit type/length/empty checks before anything is written to storage.
+function validateNameField(val, label) {
+  if (typeof val !== 'string') return { valid:false, error: label+' is required' };
+  const trimmed = val.trim();
+  if (!trimmed) return { valid:false, error: label+' cannot be empty' };
+  if (trimmed.length > 60) return { valid:false, error: label+' is too long (max 60 characters)' };
+  return { valid:true, value: trimmed };
+}
+function validatePhoneField(val) {
+  if (typeof val !== 'string') return { valid:false, error: 'Phone number is required' };
+  const digits = val.replace(/\D/g,'');
+  if (digits.length < 7 || digits.length > 15) return { valid:false, error: 'Enter a valid phone number' };
+  return { valid:true, value: digits };
+}
 
 function renderTeam() {
   const staff = getStaff();
-  document.getElementById('teamList').innerHTML = staff.map(t=>`
-    <div class="team-card">
-      <div class="team-avatar">${t.emoji||'🙂'}</div>
+  document.getElementById('teamList').innerHTML = staff.map(t=>{
+    const name = (t && t.name) || 'N/A';
+    const role = (t && t.role) || 'N/A';
+    const wa = (t && t.wa) || '';
+    const emoji = (t && t.emoji) || '🙂';
+    const id = (t && t.id) || '';
+    const idAttr = escapeHtml(id).replace(/'/g,'&#39;');
+    return `<div class="team-card">
+      <div class="team-avatar">${escapeHtml(emoji)}</div>
       <div class="team-info">
-        <div class="team-name">${t.name}</div>
-        <div class="team-role">${t.role||''}</div>
+        <div class="team-name">${escapeHtml(name)}</div>
+        <div class="team-role">${escapeHtml(role)}</div>
       </div>
-      <a class="team-wa" href="https://wa.me/${t.wa}">💬 Chat</a>
-      <a class="team-wa" style="background:var(--gold);color:#0B1E2D" href="${notifyLink(t.wa,'🔔 APR Alert: Please check the staff console for an update — '+t.name)}">🔔 Notify</a>
-      <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer" onclick="removeStaff('${t.id}')">🗑️</button>
-    </div>
-  `).join('');
+      ${wa?`<a class="team-wa" href="https://wa.me/${encodeURIComponent(wa)}">💬 Chat</a>
+      <a class="team-wa" style="background:var(--gold);color:#0B1E2D" href="${notifyLink(wa,'🔔 APR Alert: Please check the staff console for an update — '+name)}">🔔 Notify</a>`
+      :'<span style="font-size:0.72rem;color:rgba(255,255,255,0.4)">No phone on file</span>'}
+      <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer" onclick="removeStaff('${idAttr}')">🗑️</button>
+    </div>`;
+  }).join('');
 }
 
 function addStaff() {
-  const name = document.getElementById('newStaffName').value.trim();
-  const role = document.getElementById('newStaffRole').value.trim();
-  const phoneRaw = document.getElementById('newStaffPhone').value.trim();
-  const wa = phoneRaw.replace(/\D/g,'');
-  if (!name || !wa) { showToast('Name and phone required', 'warn'); return; }
+  const nameCheck = validateNameField(document.getElementById('newStaffName').value, 'Name');
+  if (!nameCheck.valid) { showToast(nameCheck.error, 'warn'); return; }
+  const roleCheck = validateNameField(document.getElementById('newStaffRole').value || '', 'Role');
+  const phoneCheck = validatePhoneField(document.getElementById('newStaffPhone').value);
+  if (!phoneCheck.valid) { showToast(phoneCheck.error, 'warn'); return; }
+
   const staff = getStaff();
-  staff.push({id:'staff-'+Date.now(), name, role, wa, emoji:'🙂'});
+  staff.push({
+    id: 'staff-'+Date.now(),
+    name: nameCheck.value,
+    role: roleCheck.valid ? roleCheck.value : 'N/A',
+    wa: phoneCheck.value,
+    emoji: '🙂'
+  });
   saveStaff(staff);
   document.getElementById('newStaffName').value='';
   document.getElementById('newStaffRole').value='';
   document.getElementById('newStaffPhone').value='';
   renderTeam();
-  addLog('👥 Staff added: '+name);
+  addLog('👥 Staff added: '+nameCheck.value);
   showToast('Staff added ✅','ok');
 }
 
 function removeStaff(id) {
-  saveStaff(getStaff().filter(t=>t.id!==id));
+  if (!id) return;
+  saveStaff(getStaff().filter(t=>t && t.id!==id));
   renderTeam();
   addLog('👥 Staff removed');
 }
 
 function notifyAllStaff() {
-  const staff = getStaff();
-  if (!staff.length) { showToast('No staff to notify','warn'); return; }
+  const staff = getStaff().filter(t => t && t.wa);
+  if (!staff.length) { showToast('No staff with a phone number to notify','warn'); return; }
   staff.forEach((t,i) => setTimeout(()=>window.open(notifyLink(t.wa,'🔔 APR Alert: Please check the staff console for an update.'),'_blank'), i*400));
   addLog('🔔 Notified all staff ('+staff.length+')');
 }
 
 // ── DRIVERS — persisted, editable ──
-function getDrivers() { return JSON.parse(localStorage.getItem('apr_drivers')||'[]'); }
-function saveDrivers(list) { localStorage.setItem('apr_drivers', JSON.stringify(list)); }
+function getDrivers() {
+  const list = safeParseJSON('apr_drivers', []);
+  return Array.isArray(list) ? list : [];
+}
+function saveDrivers(list) { safeSetJSON('apr_drivers', Array.isArray(list) ? list : []); }
+
+// ── DELIVERY NOTIFICATION IDEMPOTENCY (ref -> ISO timestamp) ──
+function getNotifiedMap() {
+  const map = safeParseJSON('apr_notified', {});
+  return (map && typeof map === 'object' && !Array.isArray(map)) ? map : {};
+}
+function markNotified(ref) {
+  const map = getNotifiedMap();
+  map[ref] = new Date().toISOString();
+  safeSetJSON('apr_notified', map);
+}
 
 function renderDrivers() {
   const drivers = getDrivers();
   const el = document.getElementById('driverList');
   if (!el) return;
-  el.innerHTML = drivers.length ? drivers.map(d=>`
-    <div class="team-card">
+  el.innerHTML = drivers.length ? drivers.map(d=>{
+    const name = (d && d.name) || 'N/A';
+    const vehicle = (d && d.vehicle) || 'Driver';
+    const wa = (d && d.wa) || '';
+    const id = (d && d.id) || '';
+    const idAttr = escapeHtml(id).replace(/'/g,'&#39;');
+    return `<div class="team-card">
       <div class="team-avatar">🚚</div>
       <div class="team-info">
-        <div class="team-name">${d.name}</div>
-        <div class="team-role">${d.vehicle||'Driver'}</div>
+        <div class="team-name">${escapeHtml(name)}</div>
+        <div class="team-role">${escapeHtml(vehicle)}</div>
       </div>
-      <a class="team-wa" href="https://wa.me/${d.wa}">💬 Chat</a>
-      <a class="team-wa" style="background:var(--gold);color:#0B1E2D" href="${notifyLink(d.wa,'🔔 APR Alert: Please check the staff console for an update — '+d.name)}">🔔 Notify</a>
-      <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer" onclick="removeDriver('${d.id}')">🗑️</button>
-    </div>
-  `).join('') : '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.35)">No drivers added yet</div>';
+      ${wa?`<a class="team-wa" href="https://wa.me/${encodeURIComponent(wa)}">💬 Chat</a>
+      <a class="team-wa" style="background:var(--gold);color:#0B1E2D" href="${notifyLink(wa,'🔔 APR Alert: Please check the staff console for an update — '+name)}">🔔 Notify</a>`
+      :'<span style="font-size:0.72rem;color:rgba(255,255,255,0.4)">No phone on file</span>'}
+      <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer" onclick="removeDriver('${idAttr}')">🗑️</button>
+    </div>`;
+  }).join('') : '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.35)">No drivers added yet</div>';
 }
 
 function addDriver() {
-  const name = document.getElementById('newDriverName').value.trim();
-  const vehicle = document.getElementById('newDriverVehicle').value.trim();
-  const phoneRaw = document.getElementById('newDriverPhone').value.trim();
-  const wa = phoneRaw.replace(/\D/g,'');
-  if (!name || !wa) { showToast('Name and phone required', 'warn'); return; }
+  const nameCheck = validateNameField(document.getElementById('newDriverName').value, 'Name');
+  if (!nameCheck.valid) { showToast(nameCheck.error, 'warn'); return; }
+  const vehicleCheck = validateNameField(document.getElementById('newDriverVehicle').value || '', 'Vehicle');
+  const phoneCheck = validatePhoneField(document.getElementById('newDriverPhone').value);
+  if (!phoneCheck.valid) { showToast(phoneCheck.error, 'warn'); return; }
+
   const drivers = getDrivers();
-  drivers.push({id:'driver-'+Date.now(), name, vehicle, wa});
+  drivers.push({
+    id: 'driver-'+Date.now(),
+    name: nameCheck.value,
+    vehicle: vehicleCheck.valid ? vehicleCheck.value : 'N/A',
+    wa: phoneCheck.value
+  });
   saveDrivers(drivers);
   document.getElementById('newDriverName').value='';
   document.getElementById('newDriverVehicle').value='';
   document.getElementById('newDriverPhone').value='';
   renderDrivers();
   populateDeliveryDriverSelect();
-  addLog('🚚 Driver added: '+name);
+  addLog('🚚 Driver added: '+nameCheck.value);
   showToast('Driver added ✅','ok');
 }
 
 function removeDriver(id) {
-  saveDrivers(getDrivers().filter(d=>d.id!==id));
+  if (!id) return;
+  saveDrivers(getDrivers().filter(d=>d && d.id!==id));
   renderDrivers();
   populateDeliveryDriverSelect();
   addLog('🚚 Driver removed');
@@ -970,77 +1106,136 @@ function removeDriver(id) {
 function populateDeliveryDriverSelect() {
   const sel = document.getElementById('deliveryDriverSelect');
   if (!sel) return;
-  const drivers = getDrivers();
+  const drivers = getDrivers().filter(d => d && d.wa);
   sel.innerHTML = drivers.length
-    ? drivers.map(d=>`<option value="${d.id}">${d.name}</option>`).join('')
-    : '<option value="">No drivers added — add one in the Drivers tab</option>';
+    ? drivers.map(d=>`<option value="${d.id}">${d.name||'N/A'}</option>`).join('')
+    : '<option value="">No drivers with a phone number — add one in the Drivers tab</option>';
 }
 
 function notifyDelivery(ref) {
-  const b = allBookings.find(x=>x.ref===ref);
-  if (!b) return;
-  const drivers = getDrivers();
-  if (!drivers.length) { showToast('Add a driver first (Drivers tab)', 'warn'); return; }
+  if (!ref) { showToast('Missing booking reference', 'warn'); return; }
+  const b = (allBookings||[]).find(x=>x && x.ref===ref);
+  if (!b) { showToast('Booking not found', 'warn'); return; }
+  const drivers = getDrivers().filter(d => d && d.wa);
+  if (!drivers.length) { showToast('Add a driver with a phone number first (Drivers tab)', 'warn'); return; }
+
+  const notified = getNotifiedMap();
+  const modal = document.getElementById('deliveryModal');
   document.getElementById('deliveryRefLabel').textContent = ref;
-  document.getElementById('deliveryModal').dataset.ref = ref;
+  document.getElementById('deliveryLocation').value = '';
+  const already = document.getElementById('deliveryAlreadySent');
+  if (already) {
+    already.textContent = notified[ref] ? '⚠️ Already notified at ' + new Date(notified[ref]).toLocaleString() + ' — sending again will resend.' : '';
+  }
+  modal.dataset.ref = ref;
   populateDeliveryDriverSelect();
-  document.getElementById('deliveryModal').style.display='flex';
+  modal.style.display='flex';
 }
 
-function closeDeliveryModal() { document.getElementById('deliveryModal').style.display='none'; }
+function closeDeliveryModal() {
+  const modal = document.getElementById('deliveryModal');
+  if (modal) modal.style.display='none';
+}
+
+// Null-safe field accessor: every dynamic value falls back to 'N/A' rather
+// than risking "cannot read property of undefined" downstream.
+// Escapes HTML-significant characters — required for any customer-supplied or
+// external data (booking notes, names, etc.) rendered via innerHTML.
+function escapeHtml(val) {
+  const s = (val === undefined || val === null) ? '' : String(val);
+  return s.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
+function nz(val, fallback) {
+  if (val === undefined || val === null) return fallback !== undefined ? fallback : 'N/A';
+  const s = String(val).trim();
+  return s.length ? s : (fallback !== undefined ? fallback : 'N/A');
+}
 
 function confirmDelivery() {
-  const ref = document.getElementById('deliveryModal').dataset.ref;
-  const driverId = document.getElementById('deliveryDriverSelect').value;
-  const driver = getDrivers().find(d=>d.id===driverId);
-  const b = allBookings.find(x=>x.ref===ref);
-  if (!driver || !b) { showToast('Select a driver', 'warn'); return; }
-  const msg = `🚚 New delivery — APR\nRef: ${b.ref}\nGuest: ${b.fname||''} ${b.lname||''}\nPhone: ${b.phone||''}\nGear: ${b.gear||''}\nWhen: ${b.datetime||''}\nNotes: ${b.notes||''}`;
-  window.open(notifyLink(driver.wa, msg), '_blank');
-  addLog('🚚 Delivery notification sent to '+driver.name+' for '+ref);
-  showToast('Driver notified ✅','ok');
-  closeDeliveryModal();
+  try {
+    const modal = document.getElementById('deliveryModal');
+    const ref = modal ? modal.dataset.ref : null;
+    const driverId = document.getElementById('deliveryDriverSelect').value;
+    const location = document.getElementById('deliveryLocation').value;
+    const driver = getDrivers().find(d=>d && d.id===driverId);
+    const b = (allBookings||[]).find(x=>x && x.ref===ref);
+
+    if (!driver || !driver.wa) { showToast('Select a valid driver', 'warn'); return; }
+    if (!b) { showToast('Booking not found', 'warn'); return; }
+
+    const mapUrl = mapsLink(location);
+    const msgLines = [
+      '🚚 New delivery — APR',
+      'Ref: ' + nz(b.ref),
+      'Guest: ' + nz(b.fname,'N/A') + ' ' + nz(b.lname,''),
+      'Phone: ' + nz(b.phone),
+      'Gear: ' + nz(b.gear),
+      'When: ' + nz(b.datetime),
+      'Notes: ' + nz(b.notes,'None'),
+    ];
+    if (mapUrl) msgLines.push('Location: ' + nz(location) + '\n' + mapUrl);
+    const msg = msgLines.join('\n');
+
+    // Idempotency: record the SENT flag before opening the link so a rapid
+    // double-click or accidental duplicate call is visible/guarded against.
+    markNotified(ref);
+    window.open(notifyLink(driver.wa, msg), '_blank');
+    addLog('🚚 Delivery notification sent to '+nz(driver.name)+' for '+nz(ref));
+    showToast('Driver notified ✅','ok');
+    closeDeliveryModal();
+  } catch (err) {
+    console.error('confirmDelivery failed:', err);
+    showToast('Could not send notification — please try again', 'warn');
+  }
 }
 
 // ── ACTIVITY LOG ──
 function addLog(msg) {
-  const ts = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-  const who = currentUser ? currentUser.name+': ' : '';
-  const log = JSON.parse(localStorage.getItem('apr_activity_log')||'[]');
-  log.unshift({ts, msg: who+msg});
-  localStorage.setItem('apr_activity_log', JSON.stringify(log.slice(0,100)));
-  renderLog();
+  try {
+    const ts = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    const who = (currentUser && currentUser.name) ? currentUser.name+': ' : '';
+    const log = safeParseJSON('apr_activity_log', []);
+    (Array.isArray(log) ? log : []).unshift({ts, msg: who+(msg||'N/A')});
+    safeSetJSON('apr_activity_log', (Array.isArray(log)?log:[]).slice(0,100));
+    renderLog();
+  } catch (err) {
+    console.error('addLog failed:', err);
+  }
 }
 
 function renderLog() {
   const el = document.getElementById('activityLog');
   if (!el) return;
-  const log = JSON.parse(localStorage.getItem('apr_activity_log')||'[]');
-  el.innerHTML = log.slice(0,30).map(e=>`<div class="log-entry"><span class="log-time">${e.ts}</span><span class="log-msg">${e.msg}</span></div>`).join('')
+  const log = safeParseJSON('apr_activity_log', []);
+  const rows = (Array.isArray(log) ? log : []).slice(0,30);
+  el.innerHTML = rows.map(e=>`<div class="log-entry"><span class="log-time">${escapeHtml((e&&e.ts)||'N/A')}</span><span class="log-msg">${escapeHtml((e&&e.msg)||'N/A')}</span></div>`).join('')
     || '<div class="log-entry"><span class="log-time">now</span><span class="log-msg">Staff console opened</span></div>';
 }
 
 // ── OFFLINE QUEUE ──
 async function syncQueue() {
-  const q = JSON.parse(localStorage.getItem('apr_queue')||'[]');
-  if (!q.length) { showToast('No queued bookings','ok'); return; }
+  const q = safeParseJSON('apr_queue', []);
+  const list = Array.isArray(q) ? q : [];
+  if (!list.length) { showToast('No queued bookings','ok'); return; }
   const remaining = [];
-  for (const payload of q) {
+  for (const payload of list) {
     try {
-      const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(15000)});
       const d = await res.json();
-      if (!d.ok) remaining.push(payload);
-    } catch { remaining.push(payload); }
+      if (!d || !d.ok) remaining.push(payload);
+    } catch (err) { console.error('syncQueue item failed:', err); remaining.push(payload); }
   }
-  localStorage.setItem('apr_queue',JSON.stringify(remaining));
+  safeSetJSON('apr_queue', remaining);
   updateQueueCount();
-  showToast(`Synced ${q.length-remaining.length} of ${q.length} queued bookings`,'ok');
-  addLog(`🔄 Synced ${q.length-remaining.length} queued bookings`);
+  showToast(`Synced ${list.length-remaining.length} of ${list.length} queued bookings`,'ok');
+  addLog(`🔄 Synced ${list.length-remaining.length} queued bookings`);
 }
 
 function updateQueueCount() {
   const el = document.getElementById('queueCount');
-  if (el) el.textContent = JSON.parse(localStorage.getItem('apr_queue')||'[]').length;
+  const q = safeParseJSON('apr_queue', []);
+  if (el) el.textContent = Array.isArray(q) ? q.length : 0;
 }
 
 
