@@ -16,10 +16,12 @@ var NOTIFY_EMAIL = 'aquaticparadiserentals@gmail.com';
 // stays open since customers must be able to book without a login.
 var APP_TOKEN = '2Si_80O9OJ0DGmc8p6G5pDeG';
 var GENERIC_ERROR = 'Something went wrong. Please try again.';
+var ID_PHOTO_FOLDER_NAME = 'APR Guest ID Photos';
+var MAX_ID_PHOTO_BASE64_LEN = 8000000; // ~6MB decoded — generous cap against abuse
 
 var FIELDS = ['ref','fname','lname','phone','email','datetime','groupSize',
   'gear','duration','total','referral','notes','waiverAccepted','waiverTimestamp',
-  'source','Timestamp','NotifiedAt'];
+  'source','Timestamp','NotifiedAt','idPhotoUrl'];
 
 // ── FAIL-SAFE HELPERS ──
 
@@ -99,6 +101,20 @@ function _validateBookingPayload(p) {
       }
     }
 
+    if (p.idPhotoBase64 !== undefined && p.idPhotoBase64 !== null && p.idPhotoBase64 !== '') {
+      if (typeof p.idPhotoBase64 !== 'string') {
+        return { valid: false, error: 'Invalid ID photo data' };
+      }
+      if (p.idPhotoBase64.length > MAX_ID_PHOTO_BASE64_LEN) {
+        return { valid: false, error: 'ID photo is too large' };
+      }
+      if (p.idPhotoMimeType !== undefined && p.idPhotoMimeType !== null) {
+        if (typeof p.idPhotoMimeType !== 'string' || !/^image\/(jpeg|jpg|png|webp)$/i.test(p.idPhotoMimeType)) {
+          return { valid: false, error: 'Unsupported ID photo format' };
+        }
+      }
+    }
+
     return { valid: true };
   } catch (err) {
     _logError('validateBookingPayload', err);
@@ -128,12 +144,52 @@ function _sheet() {
     sh.appendRow([
       'ref','fname','lname','phone','email','datetime','groupSize',
       'gear','duration','total','referral','notes',
-      'waiverAccepted','waiverTimestamp','source','Timestamp','NotifiedAt'
+      'waiverAccepted','waiverTimestamp','source','Timestamp','NotifiedAt','idPhotoUrl'
     ]);
     sh.getRange('1:1').setFontWeight('bold');
     ['D:D','F:F','N:N'].forEach(function(r){ sh.getRange(r).setNumberFormat('@'); });
   }
   return sh;
+}
+
+// ── ID PHOTO UPLOAD (Drive) ──
+// Never blocks or fails the booking: any error here returns '' and is logged,
+// saveBooking proceeds regardless.
+function _saveIdPhoto(p) {
+  try {
+    if (!p || !p.idPhotoBase64) return '';
+    var mime = (typeof p.idPhotoMimeType === 'string' && /^image\/(jpeg|jpg|png|webp)$/i.test(p.idPhotoMimeType))
+      ? p.idPhotoMimeType : 'image/jpeg';
+
+    var base64 = String(p.idPhotoBase64);
+    var commaIdx = base64.indexOf(',');
+    if (base64.slice(0, 5) === 'data:' && commaIdx !== -1) base64 = base64.slice(commaIdx + 1);
+    if (base64.length > MAX_ID_PHOTO_BASE64_LEN) return '';
+
+    var bytes;
+    try {
+      bytes = Utilities.base64Decode(base64);
+    } catch (decodeErr) {
+      _logError('_saveIdPhoto.decode', decodeErr);
+      return '';
+    }
+
+    var safeRef = String(p.ref || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '');
+    var ext = mime.indexOf('png') !== -1 ? 'png' : (mime.indexOf('webp') !== -1 ? 'webp' : 'jpg');
+    var blob = Utilities.newBlob(bytes, mime, 'id_' + safeRef + '_' + Date.now() + '.' + ext);
+
+    var folders = DriveApp.getFoldersByName(ID_PHOTO_FOLDER_NAME);
+    var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(ID_PHOTO_FOLDER_NAME);
+
+    var file = folder.createFile(blob);
+    try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); }
+    catch (shareErr) { _logError('_saveIdPhoto.share', shareErr); }
+
+    return file.getUrl();
+  } catch (err) {
+    _logError('_saveIdPhoto', err);
+    return '';
+  }
 }
 
 function _safe(val, fallback) {
@@ -223,6 +279,15 @@ function saveBooking(p) {
       }
     }
 
+    // Upload the ID photo (if any) before writing the row so the Drive link
+    // can be stored in the same append. A failed upload never blocks the booking.
+    var idPhotoUrl = '';
+    try {
+      idPhotoUrl = _saveIdPhoto(p);
+    } catch (photoErr) {
+      _logError('saveBooking.photo', photoErr);
+    }
+
     try {
       sh.appendRow([
         _safe(p.ref, 'N/A'),
@@ -241,7 +306,8 @@ function saveBooking(p) {
         _safe(p.waiverTimestamp, 'N/A'),
         _safe(p.source, 'PWA'),
         new Date().toISOString(),
-        '' // NotifiedAt — set once the notification is actually sent
+        '', // NotifiedAt — set once the notification is actually sent
+        idPhotoUrl
       ]);
     } catch (writeErr) {
       return _fail('saveBooking.write', writeErr);
@@ -307,10 +373,10 @@ function setupSheet() {
     var sh = ss.getSheetByName(SHEET_NAME);
     if (!sh) sh = ss.insertSheet(SHEET_NAME);
     sh.getRange('1:1').clearContent();
-    sh.getRange(1, 1, 1, 17).setValues([[
+    sh.getRange(1, 1, 1, 18).setValues([[
       'ref','fname','lname','phone','email','datetime','groupSize',
       'gear','duration','total','referral','notes',
-      'waiverAccepted','waiverTimestamp','source','Timestamp','NotifiedAt'
+      'waiverAccepted','waiverTimestamp','source','Timestamp','NotifiedAt','idPhotoUrl'
     ]]);
     sh.getRange('1:1').setFontWeight('bold');
     ['D:D','F:F','N:N'].forEach(function (r) { sh.getRange(r).setNumberFormat('@'); });

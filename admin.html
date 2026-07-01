@@ -452,6 +452,11 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
     <p id="pinChangeMsg" style="font-size:0.75rem;margin-top:8px;min-height:16px"></p>
   </div>
 
+  <div class="sec-title">Documents</div>
+  <div class="setting-card">
+    <a href="rules.html" target="_blank" style="display:block;text-align:center;background:var(--teal);border-radius:8px;color:#fff;padding:10px 16px;font-size:0.85rem;font-weight:700;text-decoration:none">📄 Open Printable Rules &amp; Regulations</a>
+  </div>
+
   <div class="sec-title">Offline Queue</div>
   <div class="setting-card">
     <div class="setting-row"><span class="setting-label">Queued bookings</span><span class="setting-val" id="queueCount">0</span></div>
@@ -785,6 +790,7 @@ function renderBookings() {
         ${state!=='done'?`<button class="bk-btn done-btn" onclick="setBkState('${refAttr}','done')">☑ Done</button>`:''}
         ${phone?`<a class="bk-btn wa" href="https://wa.me/${encodeURIComponent(phone)}?text=${waMsg}" target="_blank">💬 WhatsApp</a>`:''}
         <button class="bk-btn" onclick="notifyDelivery('${refAttr}')">🚚 Notify Driver</button>
+        ${b.idPhotoUrl && b.idPhotoUrl!=='N/A' && /^https:\/\/drive\.google\.com\//.test(String(b.idPhotoUrl))?`<a class="bk-btn" href="${escapeHtml(b.idPhotoUrl)}" target="_blank" rel="noopener">🪪 View ID</a>`:''}
       </div>
     </div>`;
   }).join('');

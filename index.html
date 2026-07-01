@@ -101,6 +101,14 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 .form-group textarea{resize:vertical;min-height:80px}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 
+/* ── ID PHOTO UPLOAD ── */
+.id-upload-box{background:var(--card);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);margin-bottom:22px}
+.id-upload-box h3{font-size:0.9rem;font-weight:800;color:var(--navy);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.id-upload-hint{font-size:0.75rem;color:#777;margin-bottom:12px;line-height:1.5}
+.id-upload-input{display:block;width:100%;font-size:0.82rem;padding:10px;border:2px dashed #ccc;border-radius:10px;background:#f8f8f8;box-sizing:border-box;cursor:pointer}
+.id-upload-preview{margin-top:12px;max-width:180px;max-height:120px;border-radius:8px;display:none;object-fit:cover}
+.id-upload-status{font-size:0.75rem;margin-top:8px;min-height:16px}
+
 /* ── WAIVER ── */
 .waiver-box{background:var(--card);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);margin-bottom:22px}
 .waiver-box h3{font-size:0.9rem;font-weight:800;color:var(--coral);margin-bottom:10px;display:flex;align-items:center;gap:6px}
@@ -284,7 +292,16 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
       <textarea id="notes" placeholder="Anything we should know? Skill level, accessibility needs, etc."></textarea>
     </div>
 
-    <div class="section-title">4 · Safety Waiver</div>
+    <div class="section-title">4 · Photo ID (Recommended)</div>
+    <div class="id-upload-box">
+      <h3>🪪 Upload a Photo ID</h3>
+      <p class="id-upload-hint">Driver's license, passport, or national ID. This helps us verify your rental agreement — you can also show ID in person at pickup if you'd rather skip this step.</p>
+      <input type="file" id="idPhotoInput" class="id-upload-input" accept="image/*" onchange="handleIdPhotoSelect(event)"/>
+      <img id="idPhotoPreview" class="id-upload-preview" alt="ID preview"/>
+      <div class="id-upload-status" id="idPhotoStatus"></div>
+    </div>
+
+    <div class="section-title">5 · Safety Waiver</div>
     <div class="waiver-box">
       <h3>⚠️ Liability &amp; Safety Agreement</h3>
       <div class="waiver-text">
@@ -302,6 +319,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
         <input type="checkbox" id="waiverAccepted" onchange="updateBookBtn()"/>
         <span>I have read, understood, and agree to the Liability Waiver and Safety Agreement above. I confirm all information provided is accurate.</span>
       </label>
+      <a href="rules.html" target="_blank" style="display:inline-block;margin-top:12px;font-size:0.78rem;color:var(--teal);font-weight:600">📄 View / Print Full Rules &amp; Regulations →</a>
     </div>
 
     <div class="section-title">Booking Total</div>
@@ -657,6 +675,12 @@ function backToGear() {
 function newBooking() {
   selectedGear = {};
   selectedPackage = null;
+  idPhotoData = null;
+  const idInput = document.getElementById('idPhotoInput');
+  if (idInput) idInput.value = '';
+  const idPreview = document.getElementById('idPhotoPreview');
+  if (idPreview) { idPreview.style.display = 'none'; idPreview.removeAttribute('src'); }
+  setIdPhotoStatus('', false);
   document.getElementById('successScreen').classList.remove('show');
   document.getElementById('step-gear').style.display='block';
   document.getElementById('step-details').style.display='none';
@@ -677,6 +701,106 @@ function updateBookBtn() {
   const el = document.getElementById(id);
   if (el) el.addEventListener('input', updateBookBtn);
 });
+
+// ── ID PHOTO UPLOAD (client-side resize/compress before sending) ──
+let idPhotoData = null; // { base64, mimeType } or null
+const ID_PHOTO_MAX_DIMENSION = 1000;
+const ID_PHOTO_MAX_SOURCE_BYTES = 15 * 1024 * 1024; // 15MB raw file cap before we even try to process it
+
+function setIdPhotoStatus(msg, isError) {
+  const el = document.getElementById('idPhotoStatus');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.style.color = isError ? '#E0351B' : '#03939E';
+}
+
+async function handleIdPhotoSelect(event) {
+  try {
+    const file = event && event.target && event.target.files && event.target.files[0];
+    if (!file) { idPhotoData = null; return; }
+
+    if (!/^image\//i.test(file.type)) {
+      setIdPhotoStatus('Please choose an image file (JPG, PNG).', true);
+      event.target.value = '';
+      idPhotoData = null;
+      return;
+    }
+    if (file.size > ID_PHOTO_MAX_SOURCE_BYTES) {
+      setIdPhotoStatus('Image is too large (max 15MB).', true);
+      event.target.value = '';
+      idPhotoData = null;
+      return;
+    }
+
+    setIdPhotoStatus('Processing photo…', false);
+    const compressed = await compressImageFile(file);
+    if (!compressed) {
+      setIdPhotoStatus('Could not process that image — you can skip this and show ID in person.', true);
+      idPhotoData = null;
+      return;
+    }
+    idPhotoData = compressed;
+
+    const preview = document.getElementById('idPhotoPreview');
+    if (preview) {
+      preview.src = 'data:' + compressed.mimeType + ';base64,' + compressed.base64;
+      preview.style.display = 'block';
+    }
+    setIdPhotoStatus('✅ Photo ready to submit', false);
+  } catch (err) {
+    console.error('handleIdPhotoSelect failed:', err);
+    setIdPhotoStatus('Could not process that image — you can skip this and show ID in person.', true);
+    idPhotoData = null;
+  }
+}
+
+// Resizes to a max dimension and re-encodes as JPEG to keep the upload small.
+// Never throws — resolves to null on any failure so the caller can degrade gracefully.
+function compressImageFile(file) {
+  return new Promise((resolve) => {
+    try {
+      const reader = new FileReader();
+      reader.onerror = () => resolve(null);
+      reader.onload = () => {
+        try {
+          const img = new Image();
+          img.onerror = () => resolve(null);
+          img.onload = () => {
+            try {
+              let { width, height } = img;
+              if (width <= 0 || height <= 0) { resolve(null); return; }
+              const scale = Math.min(1, ID_PHOTO_MAX_DIMENSION / Math.max(width, height));
+              width = Math.max(1, Math.round(width * scale));
+              height = Math.max(1, Math.round(height * scale));
+
+              const canvas = document.createElement('canvas');
+              canvas.width = width; canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              if (!ctx) { resolve(null); return; }
+              ctx.drawImage(img, 0, 0, width, height);
+
+              const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+              const commaIdx = dataUrl.indexOf(',');
+              if (commaIdx === -1) { resolve(null); return; }
+              resolve({ base64: dataUrl.slice(commaIdx + 1), mimeType: 'image/jpeg' });
+            } catch (drawErr) {
+              console.error('compressImageFile draw failed:', drawErr);
+              resolve(null);
+            }
+          };
+          img.src = String(reader.result || '');
+        } catch (imgErr) {
+          console.error('compressImageFile image load failed:', imgErr);
+          resolve(null);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('compressImageFile failed:', err);
+      resolve(null);
+    }
+  });
+}
 
 // ── SUBMIT ──
 async function submitBooking() {
@@ -711,22 +835,34 @@ async function submitBooking() {
     source: 'PWA',
   };
 
+  if (idPhotoData && idPhotoData.base64) {
+    payload.idPhotoBase64 = idPhotoData.base64;
+    payload.idPhotoMimeType = idPhotoData.mimeType;
+  }
+
   let ok = false;
   try {
-    // Use no-cors to avoid CORS preflight issues with Google Apps Script
-    // We encode data as URL params for doGet, or use no-cors POST for doPost
-    const params = new URLSearchParams();
-    params.append('data', JSON.stringify(payload));
-    
-    // Try GET first (most reliable with GAS - no CORS preflight)
-    const getUrl = BACKEND + '?' + params.toString();
-    try {
-      const res = await fetch(getUrl, { method: 'GET' });
-      const data = await res.json();
-      ok = data.ok === true;
-    } catch(e1) {
-      // Fallback: POST with no-cors (fire-and-forget, assume success)
+    // A photo payload is too large for a URL query string, so it must go via
+    // POST. Everything else still prefers GET, since GAS reliably returns a
+    // readable JSON response for GET but not for POST (CORS preflight issue).
+    if (payload.idPhotoBase64) {
+      await fetch(BACKEND, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload),
+      });
+      ok = true; // no-cors means we can't read response, assume ok
+    } else {
+      const params = new URLSearchParams();
+      params.append('data', JSON.stringify(payload));
+      const getUrl = BACKEND + '?' + params.toString();
       try {
+        const res = await fetch(getUrl, { method: 'GET' });
+        const data = await res.json();
+        ok = data.ok === true;
+      } catch(e1) {
+        // Fallback: POST with no-cors (fire-and-forget, assume success)
         await fetch(BACKEND, {
           method: 'POST',
           mode: 'no-cors',
@@ -734,16 +870,18 @@ async function submitBooking() {
           body: JSON.stringify(payload),
         });
         ok = true; // no-cors means we can't read response, assume ok
-      } catch(e2) {
-        throw e2;
       }
     }
   } catch(e) {
     console.error('API error:', e);
-    // Store locally as offline queue
+    // Store locally as offline queue (drop the photo from the queued copy —
+    // it's already resized/compressed but still too heavy to keep retrying
+    // indefinitely in localStorage; the booking itself is preserved).
     try {
       const q = JSON.parse(localStorage.getItem('apr_queue')||'[]');
-      q.push(payload);
+      const queuedPayload = Object.assign({}, payload);
+      delete queuedPayload.idPhotoBase64;
+      q.push(queuedPayload);
       localStorage.setItem('apr_queue', JSON.stringify(q));
       ok = true; // queued successfully
     } catch(e2) { ok = false; }
