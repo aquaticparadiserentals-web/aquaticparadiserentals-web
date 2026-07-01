@@ -367,6 +367,8 @@ function updateStatus(p) {
 }
 
 // ── ONE-TIME SETUP: Run this once from Apps Script to fix sheet headers ──
+// Safe to run from the standalone script editor (not just a sheet menu) —
+// the UI alert is best-effort only and never blocks the actual header update.
 function setupSheet() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -380,10 +382,54 @@ function setupSheet() {
     ]]);
     sh.getRange('1:1').setFontWeight('bold');
     ['D:D','F:F','N:N'].forEach(function (r) { sh.getRange(r).setNumberFormat('@'); });
-    SpreadsheetApp.getUi().alert('✅ Sheet headers updated! You can delete old test rows manually.');
+    Logger.log('setupSheet: headers updated successfully.');
+    try { SpreadsheetApp.getUi().alert('✅ Sheet headers updated! You can delete old test rows manually.'); } catch (uiErr) { /* expected when run outside the Sheets UI — headers are already saved above */ }
   } catch (err) {
     _logError('setupSheet', err);
-    try { SpreadsheetApp.getUi().alert('⚠️ Setup failed — check Apps Script logs.'); } catch (e2) {}
+  }
+}
+
+// ── ONE-TIME MIGRATION: moves any existing BOOKINGS rows into a separate
+// "Archive_OldBookings" tab, leaving BOOKINGS with just the header row.
+// Run this once after setupSheet if BOOKINGS already contains rows written
+// under an older column schema (their data would otherwise sit under the
+// wrong header labels going forward). Safe to re-run: does nothing if
+// BOOKINGS has no data rows left.
+function archiveOldBookingRows() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sh = ss.getSheetByName(SHEET_NAME);
+    if (!sh) { Logger.log('archiveOldBookingRows: no BOOKINGS sheet found.'); return; }
+
+    var lastRow = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+    if (lastRow <= 1) { Logger.log('archiveOldBookingRows: no data rows to archive.'); return; }
+
+    var numDataRows = lastRow - 1; // exclude header row
+    var dataRange = sh.getRange(2, 1, numDataRows, lastCol);
+    var values = dataRange.getValues();
+
+    var archiveName = 'Archive_OldBookings';
+    var archiveSheet = ss.getSheetByName(archiveName);
+    if (!archiveSheet) {
+      archiveSheet = ss.insertSheet(archiveName);
+      archiveSheet.appendRow(['ArchivedAt', 'OriginalRowData (columns A-' + String.fromCharCode(64 + lastCol) + ' from BOOKINGS at time of archive)']);
+      archiveSheet.getRange('1:1').setFontWeight('bold');
+    }
+
+    var archiveTimestamp = new Date().toISOString();
+    var rowsToAppend = values.map(function (row) {
+      return [archiveTimestamp].concat(row);
+    });
+    archiveSheet.getRange(archiveSheet.getLastRow() + 1, 1, rowsToAppend.length, rowsToAppend[0].length)
+      .setValues(rowsToAppend);
+
+    dataRange.clearContent();
+
+    Logger.log('archiveOldBookingRows: moved ' + numDataRows + ' row(s) to "' + archiveName + '".');
+    try { SpreadsheetApp.getUi().alert('✅ Archived ' + numDataRows + ' old row(s) to "' + archiveName + '". BOOKINGS is now clean.'); } catch (uiErr) { /* expected outside Sheets UI */ }
+  } catch (err) {
+    _logError('archiveOldBookingRows', err);
   }
 }
 
