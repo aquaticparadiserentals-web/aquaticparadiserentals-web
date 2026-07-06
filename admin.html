@@ -1097,7 +1097,7 @@ async function addDriver() {
   if (!phoneCheck.valid) { showToast(phoneCheck.error, 'warn'); return; }
 
   try {
-    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
       action:'addDriver', token:APP_TOKEN,
       name:nameCheck.value,
       vehicle:vehicleCheck.valid?vehicleCheck.value:'N/A',
@@ -1122,7 +1122,7 @@ async function addDriver() {
 async function removeDriver(id) {
   if (!id) return;
   try {
-    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
       action:'deleteDriver', token:APP_TOKEN, id:id
     }),signal:AbortSignal.timeout(15000)});
     if(!res.ok) throw new Error('HTTP '+res.status);
@@ -1255,7 +1255,7 @@ async function syncQueue() {
   const remaining = [];
   for (const payload of list) {
     try {
-      const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(15000)});
+      const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),signal:AbortSignal.timeout(15000)});
       const d = await res.json();
       if (!d || !d.ok) remaining.push(payload);
     } catch (err) { console.error('syncQueue item failed:', err); remaining.push(payload); }
