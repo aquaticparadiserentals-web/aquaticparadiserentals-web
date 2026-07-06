@@ -704,7 +704,7 @@ function onLogin() {
   renderInventory();
   renderSafety();
   renderTeam();
-  renderDrivers();
+  fetchDrivers();
   fetchBookings();
   updateQueueCount();
   loadBrotherNum();
@@ -1034,12 +1034,25 @@ function notifyAllStaff() {
   addLog('🔔 Notified all staff ('+staff.length+')');
 }
 
-// ── DRIVERS — persisted, editable ──
-function getDrivers() {
-  const list = safeParseJSON('apr_drivers', []);
-  return Array.isArray(list) ? list : [];
+// ── DRIVERS — shared, persisted server-side via GAS/Sheets (not localStorage) ──
+let driversCache = [];
+
+async function fetchDrivers() {
+  try {
+    const res = await fetch(BACKEND+'?action=getDrivers&token='+encodeURIComponent(APP_TOKEN),{signal:AbortSignal.timeout(10000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (data && data.ok && Array.isArray(data.drivers)) {
+      driversCache = data.drivers;
+    } else {
+      throw new Error((data && data.error) || 'No data');
+    }
+  } catch (err) {
+    showToast('Could not load drivers: '+err.message, 'warn');
+  }
+  renderDrivers();
+  populateDeliveryDriverSelect();
 }
-function saveDrivers(list) { safeSetJSON('apr_drivers', Array.isArray(list) ? list : []); }
 
 // ── DELIVERY NOTIFICATION IDEMPOTENCY (ref -> ISO timestamp) ──
 function getNotifiedMap() {
@@ -1053,13 +1066,13 @@ function markNotified(ref) {
 }
 
 function renderDrivers() {
-  const drivers = getDrivers();
+  const drivers = driversCache;
   const el = document.getElementById('driverList');
   if (!el) return;
   el.innerHTML = drivers.length ? drivers.map(d=>{
     const name = (d && d.name) || 'N/A';
     const vehicle = (d && d.vehicle) || 'Driver';
-    const wa = (d && d.wa) || '';
+    const wa = (d && d.phone) || '';
     const id = (d && d.id) || '';
     const idAttr = escapeHtml(id).replace(/'/g,'&#39;');
     return `<div class="team-card">
@@ -1076,35 +1089,50 @@ function renderDrivers() {
   }).join('') : '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.35)">No drivers added yet</div>';
 }
 
-function addDriver() {
+async function addDriver() {
   const nameCheck = validateNameField(document.getElementById('newDriverName').value, 'Name');
   if (!nameCheck.valid) { showToast(nameCheck.error, 'warn'); return; }
   const vehicleCheck = validateNameField(document.getElementById('newDriverVehicle').value || '', 'Vehicle');
   const phoneCheck = validatePhoneField(document.getElementById('newDriverPhone').value);
   if (!phoneCheck.valid) { showToast(phoneCheck.error, 'warn'); return; }
 
-  const drivers = getDrivers();
-  drivers.push({
-    id: 'driver-'+Date.now(),
-    name: nameCheck.value,
-    vehicle: vehicleCheck.valid ? vehicleCheck.value : 'N/A',
-    wa: phoneCheck.value
-  });
-  saveDrivers(drivers);
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      action:'addDriver', token:APP_TOKEN,
+      name:nameCheck.value,
+      vehicle:vehicleCheck.valid?vehicleCheck.value:'N/A',
+      phone:phoneCheck.value
+    }),signal:AbortSignal.timeout(15000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Save failed');
+  } catch (err) {
+    showToast('Could not add driver: '+err.message, 'warn');
+    return;
+  }
+
   document.getElementById('newDriverName').value='';
   document.getElementById('newDriverVehicle').value='';
   document.getElementById('newDriverPhone').value='';
-  renderDrivers();
-  populateDeliveryDriverSelect();
+  await fetchDrivers();
   addLog('🚚 Driver added: '+nameCheck.value);
   showToast('Driver added ✅','ok');
 }
 
-function removeDriver(id) {
+async function removeDriver(id) {
   if (!id) return;
-  saveDrivers(getDrivers().filter(d=>d && d.id!==id));
-  renderDrivers();
-  populateDeliveryDriverSelect();
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      action:'deleteDriver', token:APP_TOKEN, id:id
+    }),signal:AbortSignal.timeout(15000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Delete failed');
+  } catch (err) {
+    showToast('Could not remove driver: '+err.message, 'warn');
+    return;
+  }
+  await fetchDrivers();
   addLog('🚚 Driver removed');
 }
 
@@ -1112,7 +1140,7 @@ function removeDriver(id) {
 function populateDeliveryDriverSelect() {
   const sel = document.getElementById('deliveryDriverSelect');
   if (!sel) return;
-  const drivers = getDrivers().filter(d => d && d.wa);
+  const drivers = driversCache.filter(d => d && d.phone);
   sel.innerHTML = drivers.length
     ? drivers.map(d=>`<option value="${d.id}">${d.name||'N/A'}</option>`).join('')
     : '<option value="">No drivers with a phone number — add one in the Drivers tab</option>';
@@ -1122,7 +1150,7 @@ function notifyDelivery(ref) {
   if (!ref) { showToast('Missing booking reference', 'warn'); return; }
   const b = (allBookings||[]).find(x=>x && x.ref===ref);
   if (!b) { showToast('Booking not found', 'warn'); return; }
-  const drivers = getDrivers().filter(d => d && d.wa);
+  const drivers = driversCache.filter(d => d && d.phone);
   if (!drivers.length) { showToast('Add a driver with a phone number first (Drivers tab)', 'warn'); return; }
 
   const notified = getNotifiedMap();
@@ -1164,10 +1192,10 @@ function confirmDelivery() {
     const ref = modal ? modal.dataset.ref : null;
     const driverId = document.getElementById('deliveryDriverSelect').value;
     const location = document.getElementById('deliveryLocation').value;
-    const driver = getDrivers().find(d=>d && d.id===driverId);
+    const driver = driversCache.find(d=>d && d.id===driverId);
     const b = (allBookings||[]).find(x=>x && x.ref===ref);
 
-    if (!driver || !driver.wa) { showToast('Select a valid driver', 'warn'); return; }
+    if (!driver || !driver.phone) { showToast('Select a valid driver', 'warn'); return; }
     if (!b) { showToast('Booking not found', 'warn'); return; }
 
     const mapUrl = mapsLink(location);
@@ -1186,7 +1214,7 @@ function confirmDelivery() {
     // Idempotency: record the SENT flag before opening the link so a rapid
     // double-click or accidental duplicate call is visible/guarded against.
     markNotified(ref);
-    window.open(notifyLink(driver.wa, msg), '_blank');
+    window.open(notifyLink(driver.phone, msg), '_blank');
     addLog('🚚 Delivery notification sent to '+nz(driver.name)+' for '+nz(ref));
     showToast('Driver notified ✅','ok');
     closeDeliveryModal();

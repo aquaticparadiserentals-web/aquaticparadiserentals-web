@@ -11,6 +11,7 @@
  */
 
 var SHEET_NAME = 'BOOKINGS';
+var DRIVERS_SHEET_NAME = 'DRIVERS';
 var NOTIFY_EMAIL = 'aquaticparadiserentals@gmail.com';
 // Shared secret required to read booking/customer data (PII). Booking *submission*
 // stays open since customers must be able to book without a login.
@@ -122,6 +123,29 @@ function _validateBookingPayload(p) {
   }
 }
 
+function _validateDriverPayload(p) {
+  try {
+    if (!p || typeof p !== 'object') return { valid: false, error: 'Missing driver data' };
+    if (typeof p.name !== 'string' || !p.name.trim() || p.name.length > 200) {
+      return { valid: false, error: 'Invalid or missing name' };
+    }
+    if (p.vehicle !== undefined && p.vehicle !== null) {
+      if (typeof p.vehicle !== 'string' || p.vehicle.length > 200) {
+        return { valid: false, error: 'Invalid vehicle' };
+      }
+    }
+    if (p.phone !== undefined && p.phone !== null) {
+      if (typeof p.phone !== 'string' || p.phone.length > 50) {
+        return { valid: false, error: 'Invalid phone' };
+      }
+    }
+    return { valid: true };
+  } catch (err) {
+    _logError('validateDriverPayload', err);
+    return { valid: false, error: 'Validation failed' };
+  }
+}
+
 function _validateStatusPayload(p) {
   try {
     if (!p || typeof p !== 'object') return { valid: false, error: 'Missing data' };
@@ -150,6 +174,69 @@ function _sheet() {
     ['D:D','F:F','N:N'].forEach(function(r){ sh.getRange(r).setNumberFormat('@'); });
   }
   return sh;
+}
+
+function _driversSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(DRIVERS_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(DRIVERS_SHEET_NAME);
+    sh.appendRow(['id', 'name', 'vehicle', 'phone', 'createdAt']);
+    sh.getRange('1:1').setFontWeight('bold');
+  }
+  return sh;
+}
+
+// ── DRIVERS (shared across staff — same sheet/GAS backend as bookings) ──
+function getDrivers() {
+  try {
+    var sh = _driversSheet();
+    var data = sh.getDataRange().getValues();
+    if (data.length <= 1) return [];
+    return data.slice(1).map(function (row) {
+      return { id: row[0], name: row[1], vehicle: row[2], phone: row[3], createdAt: row[4] };
+    }).filter(function (d) { return d.id; });
+  } catch (err) {
+    _logError('getDrivers', err);
+    return [];
+  }
+}
+
+function addDriver(p) {
+  try {
+    var validation = _validateDriverPayload(p);
+    if (!validation.valid) return { ok: false, error: validation.error };
+
+    var sh = _driversSheet();
+    var id = 'driver-' + Date.now();
+    sh.appendRow([
+      id,
+      _safe(p.name, 'N/A'),
+      _safe(p.vehicle, 'N/A'),
+      _safe(p.phone, ''),
+      new Date().toISOString()
+    ]);
+    return { ok: true, id: id };
+  } catch (err) {
+    return _fail('addDriver', err);
+  }
+}
+
+function deleteDriver(p) {
+  try {
+    if (!p || typeof p.id !== 'string' || !p.id.trim()) return { ok: false, error: 'Invalid id' };
+    var sh = _driversSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(p.id)) {
+        sh.deleteRow(i + 1);
+        return { ok: true };
+      }
+    }
+    return { ok: true }; // already gone — idempotent
+  } catch (err) {
+    return _fail('deleteDriver', err);
+  }
 }
 
 // ── ID PHOTO UPLOAD (Drive) ──
@@ -214,6 +301,10 @@ function doGet(e) {
       if (!_authOk(p)) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, bookings: getBookings(parseInt(p.limit, 10) || 50) });
     }
+    if (p.action === 'getDrivers') {
+      if (!_authOk(p)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json({ ok: true, drivers: getDrivers() });
+    }
     return _json({ ok: true, message: 'APR Backend v4' });
   } catch (err) {
     return _json(_fail('doGet', err));
@@ -246,6 +337,18 @@ function doPost(e) {
     if (payload.action === 'getBookings') {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, bookings: getBookings(50) });
+    }
+    if (payload.action === 'getDrivers') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json({ ok: true, drivers: getDrivers() });
+    }
+    if (payload.action === 'addDriver') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(addDriver(payload));
+    }
+    if (payload.action === 'deleteDriver') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(deleteDriver(payload));
     }
     return _json(saveBooking(payload));
   } catch (err) {
