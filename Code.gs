@@ -25,6 +25,12 @@ var FIELDS = ['ref','fname','lname','phone','email','datetime','groupSize',
   'source','Timestamp','NotifiedAt','idPhotoUrl','status','kidsCount'];
 var VALID_STATUSES = ['pending', 'confirmed', 'done'];
 var INVENTORY_SHEET_NAME = 'INVENTORY';
+var STAFF_SHEET_NAME = 'STAFF';
+// Staff/driver photos are intentionally PUBLIC (guests are meant to see who
+// they're dealing with) — opposite posture from guest ID photos, which are
+// sensitive PII and must never be publicly shareable.
+var STAFF_PHOTO_FOLDER_NAME = 'APR Staff Photos';
+var MAX_STAFF_PHOTO_BASE64_LEN = 4000000; // ~3MB decoded — headshots, not ID scans
 
 // ── FAIL-SAFE HELPERS ──
 
@@ -200,10 +206,48 @@ function _driversSheet() {
   var sh = ss.getSheetByName(DRIVERS_SHEET_NAME);
   if (!sh) {
     sh = ss.insertSheet(DRIVERS_SHEET_NAME);
-    sh.appendRow(['id', 'name', 'vehicle', 'phone', 'createdAt']);
+    sh.appendRow(['id', 'name', 'vehicle', 'phone', 'createdAt', 'photoUrl']);
     sh.getRange('1:1').setFontWeight('bold');
+  } else {
+    var lastCol = sh.getLastColumn();
+    var header = lastCol > 0 ? sh.getRange(1, 1, 1, lastCol).getValues()[0] : [];
+    if (header.indexOf('photoUrl') === -1) {
+      sh.getRange(1, lastCol + 1).setValue('photoUrl');
+      sh.getRange('1:1').setFontWeight('bold');
+    }
   }
   return sh;
+}
+
+// Shared by driver/staff photo uploads. PUBLIC on purpose — the whole point
+// is guests can see who's showing up. Never use this for guest ID photos.
+function _saveStaffPhoto(base64Raw, mimeTypeRaw, namePrefix) {
+  try {
+    if (!base64Raw) return '';
+    var mime = (typeof mimeTypeRaw === 'string' && /^image\/(jpeg|jpg|png|webp)$/i.test(mimeTypeRaw)) ? mimeTypeRaw : 'image/jpeg';
+    var base64 = String(base64Raw);
+    var commaIdx = base64.indexOf(',');
+    if (base64.slice(0, 5) === 'data:' && commaIdx !== -1) base64 = base64.slice(commaIdx + 1);
+    if (base64.length > MAX_STAFF_PHOTO_BASE64_LEN) return '';
+
+    var bytes;
+    try { bytes = Utilities.base64Decode(base64); }
+    catch (decodeErr) { _logError('_saveStaffPhoto.decode', decodeErr); return ''; }
+
+    var ext = mime.indexOf('png') !== -1 ? 'png' : (mime.indexOf('webp') !== -1 ? 'webp' : 'jpg');
+    var safePrefix = String(namePrefix || 'staff').replace(/[^a-zA-Z0-9_-]/g, '');
+    var blob = Utilities.newBlob(bytes, mime, safePrefix + '_' + Date.now() + '.' + ext);
+
+    var folders = DriveApp.getFoldersByName(STAFF_PHOTO_FOLDER_NAME);
+    var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(STAFF_PHOTO_FOLDER_NAME);
+    var file = folder.createFile(blob);
+    try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); }
+    catch (shareErr) { _logError('_saveStaffPhoto.share', shareErr); }
+    return file.getUrl();
+  } catch (err) {
+    _logError('_saveStaffPhoto', err);
+    return '';
+  }
 }
 
 // ── DRIVERS (shared across staff — same sheet/GAS backend as bookings) ──
@@ -213,7 +257,7 @@ function getDrivers() {
     var data = sh.getDataRange().getValues();
     if (data.length <= 1) return [];
     return data.slice(1).map(function (row) {
-      return { id: row[0], name: row[1], vehicle: row[2], phone: row[3], createdAt: row[4] };
+      return { id: row[0], name: row[1], vehicle: row[2], phone: row[3], createdAt: row[4], photoUrl: row[5] || '' };
     }).filter(function (d) { return d.id; });
   } catch (err) {
     _logError('getDrivers', err);
@@ -226,6 +270,10 @@ function addDriver(p) {
     var validation = _validateDriverPayload(p);
     if (!validation.valid) return { ok: false, error: validation.error };
 
+    var photoUrl = '';
+    try { photoUrl = _saveStaffPhoto(p.photoBase64, p.photoMimeType, 'driver'); }
+    catch (photoErr) { _logError('addDriver.photo', photoErr); }
+
     var sh = _driversSheet();
     var id = 'driver-' + Date.now();
     sh.appendRow([
@@ -233,7 +281,8 @@ function addDriver(p) {
       _safe(p.name, 'N/A'),
       _safe(p.vehicle, 'N/A'),
       _safe(p.phone, ''),
-      new Date().toISOString()
+      new Date().toISOString(),
+      photoUrl
     ]);
     return { ok: true, id: id };
   } catch (err) {
@@ -255,6 +304,114 @@ function deleteDriver(p) {
     return { ok: true }; // already gone — idempotent
   } catch (err) {
     return _fail('deleteDriver', err);
+  }
+}
+
+// ── STAFF (on-site employees — shared across devices, same pattern as
+// DRIVERS. Previously localStorage-only in admin.html, meaning different
+// staff logins disagreed on the roster; migrated to match.) ──
+function _staffSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(STAFF_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(STAFF_SHEET_NAME);
+    sh.appendRow(['id', 'name', 'role', 'phone', 'createdAt', 'photoUrl']);
+    sh.getRange('1:1').setFontWeight('bold');
+  }
+  return sh;
+}
+
+function _validateStaffPayload(p) {
+  try {
+    if (!p || typeof p !== 'object') return { valid: false, error: 'Missing staff data' };
+    if (typeof p.name !== 'string' || !p.name.trim() || p.name.length > 200) {
+      return { valid: false, error: 'Invalid or missing name' };
+    }
+    if (p.role !== undefined && p.role !== null) {
+      if (typeof p.role !== 'string' || p.role.length > 200) return { valid: false, error: 'Invalid role' };
+    }
+    if (p.phone !== undefined && p.phone !== null) {
+      if (typeof p.phone !== 'string' || p.phone.length > 50) return { valid: false, error: 'Invalid phone' };
+    }
+    return { valid: true };
+  } catch (err) {
+    _logError('validateStaffPayload', err);
+    return { valid: false, error: 'Validation failed' };
+  }
+}
+
+function getStaff() {
+  try {
+    var sh = _staffSheet();
+    var data = sh.getDataRange().getValues();
+    if (data.length <= 1) return [];
+    return data.slice(1).map(function (row) {
+      return { id: row[0], name: row[1], role: row[2], phone: row[3], createdAt: row[4], photoUrl: row[5] || '' };
+    }).filter(function (d) { return d.id; });
+  } catch (err) {
+    _logError('getStaff', err);
+    return [];
+  }
+}
+
+function addStaff(p) {
+  try {
+    var validation = _validateStaffPayload(p);
+    if (!validation.valid) return { ok: false, error: validation.error };
+
+    var photoUrl = '';
+    try { photoUrl = _saveStaffPhoto(p.photoBase64, p.photoMimeType, 'staff'); }
+    catch (photoErr) { _logError('addStaff.photo', photoErr); }
+
+    var sh = _staffSheet();
+    var id = 'staff-' + Date.now();
+    sh.appendRow([
+      id,
+      _safe(p.name, 'N/A'),
+      _safe(p.role, 'N/A'),
+      _safe(p.phone, ''),
+      new Date().toISOString(),
+      photoUrl
+    ]);
+    return { ok: true, id: id };
+  } catch (err) {
+    return _fail('addStaff', err);
+  }
+}
+
+function deleteStaff(p) {
+  try {
+    if (!p || typeof p.id !== 'string' || !p.id.trim()) return { ok: false, error: 'Invalid id' };
+    var sh = _staffSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(p.id)) {
+        sh.deleteRow(i + 1);
+        return { ok: true };
+      }
+    }
+    return { ok: true }; // already gone — idempotent
+  } catch (err) {
+    return _fail('deleteStaff', err);
+  }
+}
+
+// ── PUBLIC "MEET THE TEAM" PROJECTION ──
+// No token required — deliberately strips phone numbers before returning,
+// since this is meant for the guest-facing booking page. Only name, role/
+// vehicle, and photo are public; contact numbers stay behind the admin token.
+function getPublicTeam() {
+  try {
+    var staff = getStaff().map(function (s) {
+      return { name: s.name, role: s.role, photoUrl: s.photoUrl, kind: 'staff' };
+    });
+    var drivers = getDrivers().map(function (d) {
+      return { name: d.name, role: d.vehicle, photoUrl: d.photoUrl, kind: 'driver' };
+    });
+    return staff.concat(drivers);
+  } catch (err) {
+    _logError('getPublicTeam', err);
+    return [];
   }
 }
 
@@ -426,6 +583,31 @@ function seedFullInventory() {
   try { SpreadsheetApp.getUi().alert('✅ Seeded ' + added + ' item(s) — boards, kayaks, snorkel sets, floaters.'); } catch (uiErr) { /* expected outside Sheets UI */ }
 }
 
+// ── ONE-TIME SETUP: migrates the staff roster that used to be hardcoded
+// client-side in admin.html (DEFAULT_TEAM) into the shared STAFF sheet.
+// Run once after deploying. Safe to re-run — skips names already present.
+function seedDefaultStaff() {
+  var sh = _staffSheet();
+  var data = sh.getDataRange().getValues();
+  var existingNames = data.slice(1).map(function (row) { return row[1]; });
+
+  var toSeed = [
+    { name: 'Operations Manager', role: 'Ground Operations Lead', phone: '17844963447' },
+    { name: 'Dravin', role: 'Gear Dispatch & Guest Relations', phone: '17845325218' },
+    { name: 'Shammar', role: 'Gear Dispatch & Safety', phone: '17844340530' }
+  ];
+
+  var added = 0;
+  toSeed.forEach(function (item) {
+    if (existingNames.indexOf(item.name) !== -1) return; // already seeded
+    sh.appendRow(['staff-' + Date.now() + '-' + added, item.name, item.role, item.phone, new Date().toISOString(), '']);
+    added++;
+  });
+
+  Logger.log('seedDefaultStaff: added ' + added + ' staff member(s).');
+  try { SpreadsheetApp.getUi().alert('✅ Seeded ' + added + ' staff member(s). Add photos via the admin Team tab.'); } catch (uiErr) { /* expected outside Sheets UI */ }
+}
+
 // ── ID PHOTO UPLOAD (Drive) ──
 // Never blocks or fails the booking: any error here returns '' and is logged,
 // saveBooking proceeds regardless.
@@ -455,10 +637,11 @@ function _saveIdPhoto(p) {
     var folders = DriveApp.getFoldersByName(ID_PHOTO_FOLDER_NAME);
     var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(ID_PHOTO_FOLDER_NAME);
 
+    // Deliberately NOT calling file.setSharing() here. Guest ID photos are
+    // sensitive PII — the file stays private to the script's own account.
+    // Staff view it through getIdPhoto() (token-gated, POST-only, never a
+    // public link) instead of an open "anyone with the link" URL.
     var file = folder.createFile(blob);
-    try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); }
-    catch (shareErr) { _logError('_saveIdPhoto.share', shareErr); }
-
     return file.getUrl();
   } catch (err) {
     _logError('_saveIdPhoto', err);
@@ -496,9 +679,18 @@ function doGet(e) {
       if (!_authOk(p)) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, inventory: getInventory() });
     }
+    if (p.action === 'getStaff') {
+      if (!_authOk(p)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json({ ok: true, staff: getStaff() });
+    }
     if (p.action === 'getWeather') {
       // Public — safety info, not PII. No token required.
       return _json({ ok: true, weather: getWeather() });
+    }
+    if (p.action === 'getPublicTeam') {
+      // Public — name/role/photo only, phone numbers already stripped
+      // upstream in getPublicTeam(). No token required.
+      return _json({ ok: true, team: getPublicTeam() });
     }
     return _json({ ok: true, message: 'APR Backend v4' });
   } catch (err) {
@@ -560,6 +752,24 @@ function doPost(e) {
     if (payload.action === 'deleteInventoryItem') {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json(deleteInventoryItem(payload));
+    }
+    if (payload.action === 'getIdPhoto') {
+      // POST-only, deliberately absent from doGet — keeps the token out of
+      // URLs/query strings entirely for this sensitive-PII action.
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(getIdPhoto(payload));
+    }
+    if (payload.action === 'getStaff') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json({ ok: true, staff: getStaff() });
+    }
+    if (payload.action === 'addStaff') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(addStaff(payload));
+    }
+    if (payload.action === 'deleteStaff') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(deleteStaff(payload));
     }
     return _json(saveBooking(payload));
   } catch (err) {
@@ -686,6 +896,42 @@ function getBookings(limit) {
   } catch (err) {
     _logError('getBookings', err);
     return [];
+  }
+}
+
+// ── GUEST ID PHOTO VIEW (token-gated, POST-only — never a public link) ──
+// Looks up the booking's stored idPhotoUrl, extracts the Drive file ID, and
+// returns the image content directly. This is the only way to view a guest
+// ID photo now that _saveIdPhoto() no longer makes the file public.
+function getIdPhoto(p) {
+  try {
+    if (!p || typeof p.ref !== 'string' || !p.ref.trim()) return { ok: false, error: 'Invalid ref' };
+
+    var sh = _sheet();
+    var data = sh.getDataRange().getValues();
+    var header = data[0] || [];
+    var refIdx = header.indexOf('ref');
+    var urlIdx = header.indexOf('idPhotoUrl');
+    if (refIdx === -1 || urlIdx === -1) return { ok: false, error: 'Sheet not initialized' };
+
+    var idPhotoUrl = '';
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][refIdx]) === String(p.ref)) { idPhotoUrl = String(data[i][urlIdx] || ''); break; }
+    }
+    if (!idPhotoUrl) return { ok: false, error: 'No ID photo on file for this booking' };
+
+    var match = idPhotoUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (!match) return { ok: false, error: 'Could not resolve photo file' };
+
+    var file = DriveApp.getFileById(match[1]);
+    var blob = file.getBlob();
+    return {
+      ok: true,
+      mimeType: blob.getContentType(),
+      base64: Utilities.base64Encode(blob.getBytes())
+    };
+  } catch (err) {
+    return _fail('getIdPhoto', err);
   }
 }
 
@@ -899,6 +1145,22 @@ function healthCheck() {
     // Not present yet is fine — it auto-creates on first use (e.g. running seedLifeJacketInventory).
   } catch (err) {
     issues.push('Could not read the INVENTORY sheet: ' + (err && err.message ? err.message : err));
+  }
+
+  // 2c. STAFF sheet header check.
+  try {
+    var staffSh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STAFF_SHEET_NAME);
+    if (staffSh) {
+      var staffHeader = staffSh.getRange(1, 1, 1, Math.max(staffSh.getLastColumn(), 1)).getValues()[0];
+      var expectedStaffCols = ['id', 'name', 'role', 'phone', 'createdAt', 'photoUrl'];
+      var missingStaffCols = expectedStaffCols.filter(function (f) { return staffHeader.indexOf(f) === -1; });
+      if (missingStaffCols.length) {
+        issues.push('STAFF header is missing expected column(s): ' + missingStaffCols.join(', ') + '.');
+      }
+    }
+    // Not present yet is fine — auto-creates on first use (e.g. running seedDefaultStaff).
+  } catch (err) {
+    issues.push('Could not read the STAFF sheet: ' + (err && err.message ? err.message : err));
   }
 
   // 3. Recent bookings stuck without a notification email ever being sent.

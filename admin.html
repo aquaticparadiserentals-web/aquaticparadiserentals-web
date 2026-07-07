@@ -400,8 +400,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
   <div class="card" style="margin-bottom:16px">
     <input type="text" id="newStaffName" placeholder="Full name" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:8px;box-sizing:border-box"/>
     <input type="text" id="newStaffRole" placeholder="Role (e.g. Gear Dispatch)" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:8px;box-sizing:border-box"/>
-    <input type="tel" id="newStaffPhone" placeholder="WhatsApp number, e.g. +1 784 XXX XXXX" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:10px;box-sizing:border-box"/>
-    <button onclick="addStaff()" style="width:100%;padding:10px;background:#03939E;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.88rem;cursor:pointer">➕ Add Staff Member</button>
+    <input type="tel" id="newStaffPhone" placeholder="WhatsApp number, e.g. +1 784 XXX XXXX" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:8px;box-sizing:border-box"/>
+    <label style="display:block;font-size:0.72rem;color:rgba(255,255,255,0.5);margin-bottom:4px">Photo (shown to guests — optional)</label>
+    <input type="file" accept="image/*" id="newStaffPhotoFile" style="width:100%;margin-bottom:10px;font-size:0.8rem"/>
+    <button onclick="addStaffMember()" style="width:100%;padding:10px;background:#03939E;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.88rem;cursor:pointer">➕ Add Staff Member</button>
   </div>
 
   <div class="sec-title">Operations</div>
@@ -430,7 +432,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
   <div class="card" style="margin-bottom:16px">
     <input type="text" id="newDriverName" placeholder="Full name" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:8px;box-sizing:border-box"/>
     <input type="text" id="newDriverVehicle" placeholder="Vehicle (e.g. Pickup truck)" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:8px;box-sizing:border-box"/>
-    <input type="tel" id="newDriverPhone" placeholder="WhatsApp number, e.g. +1 784 XXX XXXX" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:10px;box-sizing:border-box"/>
+    <input type="tel" id="newDriverPhone" placeholder="WhatsApp number, e.g. +1 784 XXX XXXX" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:8px;box-sizing:border-box"/>
+    <label style="display:block;font-size:0.72rem;color:rgba(255,255,255,0.5);margin-bottom:4px">Photo (shown to guests — optional)</label>
+    <input type="file" accept="image/*" id="newDriverPhotoFile" style="width:100%;margin-bottom:10px;font-size:0.8rem"/>
     <button onclick="addDriver()" style="width:100%;padding:10px;background:#03939E;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.88rem;cursor:pointer">➕ Add Driver</button>
   </div>
 </div>
@@ -723,7 +727,7 @@ function onLogin() {
   updateOnline();
   renderInventory();
   renderSafety();
-  renderTeam();
+  fetchStaff();
   fetchDrivers();
   fetchLifeJackets();
   fetchBookings();
@@ -817,7 +821,7 @@ function renderBookings() {
         ${state!=='done'?`<button class="bk-btn done-btn" onclick="setBkState('${refAttr}','done')">☑ Done</button>`:''}
         ${phone?`<a class="bk-btn wa" href="https://wa.me/${encodeURIComponent(phone)}?text=${waMsg}" target="_blank">💬 WhatsApp</a>`:''}
         <button class="bk-btn" onclick="notifyDelivery('${refAttr}')">🚚 Notify Driver</button>
-        ${b.idPhotoUrl && b.idPhotoUrl!=='N/A' && /^https:\/\/drive\.google\.com\//.test(String(b.idPhotoUrl))?`<a class="bk-btn" href="${escapeHtml(b.idPhotoUrl)}" target="_blank" rel="noopener">🪪 View ID</a>`:''}
+        ${b.idPhotoUrl && b.idPhotoUrl!=='N/A'?`<button class="bk-btn" onclick="viewIdPhoto('${refAttr}')">🪪 View ID</button>`:''}
       </div>
     </div>`;
   }).join('');
@@ -972,19 +976,26 @@ function completeSafetyCheck() {
   showToast('Dispatch cleared ✅','ok');
 }
 
-// ── TEAM (STAFF) — persisted, editable ──
-const DEFAULT_TEAM = [
-  {id:'staff-ops',name:'Operations Manager',role:'Ground Operations Lead',wa:'17844963447',emoji:'👷'},
-  {id:'staff-dravin',name:'Dravin',role:'Gear Dispatch & Guest Relations',wa:'17845325218',emoji:'🏄'},
-  {id:'staff-shammar',name:'Shammar',role:'Gear Dispatch & Safety',wa:'17844340530',emoji:'🌊'},
-];
+// ── TEAM (STAFF) — shared, persisted server-side via GAS/Sheets (not
+// localStorage — this used to be a hardcoded client-only array, meaning
+// different staff logins disagreed on the roster, same bug Drivers had). ──
+let staffCache = [];
 
-function getStaff() {
-  const stored = safeParseJSON('apr_staff', null);
-  if (!stored || !Array.isArray(stored)) { safeSetJSON('apr_staff', DEFAULT_TEAM); return DEFAULT_TEAM.slice(); }
-  return stored;
+async function fetchStaff() {
+  try {
+    const res = await fetch(BACKEND+'?action=getStaff&token='+encodeURIComponent(APP_TOKEN),{signal:AbortSignal.timeout(10000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (data && data.ok && Array.isArray(data.staff)) {
+      staffCache = data.staff;
+    } else {
+      throw new Error((data && data.error) || 'No data');
+    }
+  } catch (err) {
+    showToast('Could not load staff: '+err.message, 'warn');
+  }
+  renderTeam();
 }
-function saveStaff(list) { safeSetJSON('apr_staff', Array.isArray(list) ? list : []); }
 
 function notifyLink(wa, msg) {
   const digits = String(wa||'').replace(/\D/g,'');
@@ -1014,16 +1025,15 @@ function validatePhoneField(val) {
 }
 
 function renderTeam() {
-  const staff = getStaff();
+  const staff = staffCache;
   document.getElementById('teamList').innerHTML = staff.map(t=>{
     const name = (t && t.name) || 'N/A';
     const role = (t && t.role) || 'N/A';
-    const wa = (t && t.wa) || '';
-    const emoji = (t && t.emoji) || '🙂';
+    const wa = (t && t.phone) || '';
     const id = (t && t.id) || '';
     const idAttr = escapeHtml(id).replace(/'/g,'&#39;');
     return `<div class="team-card">
-      <div class="team-avatar">${escapeHtml(emoji)}</div>
+      ${avatarHtml(t.photoUrl, '🙂')}
       <div class="team-info">
         <div class="team-name">${escapeHtml(name)}</div>
         <div class="team-role">${escapeHtml(role)}</div>
@@ -1031,46 +1041,66 @@ function renderTeam() {
       ${wa?`<a class="team-wa" href="https://wa.me/${encodeURIComponent(wa)}">💬 Chat</a>
       <a class="team-wa" style="background:var(--gold);color:#0B1E2D" href="${notifyLink(wa,'🔔 APR Alert: Please check the staff console for an update — '+name)}">🔔 Notify</a>`
       :'<span style="font-size:0.72rem;color:rgba(255,255,255,0.4)">No phone on file</span>'}
-      <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer" onclick="removeStaff('${idAttr}')">🗑️</button>
+      <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer" onclick="removeStaffMember('${idAttr}')">🗑️</button>
     </div>`;
   }).join('');
 }
 
-function addStaff() {
+async function addStaffMember() {
   const nameCheck = validateNameField(document.getElementById('newStaffName').value, 'Name');
   if (!nameCheck.valid) { showToast(nameCheck.error, 'warn'); return; }
   const roleCheck = validateNameField(document.getElementById('newStaffRole').value || '', 'Role');
   const phoneCheck = validatePhoneField(document.getElementById('newStaffPhone').value);
   if (!phoneCheck.valid) { showToast(phoneCheck.error, 'warn'); return; }
+  const photo = await _fileToBase64(document.getElementById('newStaffPhotoFile'));
 
-  const staff = getStaff();
-  staff.push({
-    id: 'staff-'+Date.now(),
-    name: nameCheck.value,
-    role: roleCheck.valid ? roleCheck.value : 'N/A',
-    wa: phoneCheck.value,
-    emoji: '🙂'
-  });
-  saveStaff(staff);
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'addStaff', token:APP_TOKEN,
+      name:nameCheck.value,
+      role:roleCheck.valid?roleCheck.value:'N/A',
+      phone:phoneCheck.value,
+      photoBase64: photo ? photo.base64 : undefined,
+      photoMimeType: photo ? photo.mimeType : undefined
+    }),signal:AbortSignal.timeout(20000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Save failed');
+  } catch (err) {
+    showToast('Could not add staff member: '+err.message, 'warn');
+    return;
+  }
+
   document.getElementById('newStaffName').value='';
   document.getElementById('newStaffRole').value='';
   document.getElementById('newStaffPhone').value='';
-  renderTeam();
+  document.getElementById('newStaffPhotoFile').value='';
+  await fetchStaff();
   addLog('👥 Staff added: '+nameCheck.value);
   showToast('Staff added ✅','ok');
 }
 
-function removeStaff(id) {
+async function removeStaffMember(id) {
   if (!id) return;
-  saveStaff(getStaff().filter(t=>t && t.id!==id));
-  renderTeam();
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'deleteStaff', token:APP_TOKEN, id
+    }),signal:AbortSignal.timeout(15000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Delete failed');
+  } catch (err) {
+    showToast('Could not remove staff member: '+err.message, 'warn');
+    return;
+  }
+  await fetchStaff();
   addLog('👥 Staff removed');
 }
 
 function notifyAllStaff() {
-  const staff = getStaff().filter(t => t && t.wa);
+  const staff = staffCache.filter(t => t && t.phone);
   if (!staff.length) { showToast('No staff with a phone number to notify','warn'); return; }
-  staff.forEach((t,i) => setTimeout(()=>window.open(notifyLink(t.wa,'🔔 APR Alert: Please check the staff console for an update.'),'_blank'), i*400));
+  staff.forEach((t,i) => setTimeout(()=>window.open(notifyLink(t.phone,'🔔 APR Alert: Please check the staff console for an update.'),'_blank'), i*400));
   addLog('🔔 Notified all staff ('+staff.length+')');
 }
 
@@ -1286,6 +1316,21 @@ function markNotified(ref) {
   safeSetJSON('apr_notified', map);
 }
 
+// Drive "view" links aren't directly embeddable as <img src> — convert to
+// the thumbnail endpoint, which is. Returns '' if the URL can't be parsed.
+function driveThumbUrl(url) {
+  if (!url) return '';
+  const match = String(url).match(/\/d\/([a-zA-Z0-9_-]+)/);
+  return match ? `https://drive.google.com/thumbnail?id=${match[1]}&sz=w200` : '';
+}
+
+function avatarHtml(photoUrl, fallbackEmoji) {
+  const thumb = driveThumbUrl(photoUrl);
+  return thumb
+    ? `<img src="${escapeHtml(thumb)}" class="team-avatar" style="object-fit:cover" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'team-avatar',textContent:'${fallbackEmoji}'}))"/>`
+    : `<div class="team-avatar">${fallbackEmoji}</div>`;
+}
+
 function renderDrivers() {
   const drivers = driversCache;
   const el = document.getElementById('driverList');
@@ -1297,7 +1342,7 @@ function renderDrivers() {
     const id = (d && d.id) || '';
     const idAttr = escapeHtml(id).replace(/'/g,'&#39;');
     return `<div class="team-card">
-      <div class="team-avatar">🚚</div>
+      ${avatarHtml(d.photoUrl, '🚚')}
       <div class="team-info">
         <div class="team-name">${escapeHtml(name)}</div>
         <div class="team-role">${escapeHtml(vehicle)}</div>
@@ -1310,20 +1355,35 @@ function renderDrivers() {
   }).join('') : '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.35)">No drivers added yet</div>';
 }
 
+// Reads a <input type="file"> into {base64, mimeType}, or null if empty/unsupported.
+function _fileToBase64(inputEl) {
+  return new Promise((resolve) => {
+    const file = inputEl && inputEl.files && inputEl.files[0];
+    if (!file || !/^image\/(jpeg|jpg|png|webp)$/i.test(file.type)) { resolve(null); return; }
+    const reader = new FileReader();
+    reader.onload = () => resolve({ base64: reader.result, mimeType: file.type });
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
+
 async function addDriver() {
   const nameCheck = validateNameField(document.getElementById('newDriverName').value, 'Name');
   if (!nameCheck.valid) { showToast(nameCheck.error, 'warn'); return; }
   const vehicleCheck = validateNameField(document.getElementById('newDriverVehicle').value || '', 'Vehicle');
   const phoneCheck = validatePhoneField(document.getElementById('newDriverPhone').value);
   if (!phoneCheck.valid) { showToast(phoneCheck.error, 'warn'); return; }
+  const photo = await _fileToBase64(document.getElementById('newDriverPhotoFile'));
 
   try {
     const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
       action:'addDriver', token:APP_TOKEN,
       name:nameCheck.value,
       vehicle:vehicleCheck.valid?vehicleCheck.value:'N/A',
-      phone:phoneCheck.value
-    }),signal:AbortSignal.timeout(15000)});
+      phone:phoneCheck.value,
+      photoBase64: photo ? photo.base64 : undefined,
+      photoMimeType: photo ? photo.mimeType : undefined
+    }),signal:AbortSignal.timeout(20000)});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
     if (!data || !data.ok) throw new Error((data && data.error) || 'Save failed');
@@ -1335,6 +1395,7 @@ async function addDriver() {
   document.getElementById('newDriverName').value='';
   document.getElementById('newDriverVehicle').value='';
   document.getElementById('newDriverPhone').value='';
+  document.getElementById('newDriverPhotoFile').value='';
   await fetchDrivers();
   addLog('🚚 Driver added: '+nameCheck.value);
   showToast('Driver added ✅','ok');
@@ -1365,6 +1426,34 @@ function populateDeliveryDriverSelect() {
   sel.innerHTML = drivers.length
     ? drivers.map(d=>`<option value="${escapeHtml(d.id)}">${escapeHtml(d.name||'N/A')}</option>`).join('')
     : '<option value="">No drivers with a phone number — add one in the Drivers tab</option>';
+}
+
+// Guest ID photos are never a public link now — fetched on demand through
+// the token-gated backend and shown in an inline overlay (data URI only,
+// never written to a URL/history).
+async function viewIdPhoto(ref) {
+  if (!ref) return;
+  showToast('Loading ID photo…', 'ok');
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'getIdPhoto', token:APP_TOKEN, ref
+    }),signal:AbortSignal.timeout(20000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (!data || !data.ok || !data.base64) throw new Error((data && data.error) || 'No photo available');
+
+    let overlay = document.getElementById('idPhotoOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'idPhotoOverlay';
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px';
+      overlay.onclick = () => overlay.remove();
+      document.body.appendChild(overlay);
+    }
+    overlay.innerHTML = `<img src="data:${data.mimeType};base64,${data.base64}" style="max-width:100%;max-height:90vh;border-radius:8px"/>`;
+  } catch (err) {
+    showToast('Could not load ID photo: '+err.message, 'warn');
+  }
 }
 
 function notifyDelivery(ref) {

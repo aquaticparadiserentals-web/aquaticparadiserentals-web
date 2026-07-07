@@ -420,6 +420,14 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
     </div>
   </div>
 
+  <div class="section-title">👋 Meet the Team</div>
+  <div class="info-card">
+    <p style="font-size:0.8rem;color:#555;margin-bottom:10px">The people you'll actually meet on the beach or at delivery.</p>
+    <div id="teamPublicList" style="display:flex;flex-direction:column;gap:10px">
+      <div style="text-align:center;padding:10px;color:#999;font-size:0.8rem">Loading team…</div>
+    </div>
+  </div>
+
   <div class="section-title">🏄 Our Gear Fleet</div>
   <div class="info-card">
     <ul>
@@ -518,7 +526,43 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('datetime').value = d.toISOString().slice(0,16);
 
   loadWeatherBanner();
+  loadTeamPublic();
 });
+
+// ── MEET THE TEAM (public, no login needed) ──
+function driveThumbUrl(url) {
+  if (!url) return '';
+  const match = String(url).match(/\/d\/([a-zA-Z0-9_-]+)/);
+  return match ? `https://drive.google.com/thumbnail?id=${match[1]}&sz=w200` : '';
+}
+
+async function loadTeamPublic() {
+  const el = document.getElementById('teamPublicList');
+  if (!el) return;
+  try {
+    const res = await fetch(BACKEND+'?action=getPublicTeam',{signal:AbortSignal.timeout(8000)});
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    const team = (data && Array.isArray(data.team)) ? data.team : [];
+    if (!team.length) { el.innerHTML = '<div style="text-align:center;padding:10px;color:#999;font-size:0.8rem">Team info coming soon.</div>'; return; }
+    el.innerHTML = team.map(t => {
+      const thumb = driveThumbUrl(t.photoUrl);
+      const emoji = t.kind === 'driver' ? '🚚' : '🙂';
+      const avatar = thumb
+        ? `<img src="${thumb}" style="width:48px;height:48px;border-radius:50%;object-fit:cover" onerror="this.replaceWith(Object.assign(document.createElement('div'),{style:this.style.cssText,textContent:'${emoji}'}))"/>`
+        : `<div style="width:48px;height:48px;border-radius:50%;background:#eee;display:flex;align-items:center;justify-content:center;font-size:1.3rem">${emoji}</div>`;
+      return `<div style="display:flex;align-items:center;gap:12px">
+        ${avatar}
+        <div>
+          <div style="font-weight:700;font-size:0.88rem">${(t.name||'').replace(/</g,'&lt;')}</div>
+          <div style="font-size:0.76rem;color:#777">${(t.role||'').replace(/</g,'&lt;')}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (err) {
+    el.innerHTML = '<div style="text-align:center;padding:10px;color:#999;font-size:0.8rem">Could not load team info right now.</div>';
+  }
+}
 
 // ── CONDITIONS BANNER (public, no login needed — safety info) ──
 async function loadWeatherBanner() {
