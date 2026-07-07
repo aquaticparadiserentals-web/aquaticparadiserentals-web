@@ -157,6 +157,14 @@ Whenever `Code.gs` is updated (a developer, or a future AI assistant, changes th
 
 Frontend changes (`index.html`, `admin.html`, `rules.html`) just need to be pushed to the GitHub repo (`aquaticparadiserentals-web/aquaticparadiserentals-web`) — whatever's hosting the site picks up the change automatically (GitHub Pages, or wherever it's currently pointed).
 
+### One-time setup functions (run once each, from the Apps Script editor, after deploying)
+
+- `installHealthCheckTrigger()` — turns on the automated system health check (runs every 6 hours, emails you only when something's broken).
+- `installWeatherCheckTrigger()` — turns on the daily wind/conditions check (runs ~6am daily, emails you a digest, emails today's guests automatically if conditions turn caution/unsafe).
+- `seedLifeJacketInventory()` — labels your existing 8 life jackets as adult-size (`LJ-A1`–`LJ-A8`) in the shared inventory. Safe to re-run.
+
+If a service worker cache bump ever needs forcing (after a batch of frontend changes), bump the `CACHE` version string in `sw.js` — see the comment there.
+
 ---
 
 ## 6. Daily / Weekly Rhythm
@@ -175,6 +183,8 @@ Per Delroy's own working rhythm:
 - Sanitize masks, fins, and shared gear before and after each use.
 - Walkie-talkies and the business phone stay charged and on-person during beach operations.
 - CPR-safe rescue breathers exist for water emergencies — know where they are before you need them.
+
+**Automated daily conditions check (added 2026-07-07):** the app now pulls a daily wind/gust forecast for Bequia and shows a live safe/caution/unsafe banner on both the booking page and admin console, plus emails you a daily digest and auto-emails today's guests if conditions turn caution/unsafe. **This does not replace the manual anemometer check above** — it's a heads-up layer, not a substitute for the on-the-spot judgment call before each rental.
 
 ---
 
