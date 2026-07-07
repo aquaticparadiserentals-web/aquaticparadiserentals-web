@@ -16,6 +16,11 @@ var NOTIFY_EMAIL = 'aquaticparadiserentals@gmail.com';
 // Shared secret required to read booking/customer data (PII). Booking *submission*
 // stays open since customers must be able to book without a login.
 var APP_TOKEN = '2Si_80O9OJ0DGmc8p6G5pDeG';
+// Weaker, separate secret for dispatch/delivery staff (e.g. Shamar) — unlocks
+// ONLY name/gear/time/location for progressing a delivery, never pricing,
+// revenue, or full guest PII. Give this token to dispatch staff; keep
+// APP_TOKEN for the owner/admin console only.
+var STAFF_TOKEN = 'Dsp_7Kq2mNw94RfL';
 var GENERIC_ERROR = 'Something went wrong. Please try again.';
 var ID_PHOTO_FOLDER_NAME = 'APR Guest ID Photos';
 var MAX_ID_PHOTO_BASE64_LEN = 8000000; // ~6MB decoded — generous cap against abuse
@@ -44,6 +49,21 @@ function _authOk(p) {
     return token === APP_TOKEN;
   } catch (err) {
     _logError('auth', err);
+    return false;
+  }
+}
+
+// Accepts EITHER the full admin token OR the weaker dispatch-only token.
+// Use this only for actions that are safe for dispatch staff to reach
+// (scoped booking view, driver contact list, marking status) — never for
+// getBookings/getInventory/getIdPhoto/addDriver/etc, which stay _authOk-only.
+function _dispatchAuthOk(p) {
+  try {
+    var token = p && p.token;
+    if (typeof token !== 'string' || !token) return false;
+    return token === APP_TOKEN || token === STAFF_TOKEN;
+  } catch (err) {
+    _logError('dispatchAuth', err);
     return false;
   }
 }
@@ -672,8 +692,12 @@ function doGet(e) {
       return _json({ ok: true, bookings: getBookings(parseInt(p.limit, 10) || 50) });
     }
     if (p.action === 'getDrivers') {
-      if (!_authOk(p)) return _json({ ok: false, error: 'Unauthorized' });
+      if (!_dispatchAuthOk(p)) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, drivers: getDrivers() });
+    }
+    if (p.action === 'getDispatchBookings') {
+      if (!_dispatchAuthOk(p)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json({ ok: true, bookings: getDispatchBookings(parseInt(p.limit, 10) || 50) });
     }
     if (p.action === 'getInventory') {
       if (!_authOk(p)) return _json({ ok: false, error: 'Unauthorized' });
@@ -718,15 +742,19 @@ function doPost(e) {
     }
 
     if (payload.action === 'update_status') {
-      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      if (!_dispatchAuthOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json(updateStatus(payload));
+    }
+    if (payload.action === 'getDispatchBookings') {
+      if (!_dispatchAuthOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json({ ok: true, bookings: getDispatchBookings(50) });
     }
     if (payload.action === 'getBookings') {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, bookings: getBookings(50) });
     }
     if (payload.action === 'getDrivers') {
-      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      if (!_dispatchAuthOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, drivers: getDrivers() });
     }
     if (payload.action === 'addDriver') {
@@ -895,6 +923,36 @@ function getBookings(limit) {
     });
   } catch (err) {
     _logError('getBookings', err);
+    return [];
+  }
+}
+
+// ── SCOPED DISPATCH VIEW — only what a delivery/dispatch staffer needs.
+// Deliberately excludes: total, referral, waiverAccepted, waiverTimestamp,
+// idPhotoUrl, email. No pricing or revenue figure appears anywhere in this
+// return value — that's the entire point of this endpoint existing.
+var DISPATCH_FIELDS = ['ref', 'fname', 'lname', 'phone', 'datetime', 'groupSize', 'kidsCount', 'gear', 'duration', 'notes', 'status'];
+
+function getDispatchBookings(limit) {
+  try {
+    var safeLimit = (typeof limit === 'number' && limit > 0 && limit <= 500) ? limit : 50;
+    var sh = _sheet();
+    var data = sh.getDataRange().getValues();
+    if (data.length <= 1) return [];
+    var header = data[0];
+    var colIdx = {};
+    FIELDS.forEach(function (f, i) { colIdx[f] = i; });
+
+    return data.slice(1).reverse().slice(0, safeLimit).map(function (row) {
+      var obj = {};
+      DISPATCH_FIELDS.forEach(function (f) {
+        var v = row[colIdx[f]];
+        obj[f] = (v === undefined || v === null || v === '') ? 'N/A' : v;
+      });
+      return obj;
+    });
+  } catch (err) {
+    _logError('getDispatchBookings', err);
     return [];
   }
 }
