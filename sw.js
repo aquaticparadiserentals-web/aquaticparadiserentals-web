@@ -1,5 +1,8 @@
-// APR Service Worker v4.0
-const CACHE = 'apr-v4';
+// APR Service Worker v5.0
+// Bump CACHE whenever static assets (manifest, icons, logo) change — they're
+// cached-first with no expiry, so the version string is the only thing that
+// forces a refresh. HTML is network-first and self-heals on next reload.
+const CACHE = 'apr-v5';
 const ASSETS = [
   './manifest.json',
   './logo.jpg',
