@@ -289,15 +289,23 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
   <div class="sec-title" style="margin-top:18px">Summary</div>
   <div class="dash-grid" id="invSummary"></div>
 
-  <div class="sec-title" style="margin-top:18px">Life Jackets — Adult / Kid</div>
+  <div class="sec-title" style="margin-top:18px">Equipment Inventory</div>
+  <div style="font-size:0.72rem;color:rgba(255,255,255,0.4);margin-bottom:10px">Shared across every device — add or check out any item below (boards, kayaks, snorkel sets, floaters, life jackets by adult/kid).</div>
   <div id="lifeJacketList"></div>
   <div class="card" style="margin-top:12px">
     <select id="newLJCategory" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:8px;box-sizing:border-box">
-      <option value="life-jacket-adult">Adult</option>
-      <option value="life-jacket-kid">Kid</option>
+      <option value="paddle-board">Paddle Board</option>
+      <option value="kayak">Kayak</option>
+      <option value="snorkel-set">Snorkel Set</option>
+      <option value="floater">Floater</option>
+      <option value="life-jacket-adult">Life Jacket — Adult</option>
+      <option value="life-jacket-kid">Life Jacket — Kid</option>
     </select>
-    <input type="text" id="newLJNotes" placeholder="Notes (e.g. color) — optional" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:10px;box-sizing:border-box"/>
-    <button onclick="addLifeJacket()" style="width:100%;padding:10px;background:#03939E;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.88rem;cursor:pointer">➕ Add Life Jacket</button>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <input type="text" id="newLJNotes" placeholder="Notes (e.g. color, board name) — optional" style="flex:1;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;box-sizing:border-box"/>
+      <button id="voiceNotesBtn" onclick="startVoiceNotes()" style="display:none;padding:10px 14px;background:#162030;color:#fff;border:2px solid #03939E;border-radius:8px;font-size:1rem;cursor:pointer" title="Speak notes instead of typing">🎤</button>
+    </div>
+    <button onclick="addLifeJacket()" style="width:100%;padding:10px;background:#03939E;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.88rem;cursor:pointer">➕ Add Item</button>
   </div>
 </div>
 
@@ -1139,17 +1147,21 @@ async function fetchLifeJackets() {
 function renderLifeJackets() {
   const el = document.getElementById('lifeJacketList');
   if (!el) return;
-  const jackets = inventoryCache.filter(i => i && (i.category==='life-jacket-adult' || i.category==='life-jacket-kid'));
-  if (!jackets.length) {
-    el.innerHTML = '<div style="text-align:center;padding:16px;color:rgba(255,255,255,0.35)">No life jackets seeded yet — run seedLifeJacketInventory() once from the Apps Script editor, or add one below.</div>';
+  if (!inventoryCache.length) {
+    el.innerHTML = '<div style="text-align:center;padding:16px;color:rgba(255,255,255,0.35)">No equipment logged yet — run seedLifeJacketInventory() once from the Apps Script editor for life jackets, or add any item below.</div>';
     return;
   }
   const groups = [
-    {key:'life-jacket-adult', title:'Adult'},
-    {key:'life-jacket-kid', title:'Kid'}
+    {key:'paddle-board', title:'Paddle Boards'},
+    {key:'kayak', title:'Kayaks'},
+    {key:'snorkel-set', title:'Snorkel Sets'},
+    {key:'floater', title:'Floaters'},
+    {key:'life-jacket-adult', title:'Life Jackets — Adult'},
+    {key:'life-jacket-kid', title:'Life Jackets — Kid'}
   ];
+  const icons = {'paddle-board':'🏄','kayak':'🛶','snorkel-set':'🤿','floater':'🏊','life-jacket-adult':'🦺','life-jacket-kid':'🦺'};
   el.innerHTML = groups.map(g => {
-    const items = jackets.filter(j => j.category === g.key);
+    const items = inventoryCache.filter(j => j && j.category === g.key);
     if (!items.length) return '';
     return `<div style="font-weight:800;font-size:0.8rem;margin:10px 0 6px;color:rgba(255,255,255,0.6)">${g.title} (${items.length})</div>` +
       items.map(j => {
@@ -1157,7 +1169,7 @@ function renderLifeJackets() {
         const maint = j.status === 'maintenance';
         const idAttr = escapeHtml(j.id).replace(/'/g,'&#39;');
         return `<div class="team-card">
-          <div class="team-avatar">🦺</div>
+          <div class="team-avatar">${icons[g.key]||'📦'}</div>
           <div class="team-info">
             <div class="team-name">${escapeHtml(j.label)}</div>
             <div class="team-role">${escapeHtml(j.notes||'')} · ${maint?'Maintenance':(inUse?'In use':'Available')}</div>
@@ -1166,14 +1178,19 @@ function renderLifeJackets() {
           <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer" onclick="removeLifeJacket('${idAttr}')">🗑️</button>
         </div>`;
       }).join('');
-  }).join('') || '<div style="text-align:center;padding:16px;color:rgba(255,255,255,0.35)">No life jackets yet.</div>';
+  }).join('') || '<div style="text-align:center;padding:16px;color:rgba(255,255,255,0.35)">No equipment logged yet.</div>';
 }
+
+const INVENTORY_LABEL_PREFIX = {
+  'paddle-board':'PB-', 'kayak':'KY-', 'snorkel-set':'SK-', 'floater':'FL-',
+  'life-jacket-adult':'LJ-A', 'life-jacket-kid':'LJ-K'
+};
 
 async function addLifeJacket() {
   const category = document.getElementById('newLJCategory').value;
   const notes = document.getElementById('newLJNotes').value.trim();
   const existing = inventoryCache.filter(i => i && i.category === category).length;
-  const prefix = category === 'life-jacket-kid' ? 'LJ-K' : 'LJ-A';
+  const prefix = INVENTORY_LABEL_PREFIX[category] || 'IT-';
   const label = prefix + (existing + 1);
 
   try {
@@ -1184,14 +1201,46 @@ async function addLifeJacket() {
     const data = await res.json();
     if (!data || !data.ok) throw new Error((data && data.error) || 'Save failed');
   } catch (err) {
-    showToast('Could not add life jacket: '+err.message, 'warn');
+    showToast('Could not add item: '+err.message, 'warn');
     return;
   }
 
   document.getElementById('newLJNotes').value = '';
   await fetchLifeJackets();
-  addLog('🦺 Life jacket added: '+label);
-  showToast('Life jacket added ✅','ok');
+  addLog('📦 Equipment added: '+label);
+  showToast('Item added ✅','ok');
+}
+
+// ── VOICE INPUT (optional — degrades to nothing on unsupported browsers,
+// notably iOS Safari, which has no Web Speech API. Dictates into the notes
+// field only; does not attempt to parse structured commands, since beach
+// background noise makes anything beyond simple dictation unreliable.) ──
+const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SpeechRecognitionAPI) {
+  const btn = document.getElementById('voiceNotesBtn');
+  if (btn) btn.style.display = 'inline-block';
+}
+
+function startVoiceNotes() {
+  if (!SpeechRecognitionAPI) { showToast('Voice input not supported on this browser', 'warn'); return; }
+  const btn = document.getElementById('voiceNotesBtn');
+  const input = document.getElementById('newLJNotes');
+  const recognition = new SpeechRecognitionAPI();
+  recognition.lang = 'en-US';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  btn.textContent = '🔴';
+  recognition.onresult = (e) => {
+    input.value = e.results[0][0].transcript;
+  };
+  recognition.onerror = () => {
+    showToast('Could not hear that — try again or type it', 'warn');
+  };
+  recognition.onend = () => {
+    btn.textContent = '🎤';
+  };
+  recognition.start();
 }
 
 async function toggleLJStatus(id, status) {

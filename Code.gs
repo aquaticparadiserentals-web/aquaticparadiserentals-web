@@ -390,6 +390,42 @@ function seedLifeJacketInventory() {
   try { SpreadsheetApp.getUi().alert('✅ Seeded ' + added + ' life jacket(s). Add kid-size jackets via the admin Inventory tab once purchased.'); } catch (uiErr) { /* expected outside Sheets UI */ }
 }
 
+// ── ONE-TIME SETUP: seeds the rest of the fleet (boards, kayaks, snorkel
+// sets, floaters) using the real board names/sizes from OPERATIONS.md §2.
+// Kayak/snorkel/floater counts are generic (6/12/8) since they're not
+// individually named like the boards — relabel/edit via the admin
+// Inventory tab if that's not accurate. Safe to re-run: skips anything
+// already seeded by label.
+function seedFullInventory() {
+  var sh = _inventorySheet();
+  var data = sh.getDataRange().getValues();
+  var existingLabels = data.slice(1).map(function (row) { return row[1]; });
+
+  var toSeed = [
+    { label: 'PB-1', category: 'paddle-board', notes: 'Rainbow Snake (blue), 10\'x3"' },
+    { label: 'PB-2', category: 'paddle-board', notes: 'Sea Turtle (green), 10\'6"' },
+    { label: 'PB-3', category: 'paddle-board', notes: 'Horizon (yellow), 11\'x32"x6"' },
+    { label: 'PB-4', category: 'paddle-board', notes: 'Horizon (pink), 11\'' },
+    { label: 'PB-5', category: 'paddle-board', notes: 'Manta Ray (grey) #1, 10\'x32"x6"' },
+    { label: 'PB-6', category: 'paddle-board', notes: 'Manta Ray (grey) #2, 10\'x32"x6"' },
+    { label: 'PB-7', category: 'paddle-board', notes: 'Manta Ray (grey) #3, 10\'x32"x6"' },
+    { label: 'PB-8', category: 'paddle-board', notes: 'Sunshine (white & blue), 11\'x33"x6"' }
+  ];
+  for (var k = 1; k <= 6; k++) toSeed.push({ label: 'KY-' + k, category: 'kayak', notes: '' });
+  for (var s = 1; s <= 12; s++) toSeed.push({ label: 'SK-' + s, category: 'snorkel-set', notes: '' });
+  for (var f = 1; f <= 8; f++) toSeed.push({ label: 'FL-' + f, category: 'floater', notes: '' });
+
+  var added = 0;
+  toSeed.forEach(function (item) {
+    if (existingLabels.indexOf(item.label) !== -1) return; // already seeded
+    sh.appendRow(['inv-' + Date.now() + '-' + added, item.label, item.category, 'available', item.notes, new Date().toISOString()]);
+    added++;
+  });
+
+  Logger.log('seedFullInventory: added ' + added + ' item(s).');
+  try { SpreadsheetApp.getUi().alert('✅ Seeded ' + added + ' item(s) — boards, kayaks, snorkel sets, floaters.'); } catch (uiErr) { /* expected outside Sheets UI */ }
+}
+
 // ── ID PHOTO UPLOAD (Drive) ──
 // Never blocks or fails the booking: any error here returns '' and is logged,
 // saveBooking proceeds regardless.
