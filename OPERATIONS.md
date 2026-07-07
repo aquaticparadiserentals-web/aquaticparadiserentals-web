@@ -178,13 +178,20 @@ Per Delroy's own working rhythm:
 
 ---
 
-## 8. Future Growth Ideas on File
+## 8. Growth Ideas
 
-Ideas already noted as worth exploring when there's bandwidth:
-- **Night-glow paddle sessions** — waterproof LED kits on clear-bottom kayaks.
-- **Corporate/group team-building** — structured water sports events for visiting groups.
+Ranked by how directly they hit the goals Delroy's stated: more inbound leads, less on-site staffing, a pickup/delivery system that runs without him micromanaging it, and content that positions him as a systems expert.
 
-(See the growth ideas write-up for a fuller, current list.)
+1. **Turn the platform itself into your marketing.** You built a booking + admin + driver-dispatch system on Google's free tier with no monthly SaaS fee — most small rental operators pay $50–200/mo for this. A short post/video on "how I built my own booking system for $0/month" does double duty: content for the business (Monday is already content day) and a portfolio piece for the IT career transition. Nobody else in Bequia rental is likely showing this.
+2. **QR code at every pickup point straight to the booking form.** You already have a QR code file on hand (`NEW AQUATIC PARADISE QR CODE.pdf` in Downloads) — put it on a sign at the beach stand, on the boards themselves, and in villa welcome packets. Removes a staffing step (someone explaining how to book) and captures walk-up guests who'd otherwise just ask a staff member instead of self-serving.
+3. **Marina/villa-manager referral partnerships.** Your clients are already yacht guests and villa renters — a small referral commission (or a simple "mention this villa, get 10% off") to the handful of villa managers and marina staff in Bequia turns them into a lead pipeline that costs nothing until a booking actually happens. Much cheaper than ad spend for a niche, high-intent audience.
+4. **Automate the post-rental review ask once the feedback form is built.** A WhatsApp message when a rental is marked "Done" with a direct link to leave a Google review. For a tourism business, Google review volume/recency directly drives new inbound search traffic — this closes the loop from "guest had a good time" to "next guest finds you."
+5. **Package the two ideas already on file as real bookable products, not just notes.** Night-glow paddle sessions and corporate/group team-building both extend revenue into off-peak hours/season without buying more inventory — same boards, different time slot or audience. Give each its own combo price and a line in the booking form's gear dropdown so guests can actually book it instead of it staying a someday-idea.
+6. **A lightweight FAQ auto-reply for WhatsApp during peak hours.** Most guest questions before a booking (pricing, availability, "do you deliver to my villa") are repetitive. A WhatsApp Business quick-reply or auto-response for the top 3–4 questions cuts the back-and-forth that currently needs a staff member, freeing them for the two on-site jobs that actually need a human: gear handoff and safety.
+
+Two ideas already on file, now folded in above rather than left as loose notes:
+- ~~Night-glow paddle sessions~~ → #5
+- ~~Corporate/group team-building~~ → #5
 
 ---
 
