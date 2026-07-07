@@ -221,6 +221,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
   </div>
 </header>
 
+<div id="weatherBanner" style="display:none;padding:10px 16px;text-align:center;font-size:0.82rem;font-weight:700"></div>
+
 <div class="app-main">
 
 <!-- ═ TODAY ═ -->
@@ -717,6 +719,7 @@ function onLogin() {
   fetchDrivers();
   fetchLifeJackets();
   fetchBookings();
+  loadWeatherBanner();
   updateQueueCount();
   loadBrotherNum();
   setInterval(updateOnline,10000);
@@ -1081,6 +1084,37 @@ async function fetchDrivers() {
   }
   renderDrivers();
   populateDeliveryDriverSelect();
+}
+
+// ── CONDITIONS BANNER (public endpoint, no token needed — safety info) ──
+async function loadWeatherBanner() {
+  const el = document.getElementById('weatherBanner');
+  if (!el) return;
+  try {
+    const res = await fetch(BACKEND+'?action=getWeather',{signal:AbortSignal.timeout(8000)});
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    const w = data && data.weather;
+    if (!w || !w.status) return;
+    const styles = {
+      safe: {bg:'#0d3b2e', color:'#4ade80', label:'✅ Safe'},
+      caution: {bg:'#3b2f0d', color:'#facc15', label:'⚠️ Caution'},
+      unsafe: {bg:'#3b0d0d', color:'#f87171', label:'⛔ Unsafe'},
+      unknown: null
+    };
+    const s = styles[w.status];
+    if (!s) return;
+    el.style.background = s.bg;
+    el.style.color = s.color;
+    el.textContent = s.label +
+      (w.windNowKmh ? ` · Wind ${Math.round(w.windNowKmh)} km/h` : '') +
+      (w.gustNowKmh ? ` (gusts ${Math.round(w.gustNowKmh)})` : '') +
+      (w.windMaxTodayKmh ? ` · Max today ${Math.round(w.windMaxTodayKmh)} km/h` : '') +
+      (w.checkedAt ? ` · checked ${new Date(w.checkedAt).toLocaleTimeString()}` : '');
+    el.style.display = 'block';
+  } catch (err) {
+    // Silent — not core to the admin workflow, staff still have the manual anemometer check.
+  }
 }
 
 // ── LIFE JACKETS (adult/kid split — backed by the shared INVENTORY sheet) ──

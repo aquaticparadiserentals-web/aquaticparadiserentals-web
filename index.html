@@ -206,6 +206,8 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
   </nav>
 </header>
 
+<div id="weatherBanner" style="display:none;padding:10px 16px;text-align:center;font-size:0.82rem;font-weight:700"></div>
+
 <main>
 <!-- ========== BOOK SECTION ========== -->
 <div class="section active" id="sec-book">
@@ -514,7 +516,36 @@ window.addEventListener('DOMContentLoaded', () => {
   d.setDate(d.getDate() + 1);
   d.setHours(10, 0, 0, 0);
   document.getElementById('datetime').value = d.toISOString().slice(0,16);
+
+  loadWeatherBanner();
 });
+
+// ── CONDITIONS BANNER (public, no login needed — safety info) ──
+async function loadWeatherBanner() {
+  const el = document.getElementById('weatherBanner');
+  if (!el) return;
+  try {
+    const res = await fetch(BACKEND+'?action=getWeather',{signal:AbortSignal.timeout(8000)});
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    const w = data && data.weather;
+    if (!w || !w.status) return;
+    const styles = {
+      safe: {bg:'#0d3b2e', color:'#4ade80', label:'✅ Conditions are safe today'},
+      caution: {bg:'#3b2f0d', color:'#facc15', label:'⚠️ Caution — check with staff before your rental'},
+      unsafe: {bg:'#3b0d0d', color:'#f87171', label:'⛔ Unsafe conditions — contact us before heading out'},
+      unknown: null // don't show a banner when we genuinely don't know
+    };
+    const s = styles[w.status];
+    if (!s) return;
+    el.style.background = s.bg;
+    el.style.color = s.color;
+    el.textContent = s.label + (w.windNowKmh ? ` · Wind ~${Math.round(w.windNowKmh)} km/h` : '');
+    el.style.display = 'block';
+  } catch (err) {
+    // Silent failure — this is a nice-to-have banner, not core booking flow.
+  }
+}
 
 // ── RENDER GEAR ──
 function renderGear() {

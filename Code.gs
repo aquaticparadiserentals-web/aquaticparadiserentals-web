@@ -460,6 +460,10 @@ function doGet(e) {
       if (!_authOk(p)) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, inventory: getInventory() });
     }
+    if (p.action === 'getWeather') {
+      // Public — safety info, not PII. No token required.
+      return _json({ ok: true, weather: getWeather() });
+    }
     return _json({ ok: true, message: 'APR Backend v4' });
   } catch (err) {
     return _json(_fail('doGet', err));
@@ -918,6 +922,26 @@ function healthCheck() {
     issues.push('Could not reach the deployed web app to check it is alive: ' + (err && err.message ? err.message : err));
   }
 
+  // 5. Weather reading isn't stale — catches the daily trigger silently
+  // failing (e.g. Open-Meteo down repeatedly, or the trigger got deleted).
+  try {
+    var weatherRaw = PropertiesService.getScriptProperties().getProperty(WEATHER_PROP_KEY);
+    if (!weatherRaw) {
+      issues.push('No weather reading has ever been saved. Run installWeatherCheckTrigger() if you want the daily conditions check active.');
+    } else {
+      var weatherData = JSON.parse(weatherRaw);
+      var checkedAt = weatherData.checkedAt ? new Date(weatherData.checkedAt) : null;
+      if (checkedAt && !isNaN(checkedAt.getTime())) {
+        var ageHours = (Date.now() - checkedAt.getTime()) / 3600000;
+        if (ageHours > 30) { // daily trigger + generous buffer
+          issues.push('Last weather check was ' + Math.round(ageHours) + ' hours ago — the daily trigger may have stopped running.');
+        }
+      }
+    }
+  } catch (err) {
+    issues.push('Could not verify weather check freshness: ' + (err && err.message ? err.message : err));
+  }
+
   // Only send an email when there's something to act on. A silent run
   // means everything checked out.
   if (issues.length) {
@@ -950,4 +974,183 @@ function installHealthCheckTrigger() {
     .create();
   Logger.log('installHealthCheckTrigger: healthCheck() will now run every 6 hours.');
   try { SpreadsheetApp.getUi().alert('✅ Health check scheduled — runs every 6 hours automatically.'); } catch (uiErr) { /* expected outside Sheets UI */ }
+}
+
+// ── WEATHER / SEA-CONDITION SAFETY CHECK ──
+// Uses Open-Meteo (free, no API key required) for Bequia's approximate
+// coordinates. Wind speed is the same safety signal the existing manual
+// anemometer protocol already uses (see OPERATIONS.md §7) — this automates
+// the daily check, it doesn't replace the on-the-spot manual check before
+// each rental.
+var WEATHER_LAT = 13.0056;
+var WEATHER_LON = -61.2392;
+// Thresholds in km/h — adjust if these don't match real on-the-water
+// judgment; they're a starting point, not a substitute for staff judgment.
+var WIND_CAUTION_KMH = 28;  // ~15 knots
+var WIND_UNSAFE_KMH = 37;   // ~20 knots
+var WEATHER_PROP_KEY = 'apr_weather_latest';
+
+function _weatherStatus(windKmh) {
+  if (windKmh >= WIND_UNSAFE_KMH) return 'unsafe';
+  if (windKmh >= WIND_CAUTION_KMH) return 'caution';
+  return 'safe';
+}
+
+// Fetches current conditions. Never throws — a failed fetch resolves to
+// status 'unknown' so nothing downstream mistakes "couldn't check" for "safe".
+function _fetchWeather() {
+  try {
+    var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + WEATHER_LAT +
+      '&longitude=' + WEATHER_LON + '&current=wind_speed_10m,wind_gusts_10m' +
+      '&daily=wind_speed_10m_max&timezone=auto&wind_speed_unit=kmh';
+    var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    if (resp.getResponseCode() !== 200) {
+      return { status: 'unknown', error: 'HTTP ' + resp.getResponseCode() };
+    }
+    var data = JSON.parse(resp.getContentText());
+    var windNow = data.current && typeof data.current.wind_speed_10m === 'number' ? data.current.wind_speed_10m : null;
+    var gustNow = data.current && typeof data.current.wind_gusts_10m === 'number' ? data.current.wind_gusts_10m : null;
+    var windMaxToday = (data.daily && Array.isArray(data.daily.wind_speed_10m_max) && data.daily.wind_speed_10m_max.length) ? data.daily.wind_speed_10m_max[0] : null;
+    if (windNow === null) return { status: 'unknown', error: 'No wind data in response' };
+
+    return {
+      status: _weatherStatus(Math.max(windNow, windMaxToday || 0)),
+      windNowKmh: windNow,
+      gustNowKmh: gustNow,
+      windMaxTodayKmh: windMaxToday,
+      checkedAt: new Date().toISOString()
+    };
+  } catch (err) {
+    _logError('_fetchWeather', err);
+    return { status: 'unknown', error: (err && err.message) ? err.message : String(err) };
+  }
+}
+
+// Runs on a daily time-based trigger (set up via installWeatherCheckTrigger).
+// Saves the latest reading for the app to display, emails Delroy a daily
+// digest, and — only when conditions are caution/unsafe — emails today's
+// guests with a heads-up so they hear it before they arrive, not after.
+function dailyWeatherCheck() {
+  var weather = _fetchWeather();
+
+  try {
+    PropertiesService.getScriptProperties().setProperty(WEATHER_PROP_KEY, JSON.stringify(weather));
+  } catch (err) {
+    _logError('dailyWeatherCheck.save', err);
+  }
+
+  try {
+    var subject = '🌊 APR Daily Conditions: ' + weather.status.toUpperCase();
+    var body = weather.status === 'unknown'
+      ? 'Could not reach the weather service today (' + (weather.error || 'unknown error') + '). Do a manual anemometer check before dispatching.'
+      : ('Wind now: ' + weather.windNowKmh + ' km/h (gusts ' + (weather.gustNowKmh || 'N/A') + ' km/h)\n' +
+         'Max wind expected today: ' + (weather.windMaxTodayKmh || 'N/A') + ' km/h\n' +
+         'Status: ' + weather.status.toUpperCase() + '\n\n' +
+         'Thresholds: caution at ' + WIND_CAUTION_KMH + '+ km/h, unsafe at ' + WIND_UNSAFE_KMH + '+ km/h.\n' +
+         'This does not replace the on-the-spot anemometer check before each rental.');
+    GmailApp.sendEmail(NOTIFY_EMAIL, subject, body);
+  } catch (mailErr) {
+    _logError('dailyWeatherCheck.ownerEmail', mailErr);
+  }
+
+  // Guest heads-up — only when there's an actual reason to warn them.
+  if (weather.status === 'caution' || weather.status === 'unsafe') {
+    try {
+      _notifyTodaysGuestsOfConditions(weather);
+    } catch (err) {
+      _logError('dailyWeatherCheck.guestNotify', err);
+    }
+  }
+
+  Logger.log('dailyWeatherCheck: status=' + weather.status);
+  return weather;
+}
+
+// Emails guests whose booking datetime falls today, once per day per
+// booking (reuses the same ref-based idempotency style as sendNotificationOnce
+// so a re-run of dailyWeatherCheck doesn't spam the same guest twice).
+function _notifyTodaysGuestsOfConditions(weather) {
+  var sh = _sheet();
+  var data = sh.getDataRange().getValues();
+  if (data.length <= 1) return;
+
+  var header = data[0];
+  var refIdx = header.indexOf('ref');
+  var emailIdx = header.indexOf('email');
+  var fnameIdx = header.indexOf('fname');
+  var datetimeIdx = header.indexOf('datetime');
+  var statusIdx = header.indexOf('status');
+  if (refIdx === -1 || emailIdx === -1 || datetimeIdx === -1) return;
+
+  var todayStr = new Date().toDateString();
+  var notifiedToday = JSON.parse(PropertiesService.getScriptProperties().getProperty('apr_weather_notified_' + todayStr) || '[]');
+  var newlyNotified = notifiedToday.slice();
+
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var ref = String(row[refIdx] || '');
+    var email = String(row[emailIdx] || '').trim();
+    var status = statusIdx !== -1 ? row[statusIdx] : '';
+    var bookingDate = row[datetimeIdx] ? new Date(row[datetimeIdx]) : null;
+
+    if (!email || !ref) continue;
+    if (status === 'done') continue; // already completed, no need to warn
+    if (!bookingDate || isNaN(bookingDate.getTime()) || bookingDate.toDateString() !== todayStr) continue;
+    if (notifiedToday.indexOf(ref) !== -1) continue; // already emailed today
+
+    try {
+      var fname = fnameIdx !== -1 ? row[fnameIdx] : '';
+      var subject = weather.status === 'unsafe'
+        ? '⚠️ Aquatic Paradise Rentals — conditions update for today'
+        : 'Aquatic Paradise Rentals — conditions heads-up for today';
+      var body = 'Hi ' + (fname || 'there') + ',\n\n' +
+        'Wind conditions today are running ' + weather.status.toUpperCase() +
+        ' (around ' + weather.windNowKmh + ' km/h, gusts to ' + (weather.gustNowKmh || 'N/A') + ' km/h).\n\n' +
+        (weather.status === 'unsafe'
+          ? 'For your safety we may need to adjust timing or gear for your rental today — our team will follow up, or feel free to reach out directly.'
+          : 'Your rental is still on — just flagging so you know what to expect on the water today.') +
+        '\n\n— Aquatic Paradise Rentals\n+1 (784) 496-3447';
+      GmailApp.sendEmail(email, subject, body);
+      newlyNotified.push(ref);
+    } catch (err) {
+      _logError('_notifyTodaysGuestsOfConditions.' + ref, err);
+    }
+  }
+
+  try {
+    PropertiesService.getScriptProperties().setProperty('apr_weather_notified_' + todayStr, JSON.stringify(newlyNotified));
+  } catch (err) {
+    _logError('_notifyTodaysGuestsOfConditions.save', err);
+  }
+}
+
+// Public — no token required. This is safety information, not customer PII,
+// and both the guest-facing booking page and the admin console need to show
+// it without needing the admin token.
+function getWeather() {
+  try {
+    var raw = PropertiesService.getScriptProperties().getProperty(WEATHER_PROP_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (err) {
+    _logError('getWeather', err);
+  }
+  // No cached reading yet (first run hasn't happened) — check live rather
+  // than returning nothing.
+  return _fetchWeather();
+}
+
+// ── ONE-TIME SETUP: installs the daily weather-check trigger. Run once from
+// the Apps Script editor. Safe to re-run — clears any existing trigger first.
+function installWeatherCheckTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(function (t) {
+    if (t.getHandlerFunction() === 'dailyWeatherCheck') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('dailyWeatherCheck')
+    .timeBased()
+    .atHour(6)
+    .everyDays(1)
+    .create();
+  Logger.log('installWeatherCheckTrigger: dailyWeatherCheck() will now run daily around 6am.');
+  try { SpreadsheetApp.getUi().alert('✅ Daily weather check scheduled for ~6am.'); } catch (uiErr) { /* expected outside Sheets UI */ }
 }
