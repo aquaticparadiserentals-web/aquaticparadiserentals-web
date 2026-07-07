@@ -1452,3 +1452,169 @@ function installWeatherCheckTrigger() {
   Logger.log('installWeatherCheckTrigger: dailyWeatherCheck() will now run daily around 6am.');
   try { SpreadsheetApp.getUi().alert('✅ Daily weather check scheduled for ~6am.'); } catch (uiErr) { /* expected outside Sheets UI */ }
 }
+
+// ── AUTOMATED BUSINESS REPORT ──
+// Adapted to the REAL BOOKINGS schema (named FIELDS columns via _sheet(),
+// not fixed A-G letters). Two things the original draft assumed that don't
+// exist yet in this system, deliberately left out rather than faked:
+//   - Deposits: bookings only ever store one 'total' amount, no deposit field.
+//   - Staff commission: not tracked anywhere. If you want this, it needs a
+//     real payroll design first (see the open payroll conversation) — a
+//     report can't invent numbers that were never captured.
+// 'cancelled' isn't a real status either (VALID_STATUSES is pending/
+// confirmed/done) — so unlike the original draft, this counts all logged
+// bookings as revenue rather than guessing at a cancellation split.
+var REPORT_TYPE_PROP_KEY = 'apr_report_type';
+
+function sendAutoReport() {
+  var reportType = PropertiesService.getScriptProperties().getProperty(REPORT_TYPE_PROP_KEY) || 'daily';
+  var daysBack = reportType === 'weekly' ? 7 : 1;
+
+  var sh = _sheet();
+  var data = sh.getDataRange().getValues();
+  if (data.length <= 1) {
+    _sendReportEmail(_buildEmptyReportHtml(reportType), reportType);
+    return;
+  }
+
+  var header = data[0];
+  var idx = {};
+  FIELDS.forEach(function (f, i) { idx[f] = i; });
+
+  var cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - daysBack);
+  cutoff.setHours(0, 0, 0, 0);
+
+  var bookingCount = 0;
+  var totalRevenue = 0;
+  var gearUsage = {};
+  var recentBookings = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var ts = row[idx.Timestamp] ? new Date(row[idx.Timestamp]) : null;
+    if (!ts || isNaN(ts.getTime()) || ts < cutoff) continue;
+
+    bookingCount++;
+    var total = Number(row[idx.total]) || 0;
+    totalRevenue += total;
+
+    var gear = String(row[idx.gear] || '').trim();
+    if (gear) gearUsage[gear] = (gearUsage[gear] || 0) + 1;
+
+    recentBookings.push({
+      date: Utilities.formatDate(ts, Session.getScriptTimeZone(), 'MMM dd'),
+      name: (row[idx.fname] || '') + ' ' + (row[idx.lname] || ''),
+      gear: gear || 'N/A',
+      amount: total,
+      status: String(row[idx.status] || 'pending')
+    });
+  }
+
+  var topGear = Object.keys(gearUsage)
+    .map(function (g) { return [g, gearUsage[g]]; })
+    .sort(function (a, b) { return b[1] - a[1]; })
+    .slice(0, 5);
+
+  var html = _buildReportHtml(reportType, {
+    bookingCount: bookingCount,
+    totalRevenue: totalRevenue,
+    topGear: topGear,
+    recentBookings: recentBookings
+  });
+
+  _sendReportEmail(html, reportType);
+}
+
+function _buildReportHtml(reportType, d) {
+  var periodLabel = reportType === 'weekly' ? 'This Week' : 'Today';
+  var gearRows = d.topGear.length
+    ? d.topGear.map(function (g) {
+        return '<tr><td style="padding:4px 12px;">' + g[0] + '</td><td style="padding:4px 12px;">' + g[1] + ' booking(s)</td></tr>';
+      }).join('')
+    : '<tr><td style="padding:4px 12px;" colspan="2">No gear activity</td></tr>';
+
+  var bookingRows = d.recentBookings.length
+    ? d.recentBookings.slice(0, 15).map(function (b) {
+        return '<tr>' +
+          '<td style="padding:4px 12px;">' + b.date + '</td>' +
+          '<td style="padding:4px 12px;">' + b.name + '</td>' +
+          '<td style="padding:4px 12px;">' + b.gear + '</td>' +
+          '<td style="padding:4px 12px;">XCD ' + b.amount.toFixed(2) + '</td>' +
+          '<td style="padding:4px 12px; text-transform:capitalize;">' + b.status + '</td>' +
+          '</tr>';
+      }).join('')
+    : '<tr><td style="padding:4px 12px;" colspan="5">No bookings ' + periodLabel.toLowerCase() + '</td></tr>';
+
+  return '' +
+    '<div style="font-family: Arial, sans-serif; max-width: 640px; margin: auto;">' +
+    '<div style="background:#03939E; color:#fff; padding:20px; border-radius:6px 6px 0 0;">' +
+    '<h2 style="margin:0;">Aquatic Paradise Rentals</h2>' +
+    '<p style="margin:4px 0 0; opacity:0.9;">' + periodLabel + '\'s Report — ' + new Date().toDateString() + '</p>' +
+    '</div>' +
+    '<div style="padding:20px; border:1px solid #eee; border-top:none;">' +
+
+    '<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">' +
+    '<tr>' +
+    '<td style="padding:12px; background:#f7f7f7; border-radius:6px; text-align:center;"><div style="font-size:22px; font-weight:bold; color:#03939E;">' + d.bookingCount + '</div><div style="font-size:12px; color:#666;">Bookings</div></td>' +
+    '<td style="width:10px;"></td>' +
+    '<td style="padding:12px; background:#f7f7f7; border-radius:6px; text-align:center;"><div style="font-size:22px; font-weight:bold; color:#0B1E2D;">XCD ' + d.totalRevenue.toFixed(0) + '</div><div style="font-size:12px; color:#666;">Revenue</div></td>' +
+    '</tr>' +
+    '</table>' +
+
+    '<h3 style="color:#0B1E2D; border-bottom:2px solid #FBC62C; padding-bottom:4px;">Top Gear</h3>' +
+    '<table style="width:100%; border-collapse:collapse; font-size:14px;">' + gearRows + '</table>' +
+
+    '<h3 style="color:#0B1E2D; border-bottom:2px solid #FBC62C; padding-bottom:4px; margin-top:20px;">Bookings</h3>' +
+    '<table style="width:100%; border-collapse:collapse; font-size:13px;">' +
+    '<tr style="background:#f0f0f0; font-weight:bold;"><td style="padding:4px 12px;">Date</td><td style="padding:4px 12px;">Customer</td><td style="padding:4px 12px;">Gear</td><td style="padding:4px 12px;">Amount</td><td style="padding:4px 12px;">Status</td></tr>' +
+    bookingRows +
+    '</table>' +
+
+    '<p style="margin-top:16px; font-size:12px; color:#888;">Deposits and staff commission are not tracked yet — this report only covers what the booking system actually captures.</p>' +
+    '<p style="margin-top:8px; font-size:11px; color:#999;">Automated report — Aquatic Paradise Rentals booking system.</p>' +
+    '</div></div>';
+}
+
+function _buildEmptyReportHtml(reportType) {
+  return '<p>No bookings found for this period.</p>';
+}
+
+function _sendReportEmail(html, reportType) {
+  var subjectLabel = reportType === 'weekly' ? 'Weekly Report' : 'Daily Report';
+  try {
+    GmailApp.sendEmail(NOTIFY_EMAIL, 'Aquatic Paradise Rentals — ' + subjectLabel + ' (' + new Date().toDateString() + ')', '', { htmlBody: html });
+  } catch (err) {
+    _logError('_sendReportEmail', err);
+  }
+}
+
+// ── ONE-TIME SETUP: run ONE of these two, not both. Re-running either one
+// safely replaces any existing report trigger (never creates duplicates).
+function setupDailyReportTrigger() {
+  _deleteExistingReportTriggers();
+  PropertiesService.getScriptProperties().setProperty(REPORT_TYPE_PROP_KEY, 'daily');
+  ScriptApp.newTrigger('sendAutoReport').timeBased().everyDays(1).atHour(18).create();
+  Logger.log('setupDailyReportTrigger: report will send daily at 6 PM.');
+  try { SpreadsheetApp.getUi().alert('✅ Daily report scheduled for 6 PM.'); } catch (uiErr) { /* expected outside Sheets UI */ }
+}
+
+function setupWeeklyReportTrigger() {
+  _deleteExistingReportTriggers();
+  PropertiesService.getScriptProperties().setProperty(REPORT_TYPE_PROP_KEY, 'weekly');
+  ScriptApp.newTrigger('sendAutoReport').timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(8).create();
+  Logger.log('setupWeeklyReportTrigger: report will send every Monday at 8 AM.');
+  try { SpreadsheetApp.getUi().alert('✅ Weekly report scheduled for Monday 8 AM.'); } catch (uiErr) { /* expected outside Sheets UI */ }
+}
+
+function _deleteExistingReportTriggers() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'sendAutoReport') ScriptApp.deleteTrigger(t);
+  });
+}
+
+// Run manually anytime to send a report right now, without waiting for
+// the schedule — useful to confirm it works before trusting the automation.
+function testReportNow() {
+  sendAutoReport();
+}

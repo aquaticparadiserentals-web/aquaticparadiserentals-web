@@ -162,6 +162,9 @@ Frontend changes (`index.html`, `admin.html`, `rules.html`) just need to be push
 - `installHealthCheckTrigger()` — turns on the automated system health check (runs every 6 hours, emails you only when something's broken).
 - `installWeatherCheckTrigger()` — turns on the daily wind/conditions check (runs ~6am daily, emails you a digest, emails today's guests automatically if conditions turn caution/unsafe).
 - `seedLifeJacketInventory()` — labels your existing 8 life jackets as adult-size (`LJ-A1`–`LJ-A8`) in the shared inventory. Safe to re-run.
+- `seedFullInventory()` — labels your 8 named paddle boards plus generic kayak/snorkel/floater counts in the shared inventory. Safe to re-run.
+- `seedDefaultStaff()` — migrates your real staff roster (Operations Manager, Dravin, Shammar) into the shared STAFF sheet. Safe to re-run.
+- `setupDailyReportTrigger()` **or** `setupWeeklyReportTrigger()` (run only one) — emails a bookings/revenue/gear-usage report to you daily at 6 PM or weekly Monday 8 AM. Run `testReportNow()` anytime to send one immediately without waiting for the schedule. Does not include deposits or staff commission — those aren't tracked anywhere in the system yet.
 
 If a service worker cache bump ever needs forcing (after a batch of frontend changes), bump the `CACHE` version string in `sw.js` — see the comment there.
 
