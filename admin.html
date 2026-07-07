@@ -215,6 +215,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
       <div class="anav-tab" onclick="switchATab('safety')">🛡️ Safety</div>
       <div class="anav-tab" onclick="switchATab('team')">👥 Team</div>
       <div class="anav-tab" onclick="switchATab('drivers')">🚚 Drivers</div>
+      <div class="anav-tab" onclick="switchATab('feedback')">⭐ Feedback</div>
       <div class="anav-tab" onclick="switchATab('settings')">⚙️ Settings</div>
       <div class="anav-tab" onclick="switchATab('rates')">💰 Rates</div>
     </div>
@@ -437,6 +438,16 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
     <input type="file" accept="image/*" id="newDriverPhotoFile" style="width:100%;margin-bottom:10px;font-size:0.8rem"/>
     <button onclick="addDriver()" style="width:100%;padding:10px;background:#03939E;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.88rem;cursor:pointer">➕ Add Driver</button>
   </div>
+</div>
+
+<!-- ═ FEEDBACK ═ -->
+<div class="asection" id="asec-feedback">
+  <div class="sec-title">Guest Feedback</div>
+  <div class="card" id="feedbackSummary" style="margin-bottom:16px;text-align:center">
+    <div style="font-size:1.6rem;font-weight:800;color:#FBC62C" id="feedbackAvg">–</div>
+    <div style="font-size:0.75rem;color:rgba(255,255,255,0.5)" id="feedbackCount">No feedback yet</div>
+  </div>
+  <div id="feedbackList"></div>
 </div>
 
 <!-- ═ SETTINGS ═ -->
@@ -1630,8 +1641,42 @@ function exportCSV() {
   addLog('📥 Bookings exported to CSV');
 }
 
+// ── FEEDBACK ──
+async function fetchFeedback() {
+  try {
+    const res = await fetch(BACKEND+'?action=getFeedback&limit=100&token='+encodeURIComponent(APP_TOKEN),{signal:AbortSignal.timeout(10000)});
+    const data = await res.json();
+    renderFeedback((data && data.ok && Array.isArray(data.feedback)) ? data.feedback : []);
+  } catch (err) {
+    showToast('Could not load feedback', 'warn');
+  }
+}
+
+function renderFeedback(feedback) {
+  const avgEl = document.getElementById('feedbackAvg');
+  const countEl = document.getElementById('feedbackCount');
+  const listEl = document.getElementById('feedbackList');
+  if (!feedback.length) {
+    avgEl.textContent = '–';
+    countEl.textContent = 'No feedback yet';
+    listEl.innerHTML = '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.35)">No feedback submitted yet</div>';
+    return;
+  }
+  const avg = feedback.reduce((sum,f)=>sum+Number(f.rating||0),0) / feedback.length;
+  avgEl.textContent = '⭐ ' + avg.toFixed(1);
+  countEl.textContent = feedback.length + ' review' + (feedback.length===1?'':'s');
+  listEl.innerHTML = feedback.map(f => {
+    const stars = '★'.repeat(Number(f.rating)||0) + '☆'.repeat(5-(Number(f.rating)||0));
+    return `<div class="card" style="margin-bottom:10px">
+      <div style="color:#FBC62C;font-size:1rem;letter-spacing:2px">${stars}</div>
+      <div style="font-size:0.72rem;color:rgba(255,255,255,0.45);margin:4px 0">${escapeHtml(f.ref)} · ${escapeHtml(f.createdAt)}</div>
+      ${f.comment ? `<div style="font-size:0.85rem;color:rgba(255,255,255,0.85)">${escapeHtml(f.comment)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
 // ── TAB SWITCH ──
-const ATABS = ['today','bookings','inventory','safety','team','drivers','settings','rates'];
+const ATABS = ['today','bookings','inventory','safety','team','drivers','feedback','settings','rates'];
 function switchATab(tab) {
   ATABS.forEach(t => {
     document.getElementById('asec-'+t)?.classList.toggle('active', t===tab);
@@ -1642,6 +1687,7 @@ function switchATab(tab) {
   if (tab==='bookings') fetchBookings();
   if (tab==='safety') renderSafety();
   if (tab==='drivers') renderDrivers();
+  if (tab==='feedback') fetchFeedback();
 }
 
 // ── TOAST ──

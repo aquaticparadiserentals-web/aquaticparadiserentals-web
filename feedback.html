@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Rate Your Rental — Aquatic Paradise Rentals</title>
+<style>
+:root{ --teal:#03939E; --gold:#FBC62C; --coral:#E0351B; --navy:#0B1E2D; }
+*{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+body{background:var(--navy);color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center}
+header{background:linear-gradient(135deg,var(--teal),#027480);padding:20px 18px;text-align:center;width:100%}
+header h1{font-size:1.15rem}
+header p{font-size:0.78rem;color:rgba(255,255,255,0.7);margin-top:4px}
+main{width:100%;max-width:420px;padding:24px 18px}
+.card{background:#162030;border-radius:14px;padding:20px}
+label{display:block;font-size:0.85rem;color:rgba(255,255,255,0.75);margin-bottom:10px;text-align:center}
+.stars{display:flex;justify-content:center;gap:8px;margin-bottom:22px}
+.star{font-size:2.2rem;cursor:pointer;color:rgba(255,255,255,0.2);transition:color .15s}
+.star.filled{color:var(--gold)}
+textarea{width:100%;min-height:100px;background:#0B1E2D;border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:10px;color:#fff;font-size:0.85rem;resize:vertical;margin-bottom:16px}
+textarea::placeholder{color:rgba(255,255,255,0.35)}
+.btn-submit{width:100%;padding:13px;background:var(--gold);color:var(--navy);border:none;border-radius:10px;font-weight:800;font-size:0.9rem;cursor:pointer}
+.btn-submit:disabled{opacity:0.5;cursor:not-allowed}
+.note{font-size:0.72rem;color:rgba(255,255,255,0.4);text-align:center;margin-top:14px}
+.done{display:none;text-align:center;padding:30px 10px}
+.done .check{font-size:2.6rem;margin-bottom:10px}
+.done p{font-size:0.9rem;color:rgba(255,255,255,0.75)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#162030;color:#fff;padding:10px 18px;border-radius:8px;font-size:0.8rem;z-index:999;display:none}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🏄 Aquatic Paradise Rentals</h1>
+  <p>We'd love to hear how it went</p>
+</header>
+
+<main>
+  <div class="card" id="formCard">
+    <label id="starLabel">Tap to rate your rental</label>
+    <div class="stars" id="stars">
+      <span class="star" data-v="1">★</span>
+      <span class="star" data-v="2">★</span>
+      <span class="star" data-v="3">★</span>
+      <span class="star" data-v="4">★</span>
+      <span class="star" data-v="5">★</span>
+    </div>
+    <textarea id="comment" placeholder="Anything you'd like us to know? (optional)" maxlength="1000"></textarea>
+    <button class="btn-submit" id="submitBtn" disabled>Submit Feedback</button>
+    <p class="note">Thanks for renting with us in Bequia 🌊</p>
+  </div>
+  <div class="card done" id="doneCard">
+    <div class="check">✅</div>
+    <p>Feedback received — thank you! It genuinely helps us do better.</p>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const BACKEND = 'https://script.google.com/macros/s/AKfycbzr1KHela518-pgQ3dJyvv77tm9z2JWo_TTovRNys6RwYNBIUfdyJKxGF_ETzNk9m47Ww/exec';
+
+const params = new URLSearchParams(window.location.search);
+const ref = params.get('ref') || '';
+
+let rating = 0;
+const starsEl = document.getElementById('stars');
+const stars = Array.from(starsEl.querySelectorAll('.star'));
+const submitBtn = document.getElementById('submitBtn');
+
+stars.forEach(s => s.addEventListener('click', () => {
+  rating = Number(s.dataset.v);
+  renderStars();
+  submitBtn.disabled = false;
+}));
+
+function renderStars() {
+  stars.forEach(s => s.classList.toggle('filled', Number(s.dataset.v) <= rating));
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 2500);
+}
+
+submitBtn.addEventListener('click', async () => {
+  if (!ref) { showToast('Missing booking reference — please use the link we sent you'); return; }
+  if (!rating) return;
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Submitting…';
+  try {
+    const res = await fetch(BACKEND, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'submit_feedback', ref, rating, comment: document.getElementById('comment').value }),
+      signal: AbortSignal.timeout(15000)
+    });
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Failed');
+    document.getElementById('formCard').style.display = 'none';
+    document.getElementById('doneCard').style.display = 'block';
+  } catch (err) {
+    showToast('Could not submit: ' + err.message);
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Submit Feedback';
+  }
+});
+
+if (!ref) {
+  document.getElementById('starLabel').textContent = 'This link is missing a booking reference — please use the link sent to you after your rental.';
+}
+</script>
+</body>
+</html>

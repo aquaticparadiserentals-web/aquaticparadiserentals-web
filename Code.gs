@@ -7,7 +7,8 @@
  * Sheet tab: BOOKINGS (auto-created on first booking)
  * Columns: ref | fname | lname | phone | email | datetime | groupSize |
  *          gear | duration | total | referral | notes | waiverAccepted |
- *          waiverTimestamp | source | Timestamp | NotifiedAt
+ *          waiverTimestamp | source | Timestamp | NotifiedAt | idPhotoUrl |
+ *          status | kidsCount | driverLat | driverLng | driverLocAt
  */
 
 var SHEET_NAME = 'BOOKINGS';
@@ -27,10 +28,12 @@ var MAX_ID_PHOTO_BASE64_LEN = 8000000; // ~6MB decoded — generous cap against 
 
 var FIELDS = ['ref','fname','lname','phone','email','datetime','groupSize',
   'gear','duration','total','referral','notes','waiverAccepted','waiverTimestamp',
-  'source','Timestamp','NotifiedAt','idPhotoUrl','status','kidsCount'];
+  'source','Timestamp','NotifiedAt','idPhotoUrl','status','kidsCount',
+  'driverLat','driverLng','driverLocAt'];
 var VALID_STATUSES = ['pending', 'confirmed', 'done'];
 var INVENTORY_SHEET_NAME = 'INVENTORY';
 var STAFF_SHEET_NAME = 'STAFF';
+var FEEDBACK_SHEET_NAME = 'FEEDBACK';
 // Staff/driver photos are intentionally PUBLIC (guests are meant to see who
 // they're dealing with) — opposite posture from guest ID photos, which are
 // sensitive PII and must never be publicly shareable.
@@ -197,6 +200,46 @@ function _validateStatusPayload(p) {
   }
 }
 
+function _validateLocationPayload(p) {
+  try {
+    if (!p || typeof p !== 'object') return { valid: false, error: 'Missing data' };
+    if (typeof p.ref !== 'string' || !p.ref.trim() || p.ref.length > 200) {
+      return { valid: false, error: 'Invalid ref' };
+    }
+    var lat = Number(p.lat), lng = Number(p.lng);
+    if (!isFinite(lat) || lat < -90 || lat > 90) return { valid: false, error: 'Invalid latitude' };
+    if (!isFinite(lng) || lng < -180 || lng > 180) return { valid: false, error: 'Invalid longitude' };
+    return { valid: true };
+  } catch (err) {
+    _logError('validateLocationPayload', err);
+    return { valid: false, error: 'Validation failed' };
+  }
+}
+
+var MAX_FEEDBACK_COMMENT_LEN = 1000;
+
+function _validateFeedbackPayload(p) {
+  try {
+    if (!p || typeof p !== 'object') return { valid: false, error: 'Missing data' };
+    if (typeof p.ref !== 'string' || !p.ref.trim() || p.ref.length > 200) {
+      return { valid: false, error: 'Invalid ref' };
+    }
+    var rating = Number(p.rating);
+    if (!isFinite(rating) || rating < 1 || rating > 5 || Math.round(rating) !== rating) {
+      return { valid: false, error: 'Invalid rating' };
+    }
+    if (p.comment !== undefined && p.comment !== null) {
+      if (typeof p.comment !== 'string' || p.comment.length > MAX_FEEDBACK_COMMENT_LEN) {
+        return { valid: false, error: 'Comment too long' };
+      }
+    }
+    return { valid: true };
+  } catch (err) {
+    _logError('validateFeedbackPayload', err);
+    return { valid: false, error: 'Validation failed' };
+  }
+}
+
 // ── SHEET ACCESS (wrapped — a locked/slow sheet must never crash the request) ──
 function _sheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -235,6 +278,17 @@ function _driversSheet() {
       sh.getRange(1, lastCol + 1).setValue('photoUrl');
       sh.getRange('1:1').setFontWeight('bold');
     }
+  }
+  return sh;
+}
+
+function _feedbackSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(FEEDBACK_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(FEEDBACK_SHEET_NAME);
+    sh.appendRow(['ref', 'rating', 'comment', 'createdAt']);
+    sh.getRange('1:1').setFontWeight('bold');
   }
   return sh;
 }
@@ -699,6 +753,10 @@ function doGet(e) {
       if (!_dispatchAuthOk(p)) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, bookings: getDispatchBookings(parseInt(p.limit, 10) || 50) });
     }
+    if (p.action === 'getFeedback') {
+      if (!_authOk(p)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json({ ok: true, feedback: getFeedback(parseInt(p.limit, 10) || 100) });
+    }
     if (p.action === 'getInventory') {
       if (!_authOk(p)) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, inventory: getInventory() });
@@ -745,6 +803,17 @@ function doPost(e) {
       if (!_dispatchAuthOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json(updateStatus(payload));
     }
+    if (payload.action === 'update_driver_location') {
+      // Dispatch-scoped: a driver sharing their own position is the same
+      // trust level as progressing a delivery status.
+      if (!_dispatchAuthOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(updateDriverLocation(payload));
+    }
+    if (payload.action === 'submit_feedback') {
+      // Public — same posture as booking submission. A guest leaving
+      // feedback must never need a token.
+      return _json(saveFeedback(payload));
+    }
     if (payload.action === 'getDispatchBookings') {
       if (!_dispatchAuthOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, bookings: getDispatchBookings(50) });
@@ -764,6 +833,10 @@ function doPost(e) {
     if (payload.action === 'deleteDriver') {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json(deleteDriver(payload));
+    }
+    if (payload.action === 'getFeedback') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json({ ok: true, feedback: getFeedback(100) });
     }
     if (payload.action === 'getInventory') {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
@@ -816,10 +889,10 @@ function doPost(e) {
 // traffic spikes while still capping abuse.
 var RATE_LIMIT_MAX_PER_MINUTE = 20;
 
-function _rateLimitOk() {
+function _rateLimitOk(bucket) {
   try {
     var cache = CacheService.getScriptCache();
-    var key = 'booking_rl_' + Math.floor(Date.now() / 60000);
+    var key = (bucket || 'booking') + '_rl_' + Math.floor(Date.now() / 60000);
     var current = Number(cache.get(key)) || 0;
     if (current >= RATE_LIMIT_MAX_PER_MINUTE) return false;
     cache.put(key, String(current + 1), 120); // expires well after the minute window closes
@@ -931,7 +1004,7 @@ function getBookings(limit) {
 // Deliberately excludes: total, referral, waiverAccepted, waiverTimestamp,
 // idPhotoUrl, email. No pricing or revenue figure appears anywhere in this
 // return value — that's the entire point of this endpoint existing.
-var DISPATCH_FIELDS = ['ref', 'fname', 'lname', 'phone', 'datetime', 'groupSize', 'kidsCount', 'gear', 'duration', 'notes', 'status'];
+var DISPATCH_FIELDS = ['ref', 'fname', 'lname', 'phone', 'datetime', 'groupSize', 'kidsCount', 'gear', 'duration', 'notes', 'status', 'driverLat', 'driverLng', 'driverLocAt'];
 
 function getDispatchBookings(limit) {
   try {
@@ -1013,6 +1086,75 @@ function updateStatus(p) {
     return { ok: false, error: 'Booking not found' };
   } catch (err) {
     return _fail('updateStatus', err);
+  }
+}
+
+// Driver taps "Share my location" once per delivery — a single point-in-time
+// fix (browser geolocation), not continuous tracking. Overwrites the
+// booking's last-known location so dispatch/admin can open it in Maps.
+function updateDriverLocation(p) {
+  try {
+    var validation = _validateLocationPayload(p);
+    if (!validation.valid) return { ok: false, error: validation.error };
+
+    var sh = _sheet();
+    var data = sh.getDataRange().getValues();
+    var header = data[0] || [];
+    var refIdx = header.indexOf('ref');
+    var latIdx = header.indexOf('driverLat');
+    var lngIdx = header.indexOf('driverLng');
+    var atIdx = header.indexOf('driverLocAt');
+    if (refIdx === -1 || latIdx === -1 || lngIdx === -1 || atIdx === -1) {
+      return { ok: false, error: 'Sheet not initialized' };
+    }
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][refIdx]) === String(p.ref)) {
+        sh.getRange(i + 1, latIdx + 1, 1, 3).setValues([[Number(p.lat), Number(p.lng), new Date().toISOString()]]);
+        return { ok: true };
+      }
+    }
+    return { ok: false, error: 'Booking not found' };
+  } catch (err) {
+    return _fail('updateDriverLocation', err);
+  }
+}
+
+// ── FEEDBACK (public submit, like saveBooking — guest never needs a token) ──
+function saveFeedback(p) {
+  try {
+    if (!_rateLimitOk('feedback')) {
+      return { ok: false, error: 'Too many submissions right now — please try again in a minute.' };
+    }
+
+    var validation = _validateFeedbackPayload(p);
+    if (!validation.valid) return { ok: false, error: validation.error };
+
+    var sh = _feedbackSheet();
+    sh.appendRow([
+      _safe(p.ref, 'N/A'),
+      Number(p.rating),
+      _safe(p.comment, ''),
+      new Date().toISOString()
+    ]);
+    return { ok: true };
+  } catch (err) {
+    return _fail('saveFeedback', err);
+  }
+}
+
+function getFeedback(limit) {
+  try {
+    var safeLimit = (typeof limit === 'number' && limit > 0 && limit <= 500) ? limit : 100;
+    var sh = _feedbackSheet();
+    var data = sh.getDataRange().getValues();
+    if (data.length <= 1) return [];
+    return data.slice(1).reverse().slice(0, safeLimit).map(function (row) {
+      return { ref: row[0], rating: row[1], comment: row[2] || '', createdAt: row[3] };
+    });
+  } catch (err) {
+    _logError('getFeedback', err);
+    return [];
   }
 }
 

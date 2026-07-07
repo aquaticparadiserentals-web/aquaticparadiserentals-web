@@ -79,6 +79,7 @@ const BACKEND = 'https://script.google.com/macros/s/AKfycbzr1KHela518-pgQ3dJyvv7
 // Must match STAFF_TOKEN in Code.gs.
 const STAFF_TOKEN = 'Dsp_7Kq2mNw94RfL';
 const DISPATCH_PIN = '5150';
+const FEEDBACK_BASE_URL = 'https://aquaticparadiserentals.com/feedback.html';
 let pinBuffer = '';
 let bookings = [];
 let drivers = [];
@@ -144,6 +145,10 @@ function render() {
     const ref = escapeHtml(b.ref);
     const status = b.status && b.status !== 'N/A' ? b.status : 'pending';
     const phone = String(b.phone||'').replace(/\D/g,'');
+    const hasLoc = b.driverLat && b.driverLat!=='N/A' && b.driverLng && b.driverLng!=='N/A';
+    const mapUrl = hasLoc ? `https://www.google.com/maps?q=${encodeURIComponent(b.driverLat)},${encodeURIComponent(b.driverLng)}` : '';
+    const feedbackUrl = FEEDBACK_BASE_URL + '?ref=' + encodeURIComponent(b.ref);
+    const feedbackMsg = `Thanks for renting with Aquatic Paradise! We'd love your feedback: ${feedbackUrl}`;
     return `<div class="card ${status==='done'?'done':''}">
       <div class="ref">${ref}</div>
       <div class="name">${escapeHtml(b.fname)} ${escapeHtml(b.lname)}</div>
@@ -152,14 +157,38 @@ function render() {
       <div class="detail">📅 ${escapeHtml(b.datetime)}</div>
       <div class="detail">👥 Group: ${escapeHtml(b.groupSize)}${b.kidsCount && b.kidsCount!=='N/A' && Number(b.kidsCount)>0 ? ' ('+escapeHtml(b.kidsCount)+' kid(s) — kid-size life jacket)' : ''}</div>
       ${b.notes && b.notes!=='N/A' ? `<div class="detail">📝 ${escapeHtml(b.notes)}</div>` : ''}
+      ${hasLoc ? `<div class="detail">📍 Last location: <a href="${mapUrl}" target="_blank" style="color:#5fd0da">view on map</a> (${escapeHtml(b.driverLocAt)})</div>` : ''}
       <span class="status-pill ${status}">${status}</span>
       <div class="actions">
         ${status!=='confirmed'&&status!=='done'?`<button class="btn confirm" onclick="setStatus('${ref}','confirmed')">✅ Confirm</button>`:''}
         ${status!=='done'?`<button class="btn done-btn" onclick="setStatus('${ref}','done')">☑ Done</button>`:''}
+        ${status!=='done'?`<button class="btn" style="background:#3a4a5c" onclick="shareLocation('${ref}')">📍 Share Location</button>`:''}
         ${phone?`<a class="btn wa" href="https://wa.me/${encodeURIComponent(phone)}" target="_blank">💬 Guest</a>`:''}
+        ${status==='done'&&phone?`<a class="btn wa" style="background:#FBC62C;color:#0B1E2D" href="https://wa.me/${encodeURIComponent(phone)}?text=${encodeURIComponent(feedbackMsg)}" target="_blank">⭐ Ask Feedback</a>`:''}
       </div>
     </div>`;
   }).join('');
+}
+
+function shareLocation(ref) {
+  if (!navigator.geolocation) { showToast('Location not supported on this device'); return; }
+  showToast('Getting location…');
+  navigator.geolocation.getCurrentPosition(async pos => {
+    try {
+      const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+        action:'update_driver_location', token:STAFF_TOKEN, ref,
+        lat: pos.coords.latitude, lng: pos.coords.longitude
+      }),signal:AbortSignal.timeout(15000)});
+      const data = await res.json();
+      if (!data || !data.ok) throw new Error((data&&data.error)||'Failed');
+      await fetchDispatch();
+      showToast('Location shared ✅');
+    } catch (err) {
+      showToast('Could not share location: '+err.message);
+    }
+  }, err => {
+    showToast('Location denied or unavailable');
+  }, { enableHighAccuracy: true, timeout: 10000 });
 }
 
 async function setStatus(ref, status) {
