@@ -735,6 +735,11 @@ async function fetchBookings() {
     try { data = await res.json(); } catch (parseErr) { throw new Error('Malformed response from server'); }
     if (data && data.ok && Array.isArray(data.bookings)) {
       allBookings = data.bookings;
+      // The sheet is the source of truth for status now — merge it into the
+      // local cache so renderBookings/updateKPIs (which read bookingStates)
+      // reflect what other staff/devices have actually set, not stale local state.
+      allBookings.forEach(b => { if (b && b.ref && b.status && b.status !== 'N/A') bookingStates[b.ref] = b.status; });
+      localStorage.setItem('apr_bk_states', JSON.stringify(bookingStates));
       renderBookings();
       updateKPIs();
       addLog('📋 Bookings refreshed: '+allBookings.length+' total');
@@ -796,12 +801,27 @@ function renderBookings() {
   }).join('');
 }
 
-function setBkState(ref, state) {
+async function setBkState(ref, state) {
+  // Optimistic local update so the UI responds instantly; the backend call
+  // below is what actually makes this visible to other staff/devices.
   bookingStates[ref] = state;
   localStorage.setItem('apr_bk_states', JSON.stringify(bookingStates));
   renderBookings();
   updateKPIs();
   addLog(`📋 Booking ${ref} → ${state}`);
+
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'update_status', token:APP_TOKEN, ref, status:state
+    }),signal:AbortSignal.timeout(15000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const d = await res.json();
+    if (!d || !d.ok) throw new Error((d && d.error) || 'Sync failed');
+    const b = allBookings.find(x=>x && x.ref===ref);
+    if (b) b.status = state;
+  } catch (err) {
+    showToast('Status saved on this device but did not sync: '+err.message, 'warn');
+  }
 }
 
 function updateKPIs() {
@@ -1142,7 +1162,7 @@ function populateDeliveryDriverSelect() {
   if (!sel) return;
   const drivers = driversCache.filter(d => d && d.phone);
   sel.innerHTML = drivers.length
-    ? drivers.map(d=>`<option value="${d.id}">${d.name||'N/A'}</option>`).join('')
+    ? drivers.map(d=>`<option value="${escapeHtml(d.id)}">${escapeHtml(d.name||'N/A')}</option>`).join('')
     : '<option value="">No drivers with a phone number — add one in the Drivers tab</option>';
 }
 

@@ -965,7 +965,7 @@ window.addEventListener('online', async () => {
   const remaining = [];
   for (const payload of q) {
     try {
-      const res = await fetch(BACKEND, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const res = await fetch(BACKEND, {method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
       const d = await res.json();
       if (!d.ok) remaining.push(payload);
     } catch { remaining.push(payload); }

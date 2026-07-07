@@ -22,7 +22,8 @@ var MAX_ID_PHOTO_BASE64_LEN = 8000000; // ~6MB decoded — generous cap against 
 
 var FIELDS = ['ref','fname','lname','phone','email','datetime','groupSize',
   'gear','duration','total','referral','notes','waiverAccepted','waiverTimestamp',
-  'source','Timestamp','NotifiedAt','idPhotoUrl'];
+  'source','Timestamp','NotifiedAt','idPhotoUrl','status'];
+var VALID_STATUSES = ['pending', 'confirmed', 'done'];
 
 // ── FAIL-SAFE HELPERS ──
 
@@ -152,6 +153,9 @@ function _validateStatusPayload(p) {
     if (typeof p.ref !== 'string' || !p.ref.trim() || p.ref.length > 200) {
       return { valid: false, error: 'Invalid ref' };
     }
+    if (typeof p.status !== 'string' || VALID_STATUSES.indexOf(p.status) === -1) {
+      return { valid: false, error: 'Invalid status' };
+    }
     return { valid: true };
   } catch (err) {
     _logError('validateStatusPayload', err);
@@ -168,10 +172,19 @@ function _sheet() {
     sh.appendRow([
       'ref','fname','lname','phone','email','datetime','groupSize',
       'gear','duration','total','referral','notes',
-      'waiverAccepted','waiverTimestamp','source','Timestamp','NotifiedAt','idPhotoUrl'
+      'waiverAccepted','waiverTimestamp','source','Timestamp','NotifiedAt','idPhotoUrl','status'
     ]);
     sh.getRange('1:1').setFontWeight('bold');
     ['D:D','F:F','N:N'].forEach(function(r){ sh.getRange(r).setNumberFormat('@'); });
+  } else {
+    // Self-healing migration: older sheets predate the 'status' column.
+    // Add it without disturbing existing data or column order.
+    var lastCol = sh.getLastColumn();
+    var header = lastCol > 0 ? sh.getRange(1, 1, 1, lastCol).getValues()[0] : [];
+    if (header.indexOf('status') === -1) {
+      sh.getRange(1, lastCol + 1).setValue('status');
+      sh.getRange('1:1').setFontWeight('bold');
+    }
   }
   return sh;
 }
@@ -281,7 +294,7 @@ function _saveIdPhoto(p) {
 
 function _safe(val, fallback) {
   var s = (val === undefined || val === null || val === '') ? (fallback !== undefined ? fallback : '') : String(val);
-  if (/^[=+\-@]/.test(s)) return "'" + s;
+  if (/^\s*[=+\-@\t]/.test(s)) return "'" + s;
   return s;
 }
 
@@ -359,8 +372,34 @@ function doPost(e) {
 // ── IDEMPOTENT BOOKING SAVE ──
 // If the same ref is submitted twice (client retry, flaky connection, script
 // restart) we must not create a duplicate row or send a duplicate email.
+// ── RATE LIMIT (open endpoint — no login required to submit a booking) ──
+// Caps total submissions per rolling minute so a scripted flood can't
+// exhaust the Gmail daily send quota or Apps Script's execution quota.
+// A real small business does not get more than a handful of bookings in
+// any single minute, so this threshold has generous headroom for genuine
+// traffic spikes while still capping abuse.
+var RATE_LIMIT_MAX_PER_MINUTE = 20;
+
+function _rateLimitOk() {
+  try {
+    var cache = CacheService.getScriptCache();
+    var key = 'booking_rl_' + Math.floor(Date.now() / 60000);
+    var current = Number(cache.get(key)) || 0;
+    if (current >= RATE_LIMIT_MAX_PER_MINUTE) return false;
+    cache.put(key, String(current + 1), 120); // expires well after the minute window closes
+    return true;
+  } catch (err) {
+    _logError('_rateLimitOk', err);
+    return true; // never let a caching failure block real bookings
+  }
+}
+
 function saveBooking(p) {
   try {
+    if (!_rateLimitOk()) {
+      return { ok: false, error: 'Too many booking attempts right now — please try again in a minute.' };
+    }
+
     var validation = _validateBookingPayload(p);
     if (!validation.valid) return { ok: false, error: validation.error };
 
@@ -410,7 +449,8 @@ function saveBooking(p) {
         _safe(p.source, 'PWA'),
         new Date().toISOString(),
         '', // NotifiedAt — set once the notification is actually sent
-        idPhotoUrl
+        idPhotoUrl,
+        'pending' // status — updated via update_status as staff progress the booking
       ]);
     } catch (writeErr) {
       return _fail('saveBooking.write', writeErr);
@@ -458,10 +498,14 @@ function updateStatus(p) {
     var sh = _sheet();
     var data = sh.getDataRange().getValues();
     var refIdx = data[0] ? data[0].indexOf('ref') : -1;
-    if (refIdx === -1) return { ok: false, error: 'Sheet not initialized' };
+    var statusIdx = data[0] ? data[0].indexOf('status') : -1;
+    if (refIdx === -1 || statusIdx === -1) return { ok: false, error: 'Sheet not initialized' };
 
     for (var i = 1; i < data.length; i++) {
-      if (String(data[i][refIdx]) === String(p.ref)) return { ok: true };
+      if (String(data[i][refIdx]) === String(p.ref)) {
+        sh.getRange(i + 1, statusIdx + 1).setValue(p.status);
+        return { ok: true };
+      }
     }
     return { ok: false, error: 'Booking not found' };
   } catch (err) {
@@ -597,4 +641,138 @@ function sendNotification(p) {
     '', 'Submitted: ' + new Date().toISOString()
   ].join('\n');
   GmailApp.sendEmail(NOTIFY_EMAIL, subject, body);
+}
+
+// ── HEALTH CHECK ("AI technician") ──
+// Runs on a time-based trigger (set up once via installHealthCheckTrigger).
+// Checks the systems this business actually depends on and emails Delroy
+// ONLY when something looks wrong — a healthy run stays silent so this
+// doesn't turn into noise he learns to ignore.
+var HEALTH_CHECK_LOOKBACK_MIN = 60; // how far back to check for stuck notifications
+
+function healthCheck() {
+  var issues = [];
+
+  // 1. BOOKINGS sheet exists and has the expected header row.
+  try {
+    var bookSh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+    if (!bookSh) {
+      issues.push('BOOKINGS sheet is missing entirely — booking submissions will fail until _sheet() recreates it, which only happens on the next real booking attempt.');
+    } else {
+      var bookHeader = bookSh.getRange(1, 1, 1, Math.max(bookSh.getLastColumn(), 1)).getValues()[0];
+      var missingCols = FIELDS.filter(function (f) { return bookHeader.indexOf(f) === -1; });
+      if (missingCols.length) {
+        issues.push('BOOKINGS header is missing expected column(s): ' + missingCols.join(', ') + '. Run setupSheet() from the Apps Script editor to repair it.');
+      }
+    }
+  } catch (err) {
+    issues.push('Could not read the BOOKINGS sheet at all: ' + (err && err.message ? err.message : err));
+  }
+
+  // 2. DRIVERS sheet exists and has the expected header row.
+  try {
+    var drvSh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DRIVERS_SHEET_NAME);
+    if (!drvSh) {
+      issues.push('DRIVERS sheet is missing — it should auto-create on first driver add, but if admin.html shows no drivers and adding one fails, this is why.');
+    } else {
+      var drvHeader = drvSh.getRange(1, 1, 1, Math.max(drvSh.getLastColumn(), 1)).getValues()[0];
+      var expectedDrvCols = ['id', 'name', 'vehicle', 'phone', 'createdAt'];
+      var missingDrvCols = expectedDrvCols.filter(function (f) { return drvHeader.indexOf(f) === -1; });
+      if (missingDrvCols.length) {
+        issues.push('DRIVERS header is missing expected column(s): ' + missingDrvCols.join(', ') + '.');
+      }
+    }
+  } catch (err) {
+    issues.push('Could not read the DRIVERS sheet at all: ' + (err && err.message ? err.message : err));
+  }
+
+  // 3. Recent bookings stuck without a notification email ever being sent.
+  // A gap here means either GmailApp is failing (quota, permission revoked)
+  // or sendNotificationOnce has a bug — either way, Delroy is not finding
+  // out about real bookings, which is the single worst failure mode for
+  // this business.
+  try {
+    var sh = _sheet();
+    var data = sh.getDataRange().getValues();
+    if (data.length > 1) {
+      var header = data[0];
+      var tsIdx = header.indexOf('Timestamp');
+      var notifiedIdx = header.indexOf('NotifiedAt');
+      var refIdx = header.indexOf('ref');
+      if (tsIdx !== -1 && notifiedIdx !== -1) {
+        var cutoff = new Date(Date.now() - HEALTH_CHECK_LOOKBACK_MIN * 60 * 1000);
+        var stuck = [];
+        for (var i = 1; i < data.length; i++) {
+          var row = data[i];
+          var ts = row[tsIdx] ? new Date(row[tsIdx]) : null;
+          var notified = row[notifiedIdx];
+          if (ts && !isNaN(ts.getTime()) && ts < cutoff && (!notified || String(notified).trim() === '')) {
+            stuck.push(refIdx !== -1 ? row[refIdx] : ('row ' + (i + 1)));
+          }
+        }
+        if (stuck.length) {
+          issues.push('Booking(s) older than ' + HEALTH_CHECK_LOOKBACK_MIN + ' min with no notification ever sent: ' + stuck.slice(0, 10).join(', ') +
+            (stuck.length > 10 ? (' (+' + (stuck.length - 10) + ' more)') : '') +
+            '. Check Gmail sending quota/permissions, or look at Apps Script execution logs for sendNotification errors.');
+        }
+      }
+    }
+  } catch (err) {
+    issues.push('Could not run the stuck-notification check: ' + (err && err.message ? err.message : err));
+  }
+
+  // 4. The deployed web app URL actually responds. Uses UrlFetchApp to hit
+  // its own public endpoint — catches the case where a deploy went out
+  // broken (e.g. a syntax error that only surfaces at request time).
+  try {
+    var deploymentUrl = ScriptApp.getService().getUrl();
+    if (deploymentUrl) {
+      var resp = UrlFetchApp.fetch(deploymentUrl, { muteHttpExceptions: true });
+      var code = resp.getResponseCode();
+      if (code !== 200) {
+        issues.push('The deployed web app is not responding normally (HTTP ' + code + '). Bookings from the live site are likely failing right now.');
+      } else {
+        var bodyText = '';
+        try { bodyText = resp.getContentText(); } catch (readErr) { /* ignore */ }
+        if (bodyText.indexOf('"ok"') === -1) {
+          issues.push('The deployed web app responded but not with the expected JSON shape — something may be broken in doGet().');
+        }
+      }
+    }
+  } catch (err) {
+    issues.push('Could not reach the deployed web app to check it is alive: ' + (err && err.message ? err.message : err));
+  }
+
+  // Only send an email when there's something to act on. A silent run
+  // means everything checked out.
+  if (issues.length) {
+    try {
+      var subject = '⚠️ APR System Health Check — ' + issues.length + ' issue(s) found';
+      var body = 'Automated health check found the following:\n\n' +
+        issues.map(function (s, i) { return (i + 1) + '. ' + s; }).join('\n\n') +
+        '\n\nChecked at: ' + new Date().toISOString();
+      GmailApp.sendEmail(NOTIFY_EMAIL, subject, body);
+    } catch (mailErr) {
+      _logError('healthCheck.notify', mailErr);
+    }
+  }
+  Logger.log('healthCheck: ' + issues.length + ' issue(s) found.');
+  return issues;
+}
+
+// ── ONE-TIME SETUP: installs a time-based trigger so healthCheck() runs on
+// its own without anyone remembering to run it manually. Run this once from
+// the Apps Script editor. Safe to re-run — it clears any existing
+// healthCheck trigger first so you never end up with duplicates.
+function installHealthCheckTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(function (t) {
+    if (t.getHandlerFunction() === 'healthCheck') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('healthCheck')
+    .timeBased()
+    .everyHours(6)
+    .create();
+  Logger.log('installHealthCheckTrigger: healthCheck() will now run every 6 hours.');
+  try { SpreadsheetApp.getUi().alert('✅ Health check scheduled — runs every 6 hours automatically.'); } catch (uiErr) { /* expected outside Sheets UI */ }
 }
