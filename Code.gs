@@ -22,8 +22,9 @@ var MAX_ID_PHOTO_BASE64_LEN = 8000000; // ~6MB decoded — generous cap against 
 
 var FIELDS = ['ref','fname','lname','phone','email','datetime','groupSize',
   'gear','duration','total','referral','notes','waiverAccepted','waiverTimestamp',
-  'source','Timestamp','NotifiedAt','idPhotoUrl','status'];
+  'source','Timestamp','NotifiedAt','idPhotoUrl','status','kidsCount'];
 var VALID_STATUSES = ['pending', 'confirmed', 'done'];
+var INVENTORY_SHEET_NAME = 'INVENTORY';
 
 // ── FAIL-SAFE HELPERS ──
 
@@ -103,6 +104,13 @@ function _validateBookingPayload(p) {
       }
     }
 
+    if (p.kidsCount !== undefined && p.kidsCount !== null && p.kidsCount !== '') {
+      var kidsNum = Number(p.kidsCount);
+      if (isNaN(kidsNum) || kidsNum < 0 || kidsNum > 20 || Math.floor(kidsNum) !== kidsNum) {
+        return { valid: false, error: 'Invalid number of kids' };
+      }
+    }
+
     if (p.idPhotoBase64 !== undefined && p.idPhotoBase64 !== null && p.idPhotoBase64 !== '') {
       if (typeof p.idPhotoBase64 !== 'string') {
         return { valid: false, error: 'Invalid ID photo data' };
@@ -169,20 +177,18 @@ function _sheet() {
   var sh = ss.getSheetByName(SHEET_NAME);
   if (!sh) {
     sh = ss.insertSheet(SHEET_NAME);
-    sh.appendRow([
-      'ref','fname','lname','phone','email','datetime','groupSize',
-      'gear','duration','total','referral','notes',
-      'waiverAccepted','waiverTimestamp','source','Timestamp','NotifiedAt','idPhotoUrl','status'
-    ]);
+    sh.appendRow(FIELDS);
     sh.getRange('1:1').setFontWeight('bold');
     ['D:D','F:F','N:N'].forEach(function(r){ sh.getRange(r).setNumberFormat('@'); });
   } else {
-    // Self-healing migration: older sheets predate the 'status' column.
-    // Add it without disturbing existing data or column order.
+    // Self-healing migration: older sheets predate newer columns (e.g.
+    // 'status', 'kidsCount'). Append any missing ones at the end without
+    // disturbing existing data or column order.
     var lastCol = sh.getLastColumn();
     var header = lastCol > 0 ? sh.getRange(1, 1, 1, lastCol).getValues()[0] : [];
-    if (header.indexOf('status') === -1) {
-      sh.getRange(1, lastCol + 1).setValue('status');
+    var missing = FIELDS.filter(function (f) { return header.indexOf(f) === -1; });
+    if (missing.length) {
+      sh.getRange(1, lastCol + 1, 1, missing.length).setValues([missing]);
       sh.getRange('1:1').setFontWeight('bold');
     }
   }
@@ -252,6 +258,138 @@ function deleteDriver(p) {
   }
 }
 
+// ── INVENTORY (life jackets, boards, etc. — shared across staff) ──
+// Category convention: 'life-jacket-adult', 'life-jacket-kid' today;
+// extend to 'board', 'kayak', 'snorkel-set' etc. later without a schema change.
+var VALID_INVENTORY_STATUSES = ['available', 'in-use', 'maintenance'];
+
+function _inventorySheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(INVENTORY_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(INVENTORY_SHEET_NAME);
+    sh.appendRow(['id', 'label', 'category', 'status', 'notes', 'createdAt']);
+    sh.getRange('1:1').setFontWeight('bold');
+  }
+  return sh;
+}
+
+function _validateInventoryPayload(p) {
+  try {
+    if (!p || typeof p !== 'object') return { valid: false, error: 'Missing item data' };
+    if (typeof p.label !== 'string' || !p.label.trim() || p.label.length > 50) {
+      return { valid: false, error: 'Invalid or missing label' };
+    }
+    if (typeof p.category !== 'string' || !p.category.trim() || p.category.length > 50) {
+      return { valid: false, error: 'Invalid or missing category' };
+    }
+    return { valid: true };
+  } catch (err) {
+    _logError('validateInventoryPayload', err);
+    return { valid: false, error: 'Validation failed' };
+  }
+}
+
+function getInventory() {
+  try {
+    var sh = _inventorySheet();
+    var data = sh.getDataRange().getValues();
+    if (data.length <= 1) return [];
+    return data.slice(1).map(function (row) {
+      return { id: row[0], label: row[1], category: row[2], status: row[3], notes: row[4], createdAt: row[5] };
+    }).filter(function (d) { return d.id; });
+  } catch (err) {
+    _logError('getInventory', err);
+    return [];
+  }
+}
+
+function addInventoryItem(p) {
+  try {
+    var validation = _validateInventoryPayload(p);
+    if (!validation.valid) return { ok: false, error: validation.error };
+
+    var sh = _inventorySheet();
+    var id = 'inv-' + Date.now();
+    sh.appendRow([
+      id,
+      _safe(p.label, 'N/A'),
+      _safe(p.category, 'N/A'),
+      'available',
+      _safe(p.notes, ''),
+      new Date().toISOString()
+    ]);
+    return { ok: true, id: id };
+  } catch (err) {
+    return _fail('addInventoryItem', err);
+  }
+}
+
+function updateInventoryStatus(p) {
+  try {
+    if (!p || typeof p.id !== 'string' || !p.id.trim()) return { ok: false, error: 'Invalid id' };
+    if (typeof p.status !== 'string' || VALID_INVENTORY_STATUSES.indexOf(p.status) === -1) {
+      return { ok: false, error: 'Invalid status' };
+    }
+    var sh = _inventorySheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(p.id)) {
+        sh.getRange(i + 1, 4).setValue(p.status); // column 4 = status
+        return { ok: true };
+      }
+    }
+    return { ok: false, error: 'Item not found' };
+  } catch (err) {
+    return _fail('updateInventoryStatus', err);
+  }
+}
+
+function deleteInventoryItem(p) {
+  try {
+    if (!p || typeof p.id !== 'string' || !p.id.trim()) return { ok: false, error: 'Invalid id' };
+    var sh = _inventorySheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(p.id)) {
+        sh.deleteRow(i + 1);
+        return { ok: true };
+      }
+    }
+    return { ok: true }; // already gone — idempotent
+  } catch (err) {
+    return _fail('deleteInventoryItem', err);
+  }
+}
+
+// ── ONE-TIME SETUP: seeds the 8 existing life jackets as labeled, adult-size
+// inventory (per the current equipment list — 4 blue + 4 red, no kid-size
+// jackets owned yet). Safe to re-run: skips creation if items with these
+// labels already exist. Add kid-size jackets later via the admin Inventory
+// tab with category 'life-jacket-kid' once purchased.
+function seedLifeJacketInventory() {
+  var sh = _inventorySheet();
+  var data = sh.getDataRange().getValues();
+  var existingLabels = data.slice(1).map(function (row) { return row[1]; });
+
+  var toSeed = [
+    { label: 'LJ-A1', notes: 'Blue' }, { label: 'LJ-A2', notes: 'Blue' },
+    { label: 'LJ-A3', notes: 'Blue' }, { label: 'LJ-A4', notes: 'Blue' },
+    { label: 'LJ-A5', notes: 'Red' }, { label: 'LJ-A6', notes: 'Red' },
+    { label: 'LJ-A7', notes: 'Red' }, { label: 'LJ-A8', notes: 'Red' }
+  ];
+
+  var added = 0;
+  toSeed.forEach(function (item) {
+    if (existingLabels.indexOf(item.label) !== -1) return; // already seeded
+    sh.appendRow(['inv-' + Date.now() + '-' + added, item.label, 'life-jacket-adult', 'available', item.notes, new Date().toISOString()]);
+    added++;
+  });
+
+  Logger.log('seedLifeJacketInventory: added ' + added + ' item(s).');
+  try { SpreadsheetApp.getUi().alert('✅ Seeded ' + added + ' life jacket(s). Add kid-size jackets via the admin Inventory tab once purchased.'); } catch (uiErr) { /* expected outside Sheets UI */ }
+}
+
 // ── ID PHOTO UPLOAD (Drive) ──
 // Never blocks or fails the booking: any error here returns '' and is logged,
 // saveBooking proceeds regardless.
@@ -318,6 +456,10 @@ function doGet(e) {
       if (!_authOk(p)) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, drivers: getDrivers() });
     }
+    if (p.action === 'getInventory') {
+      if (!_authOk(p)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json({ ok: true, inventory: getInventory() });
+    }
     return _json({ ok: true, message: 'APR Backend v4' });
   } catch (err) {
     return _json(_fail('doGet', err));
@@ -362,6 +504,22 @@ function doPost(e) {
     if (payload.action === 'deleteDriver') {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json(deleteDriver(payload));
+    }
+    if (payload.action === 'getInventory') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json({ ok: true, inventory: getInventory() });
+    }
+    if (payload.action === 'addInventoryItem') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(addInventoryItem(payload));
+    }
+    if (payload.action === 'updateInventoryStatus') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(updateInventoryStatus(payload));
+    }
+    if (payload.action === 'deleteInventoryItem') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(deleteInventoryItem(payload));
     }
     return _json(saveBooking(payload));
   } catch (err) {
@@ -450,7 +608,8 @@ function saveBooking(p) {
         new Date().toISOString(),
         '', // NotifiedAt — set once the notification is actually sent
         idPhotoUrl,
-        'pending' // status — updated via update_status as staff progress the booking
+        'pending', // status — updated via update_status as staff progress the booking
+        (p.kidsCount !== undefined && p.kidsCount !== null && !isNaN(Number(p.kidsCount))) ? Number(p.kidsCount) : 0
       ]);
     } catch (writeErr) {
       return _fail('saveBooking.write', writeErr);
@@ -632,7 +791,7 @@ function sendNotification(p) {
     'Phone:     ' + n(p && p.phone, 'N/A'),
     'Email:     ' + n(p && p.email, 'N/A'),
     'Date/Time: ' + n(p && p.datetime, 'N/A'),
-    'Group:     ' + n(p && p.groupSize, 'N/A'),
+    'Group:     ' + n(p && p.groupSize, 'N/A') + (p && p.kidsCount ? ' (' + p.kidsCount + ' kid(s) — prep kid-size life jackets)' : ''),
     'Gear:      ' + n(p && p.gear, 'N/A'),
     'Duration:  ' + n(p && p.duration, 'N/A'),
     'Total:     XCD ' + n(p && p.total, '0'),
@@ -684,6 +843,22 @@ function healthCheck() {
     }
   } catch (err) {
     issues.push('Could not read the DRIVERS sheet at all: ' + (err && err.message ? err.message : err));
+  }
+
+  // 2b. INVENTORY sheet exists and has the expected header row.
+  try {
+    var invSh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(INVENTORY_SHEET_NAME);
+    if (invSh) {
+      var invHeader = invSh.getRange(1, 1, 1, Math.max(invSh.getLastColumn(), 1)).getValues()[0];
+      var expectedInvCols = ['id', 'label', 'category', 'status', 'notes', 'createdAt'];
+      var missingInvCols = expectedInvCols.filter(function (f) { return invHeader.indexOf(f) === -1; });
+      if (missingInvCols.length) {
+        issues.push('INVENTORY header is missing expected column(s): ' + missingInvCols.join(', ') + '.');
+      }
+    }
+    // Not present yet is fine — it auto-creates on first use (e.g. running seedLifeJacketInventory).
+  } catch (err) {
+    issues.push('Could not read the INVENTORY sheet: ' + (err && err.message ? err.message : err));
   }
 
   // 3. Recent bookings stuck without a notification email ever being sent.

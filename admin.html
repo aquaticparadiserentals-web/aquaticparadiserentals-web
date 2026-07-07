@@ -282,11 +282,21 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
     <div class="inv-chip" onclick="filterInv('KY')">Kayaks</div>
     <div class="inv-chip" onclick="filterInv('SK')">Snorkel</div>
     <div class="inv-chip" onclick="filterInv('FL')">Floaters</div>
-    <div class="inv-chip" onclick="filterInv('LJ')">Life Jackets</div>
   </div>
   <div class="inv-grid" id="invGrid"></div>
   <div class="sec-title" style="margin-top:18px">Summary</div>
   <div class="dash-grid" id="invSummary"></div>
+
+  <div class="sec-title" style="margin-top:18px">Life Jackets — Adult / Kid</div>
+  <div id="lifeJacketList"></div>
+  <div class="card" style="margin-top:12px">
+    <select id="newLJCategory" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:8px;box-sizing:border-box">
+      <option value="life-jacket-adult">Adult</option>
+      <option value="life-jacket-kid">Kid</option>
+    </select>
+    <input type="text" id="newLJNotes" placeholder="Notes (e.g. color) — optional" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:10px;box-sizing:border-box"/>
+    <button onclick="addLifeJacket()" style="width:100%;padding:10px;background:#03939E;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.88rem;cursor:pointer">➕ Add Life Jacket</button>
+  </div>
 </div>
 
 <!-- ═ SAFETY ═ -->
@@ -705,6 +715,7 @@ function onLogin() {
   renderSafety();
   renderTeam();
   fetchDrivers();
+  fetchLifeJackets();
   fetchBookings();
   updateQueueCount();
   loadBrotherNum();
@@ -842,7 +853,6 @@ const FLEET = [
   ...Array.from({length:6},(_,i)=>({code:`KY-0${i+1}`,name:'Kayak',type:'KY'})),
   ...Array.from({length:12},(_,i)=>({code:`SK-${String(i+1).padStart(2,'0')}`,name:'Snorkel Set',type:'SK'})),
   ...Array.from({length:8},(_,i)=>({code:`FL-0${i+1}`,name:'Floater',type:'FL'})),
-  ...Array.from({length:12},(_,i)=>({code:`LJ-${String(i+1).padStart(2,'0')}`,name:'Life Jacket',type:'LJ'})),
 ];
 
 let invState = safeParseJSON('apr_inv', {});
@@ -869,7 +879,6 @@ function renderInventory() {
     {label:'Kayaks',type:'KY',total:6},
     {label:'Snorkel Sets',type:'SK',total:12},
     {label:'Floaters',type:'FL',total:8},
-    {label:'Life Jackets',type:'LJ',total:12},
   ];
   const avail = types.map(t=>{
     const out = FLEET.filter(u=>u.type===t.type&&invState[u.code]==='out').length;
@@ -1072,6 +1081,115 @@ async function fetchDrivers() {
   }
   renderDrivers();
   populateDeliveryDriverSelect();
+}
+
+// ── LIFE JACKETS (adult/kid split — backed by the shared INVENTORY sheet) ──
+let inventoryCache = [];
+
+async function fetchLifeJackets() {
+  try {
+    const res = await fetch(BACKEND+'?action=getInventory&token='+encodeURIComponent(APP_TOKEN),{signal:AbortSignal.timeout(10000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (data && data.ok && Array.isArray(data.inventory)) {
+      inventoryCache = data.inventory;
+    } else {
+      throw new Error((data && data.error) || 'No data');
+    }
+  } catch (err) {
+    showToast('Could not load life jacket inventory: '+err.message, 'warn');
+  }
+  renderLifeJackets();
+}
+
+function renderLifeJackets() {
+  const el = document.getElementById('lifeJacketList');
+  if (!el) return;
+  const jackets = inventoryCache.filter(i => i && (i.category==='life-jacket-adult' || i.category==='life-jacket-kid'));
+  if (!jackets.length) {
+    el.innerHTML = '<div style="text-align:center;padding:16px;color:rgba(255,255,255,0.35)">No life jackets seeded yet — run seedLifeJacketInventory() once from the Apps Script editor, or add one below.</div>';
+    return;
+  }
+  const groups = [
+    {key:'life-jacket-adult', title:'Adult'},
+    {key:'life-jacket-kid', title:'Kid'}
+  ];
+  el.innerHTML = groups.map(g => {
+    const items = jackets.filter(j => j.category === g.key);
+    if (!items.length) return '';
+    return `<div style="font-weight:800;font-size:0.8rem;margin:10px 0 6px;color:rgba(255,255,255,0.6)">${g.title} (${items.length})</div>` +
+      items.map(j => {
+        const inUse = j.status === 'in-use';
+        const maint = j.status === 'maintenance';
+        const idAttr = escapeHtml(j.id).replace(/'/g,'&#39;');
+        return `<div class="team-card">
+          <div class="team-avatar">🦺</div>
+          <div class="team-info">
+            <div class="team-name">${escapeHtml(j.label)}</div>
+            <div class="team-role">${escapeHtml(j.notes||'')} · ${maint?'Maintenance':(inUse?'In use':'Available')}</div>
+          </div>
+          <button class="team-wa" style="background:${inUse?'var(--teal)':'var(--gold)'};color:#0B1E2D;border:none;cursor:pointer" onclick="toggleLJStatus('${idAttr}','${inUse?'available':'in-use'}')">${inUse?'✅ Return':'📤 Check out'}</button>
+          <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer" onclick="removeLifeJacket('${idAttr}')">🗑️</button>
+        </div>`;
+      }).join('');
+  }).join('') || '<div style="text-align:center;padding:16px;color:rgba(255,255,255,0.35)">No life jackets yet.</div>';
+}
+
+async function addLifeJacket() {
+  const category = document.getElementById('newLJCategory').value;
+  const notes = document.getElementById('newLJNotes').value.trim();
+  const existing = inventoryCache.filter(i => i && i.category === category).length;
+  const prefix = category === 'life-jacket-kid' ? 'LJ-K' : 'LJ-A';
+  const label = prefix + (existing + 1);
+
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'addInventoryItem', token:APP_TOKEN, label, category, notes
+    }),signal:AbortSignal.timeout(15000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Save failed');
+  } catch (err) {
+    showToast('Could not add life jacket: '+err.message, 'warn');
+    return;
+  }
+
+  document.getElementById('newLJNotes').value = '';
+  await fetchLifeJackets();
+  addLog('🦺 Life jacket added: '+label);
+  showToast('Life jacket added ✅','ok');
+}
+
+async function toggleLJStatus(id, status) {
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'updateInventoryStatus', token:APP_TOKEN, id, status
+    }),signal:AbortSignal.timeout(15000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Update failed');
+  } catch (err) {
+    showToast('Could not update status: '+err.message, 'warn');
+    return;
+  }
+  await fetchLifeJackets();
+}
+
+async function removeLifeJacket(id) {
+  if (!id) return;
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'deleteInventoryItem', token:APP_TOKEN, id
+    }),signal:AbortSignal.timeout(15000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Delete failed');
+  } catch (err) {
+    showToast('Could not remove life jacket: '+err.message, 'warn');
+    return;
+  }
+  await fetchLifeJackets();
+  addLog('🦺 Life jacket removed');
 }
 
 // ── DELIVERY NOTIFICATION IDEMPOTENCY (ref -> ISO timestamp) ──
