@@ -80,7 +80,10 @@ const BACKEND = 'https://script.google.com/macros/s/AKfycbzr1KHela518-pgQ3dJyvv7
 // until the PIN is verified server-side, and only ever lives in memory for
 // this tab's session.
 let STAFF_TOKEN = null;
-const FEEDBACK_BASE_URL = 'https://aquaticparadiserentals.com/feedback.html';
+// aquaticparadiserentals.com doesn't resolve yet (no DNS/CNAME set up — see
+// OPERATIONS.md §9) — using that here sent customers to a dead domain.
+// This is the real live URL until the custom domain is actually wired up.
+const FEEDBACK_BASE_URL = 'https://aquaticparadiserentals-web.github.io/aquaticparadiserentals-web/feedback.html';
 let pinBuffer = '';
 let bookings = [];
 let drivers = [];
