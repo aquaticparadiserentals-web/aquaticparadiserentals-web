@@ -527,8 +527,11 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
 
 <script>
 const BACKEND = 'https://script.google.com/macros/s/AKfycbzr1KHela518-pgQ3dJyvv77tm9z2JWo_TTovRNys6RwYNBIUfdyJKxGF_ETzNk9m47Ww/exec';
-// Must match APP_TOKEN in Code.gs — gates access to customer PII (bookings).
-const APP_TOKEN = '2Si_80O9OJ0DGmc8p6G5pDeG';
+// No longer a hardcoded constant — anyone viewing this file's source used to
+// get the real token regardless of the PIN gate below. Now it's null until
+// the PIN is verified server-side (verifyPinWithServer), and only ever lives
+// in memory for this tab's session — never localStorage, never in source.
+let APP_TOKEN = null;
 const DEFAULT_PIN = '1784';
 let pinBuffer = '';
 let attempts = 0;
@@ -641,32 +644,56 @@ function updatePinDots() {
   }
 }
 
+// Calls the backend, which holds the real PIN hash and is the only place
+// the actual comparison happens. Never throws — network/parse failures
+// resolve to { ok:false }, which the caller treats as "access denied".
+async function verifyPinWithServer(role, pin) {
+  try {
+    const res = await fetch(BACKEND, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'verifyPin', role, pin }),
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!res.ok) return { ok: false };
+    return await res.json();
+  } catch (err) {
+    console.error('verifyPinWithServer failed:', err);
+    return { ok: false };
+  }
+}
+
 async function checkPin() {
-  // Whole check is wrapped: any unexpected error (crypto unavailable, storage
-  // read failure, etc.) falls through to the "access denied" branch below —
-  // it must never silently grant entry.
-  let match = null;
+  // Whole check is wrapped: any unexpected error (network failure, crypto
+  // unavailable, storage read failure, etc.) falls through to the "access
+  // denied" branch below — it must never silently grant entry.
+  let serverResult = null;
   try {
     if (isLockedOut()) {
       document.getElementById('pinError').textContent = '🔒 Locked. Try again later.';
       pinBuffer=''; updatePinDots();
       return;
     }
-    const hash = await sha256(pinBuffer);
-    match = hash ? getPeople().find(p => p && p.pinHash === hash) : null;
+    // The server is the actual authority on whether this PIN is correct —
+    // it's also where APP_TOKEN comes from now. The local hash list below
+    // is only consulted afterward, to greet the right person by name.
+    serverResult = await verifyPinWithServer('admin', pinBuffer);
   } catch (err) {
     console.error('checkPin failed:', err);
-    match = null; // fail-safe: any error during auth = access denied
+    serverResult = null; // fail-safe: any error during auth = access denied
   }
-  if (match) {
+  if (serverResult && serverResult.ok && serverResult.token) {
+    APP_TOKEN = serverResult.token;
     attempts = 0;
     localStorage.removeItem('apr_lockout_until');
-    currentUser = match;
+    const hash = await sha256(pinBuffer);
+    const localMatch = hash ? getPeople().find(p => p && p.pinHash === hash) : null;
+    currentUser = localMatch || { id: 'owner', name: 'Owner' };
     document.getElementById('pinGate').style.display='none';
     document.getElementById('appShell').style.display='block';
     document.getElementById('sessionTime').textContent = new Date().toLocaleTimeString();
     onLogin();
-    addLog('🔐 ' + match.name + ' logged in');
+    addLog('🔐 ' + currentUser.name + ' logged in');
     resetIdleTimer();
   } else {
     attempts++;
@@ -724,6 +751,22 @@ async function changePin() {
   if (p1 !== p2) { msg.style.color=var_coral(); msg.textContent="PINs don't match"; return; }
   if (!/^\d{4}$/.test(p1)) { msg.style.color=var_coral(); msg.textContent='Digits only'; return; }
   if (!currentUser) { msg.style.color=var_coral(); msg.textContent='Not logged in'; return; }
+  // The server hash is the actual gate now — update it first. Only update
+  // the local "who is this" hash if the server confirms the change, so the
+  // two never drift out of sync.
+  try {
+    const res = await fetch(BACKEND, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'changePin', role: 'admin', token: APP_TOKEN, newPin: p1 }),
+      signal: AbortSignal.timeout(10000)
+    });
+    const data = await res.json();
+    if (!data || !data.ok) { msg.style.color=var_coral(); msg.textContent = (data && data.error) || 'Could not update PIN'; return; }
+  } catch (err) {
+    console.error('changePin server call failed:', err);
+    msg.style.color=var_coral(); msg.textContent='Network error — PIN not changed'; return;
+  }
   await setPersonPin(currentUser.id, currentUser.name, p1);
   msg.style.color='#4ade80'; msg.textContent='✅ PIN updated!';
   document.getElementById('newPin1').value='';

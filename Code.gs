@@ -71,6 +71,71 @@ function _dispatchAuthOk(p) {
   }
 }
 
+// ── PIN VERIFICATION (server-side — the actual security boundary) ──
+// admin.html/dispatch.html used to embed APP_TOKEN/STAFF_TOKEN as plain JS
+// constants, with the 4-digit PIN gate checked entirely client-side. That
+// meant anyone who viewed page source got the token regardless of the PIN —
+// the PIN protected nothing. Now the client holds no token until it proves
+// it knows the PIN via this endpoint, which is the only place the real
+// comparison happens.
+function _hashPin(pin) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(pin));
+  return bytes.map(function (b) {
+    var v = (b < 0 ? b + 256 : b).toString(16);
+    return v.length === 1 ? '0' + v : v;
+  }).join('');
+}
+
+function _pinPropKey(role) {
+  return role === 'staff' ? 'APR_STAFF_PIN_HASH' : 'APR_ADMIN_PIN_HASH';
+}
+
+// Public (no token) — this IS the login step. Rate-limited against brute force.
+function verifyPin(p) {
+  try {
+    if (!_rateLimitOk('pin')) return { ok: false, error: 'Too many attempts — please wait a minute.' };
+    if (!p || (p.role !== 'admin' && p.role !== 'staff')) return { ok: false, error: 'Invalid request' };
+    if (typeof p.pin !== 'string' || !/^\d{4}$/.test(p.pin)) return { ok: false, error: 'Incorrect PIN' };
+
+    var storedHash = PropertiesService.getScriptProperties().getProperty(_pinPropKey(p.role));
+    if (!storedHash) return { ok: false, error: 'PIN not set up yet — run seedDefaultPins() once from the Apps Script editor.' };
+    if (_hashPin(p.pin) !== storedHash) return { ok: false, error: 'Incorrect PIN' };
+
+    return { ok: true, token: p.role === 'staff' ? STAFF_TOKEN : APP_TOKEN };
+  } catch (err) {
+    return _fail('verifyPin', err);
+  }
+}
+
+// Changing a PIN requires already holding the token for that role — so this
+// only tightens access further, never loosens it.
+function changePin(p) {
+  try {
+    if (!p || (p.role !== 'admin' && p.role !== 'staff')) return { ok: false, error: 'Invalid request' };
+    var okAuth = (p.role === 'admin') ? _authOk(p) : _dispatchAuthOk(p);
+    if (!okAuth) return { ok: false, error: 'Unauthorized' };
+    if (typeof p.newPin !== 'string' || !/^\d{4}$/.test(p.newPin)) return { ok: false, error: 'PIN must be exactly 4 digits' };
+
+    PropertiesService.getScriptProperties().setProperty(_pinPropKey(p.role), _hashPin(p.newPin));
+    return { ok: true };
+  } catch (err) {
+    return _fail('changePin', err);
+  }
+}
+
+// ── ONE-TIME SETUP: seeds the PIN hashes from the PINs that used to be
+// hardcoded client-side (admin: 1784, staff/dispatch: 5150), so nothing
+// breaks for existing users before they change them. Only sets a hash if
+// one isn't already there — safe to re-run, never clobbers a PIN someone
+// already changed.
+function seedDefaultPins() {
+  var props = PropertiesService.getScriptProperties();
+  if (!props.getProperty('APR_ADMIN_PIN_HASH')) props.setProperty('APR_ADMIN_PIN_HASH', _hashPin('1784'));
+  if (!props.getProperty('APR_STAFF_PIN_HASH')) props.setProperty('APR_STAFF_PIN_HASH', _hashPin('5150'));
+  Logger.log('seedDefaultPins: admin/staff PIN hashes seeded (only where not already set).');
+  try { SpreadsheetApp.getUi().alert('✅ Default PINs seeded (admin: 1784, staff: 5150). Change them from the app once logged in — the PIN is no longer stored anywhere in the code.'); } catch (uiErr) { /* expected outside Sheets UI */ }
+}
+
 // Never let raw exception details (stack traces, sheet names, formulas) reach
 // the client. Log full detail server-side, return a generic message.
 function _logError(where, err) {
@@ -799,6 +864,16 @@ function doPost(e) {
       return _json({ ok: false, error: 'No data received' });
     }
 
+    if (payload.action === 'verifyPin') {
+      // Public, no token — this is the login step itself. Rate-limited
+      // inside verifyPin() against brute force.
+      return _json(verifyPin(payload));
+    }
+    if (payload.action === 'changePin') {
+      // No blanket auth check here — changePin() itself requires already
+      // holding the token for the role being changed.
+      return _json(changePin(payload));
+    }
     if (payload.action === 'update_status') {
       if (!_dispatchAuthOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json(updateStatus(payload));

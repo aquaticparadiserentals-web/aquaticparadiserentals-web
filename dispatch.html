@@ -75,10 +75,11 @@ header p{font-size:0.72rem;color:rgba(255,255,255,0.7);margin-top:2px}
 
 <script>
 const BACKEND = 'https://script.google.com/macros/s/AKfycbzr1KHela518-pgQ3dJyvv77tm9z2JWo_TTovRNys6RwYNBIUfdyJKxGF_ETzNk9m47Ww/exec';
-// Weaker dispatch-only token — cannot read pricing/revenue endpoints.
-// Must match STAFF_TOKEN in Code.gs.
-const STAFF_TOKEN = 'Dsp_7Kq2mNw94RfL';
-const DISPATCH_PIN = '5150';
+// No longer a hardcoded constant — this page's source used to hand out the
+// real token to anyone who viewed it, regardless of the PIN. Now it's null
+// until the PIN is verified server-side, and only ever lives in memory for
+// this tab's session.
+let STAFF_TOKEN = null;
 const FEEDBACK_BASE_URL = 'https://aquaticparadiserentals.com/feedback.html';
 let pinBuffer = '';
 let bookings = [];
@@ -96,8 +97,22 @@ function renderPinDots() {
   document.getElementById('pinDots').innerHTML = Array.from({length:4}, (_,i)=>
     `<div class="pin-dot ${i<pinBuffer.length?'filled':''}"></div>`).join('');
 }
-function checkPin() {
-  if (pinBuffer === DISPATCH_PIN) {
+async function checkPin() {
+  let result = null;
+  try {
+    const res = await fetch(BACKEND, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'verifyPin', role: 'staff', pin: pinBuffer }),
+      signal: AbortSignal.timeout(10000)
+    });
+    result = res.ok ? await res.json() : null;
+  } catch (err) {
+    console.error('checkPin failed:', err);
+    result = null; // fail-safe: any error during auth = access denied
+  }
+  if (result && result.ok && result.token) {
+    STAFF_TOKEN = result.token;
     document.getElementById('pinScreen').style.display='none';
     document.getElementById('app').style.display='block';
     fetchDispatch();
