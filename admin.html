@@ -808,7 +808,7 @@ function renderBookings() {
   el.innerHTML = allBookings.slice().reverse().map(b => {
     b = b || {};
     const ref = String(b.ref === undefined || b.ref === null || b.ref === '' ? 'N/A' : b.ref);
-    const refAttr = escapeHtml(ref).replace(/'/g,'&#39;');
+    const refAttr = escapeHtml(ref);
     const state = bookingStates[ref] || 'pending';
     const statusClass = state==='done'?'done':state==='confirmed'?'confirmed':'pending';
     const statusLabel = state==='done'?'Done':state==='confirmed'?'Confirmed':'Pending';
@@ -828,11 +828,11 @@ function renderBookings() {
       ${b.notes&&b.notes!=='N/A'?'<div class="bk-detail">📝 '+escapeHtml(b.notes)+'</div>':''}
       <div class="bk-total">XCD ${escapeHtml(b.total||0)}</div>
       <div class="bk-actions">
-        ${state!=='confirmed'&&state!=='done'?`<button class="bk-btn confirm" onclick="setBkState('${refAttr}','confirmed')">✅ Confirm</button>`:''}
-        ${state!=='done'?`<button class="bk-btn done-btn" onclick="setBkState('${refAttr}','done')">☑ Done</button>`:''}
+        ${state!=='confirmed'&&state!=='done'?`<button class="bk-btn confirm" data-ref="${refAttr}" onclick="setBkState(this.dataset.ref,'confirmed')">✅ Confirm</button>`:''}
+        ${state!=='done'?`<button class="bk-btn done-btn" data-ref="${refAttr}" onclick="setBkState(this.dataset.ref,'done')">☑ Done</button>`:''}
         ${phone?`<a class="bk-btn wa" href="https://wa.me/${encodeURIComponent(phone)}?text=${waMsg}" target="_blank">💬 WhatsApp</a>`:''}
-        <button class="bk-btn" onclick="notifyDelivery('${refAttr}')">🚚 Notify Driver</button>
-        ${b.idPhotoUrl && b.idPhotoUrl!=='N/A'?`<button class="bk-btn" onclick="viewIdPhoto('${refAttr}')">🪪 View ID</button>`:''}
+        <button class="bk-btn" data-ref="${refAttr}" onclick="notifyDelivery(this.dataset.ref)">🚚 Notify Driver</button>
+        ${b.idPhotoUrl && b.idPhotoUrl!=='N/A'?`<button class="bk-btn" data-ref="${refAttr}" onclick="viewIdPhoto(this.dataset.ref)">🪪 View ID</button>`:''}
       </div>
     </div>`;
   }).join('');

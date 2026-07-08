@@ -160,9 +160,9 @@ function render() {
       ${hasLoc ? `<div class="detail">📍 Last location: <a href="${mapUrl}" target="_blank" style="color:#5fd0da">view on map</a> (${escapeHtml(b.driverLocAt)})</div>` : ''}
       <span class="status-pill ${status}">${status}</span>
       <div class="actions">
-        ${status!=='confirmed'&&status!=='done'?`<button class="btn confirm" onclick="setStatus('${ref}','confirmed')">✅ Confirm</button>`:''}
-        ${status!=='done'?`<button class="btn done-btn" onclick="setStatus('${ref}','done')">☑ Done</button>`:''}
-        ${status!=='done'?`<button class="btn" style="background:#3a4a5c" onclick="shareLocation('${ref}')">📍 Share Location</button>`:''}
+        ${status!=='confirmed'&&status!=='done'?`<button class="btn confirm" data-ref="${ref}" onclick="setStatus(this.dataset.ref,'confirmed')">✅ Confirm</button>`:''}
+        ${status!=='done'?`<button class="btn done-btn" data-ref="${ref}" onclick="setStatus(this.dataset.ref,'done')">☑ Done</button>`:''}
+        ${status!=='done'?`<button class="btn" style="background:#3a4a5c" data-ref="${ref}" onclick="shareLocation(this.dataset.ref)">📍 Share Location</button>`:''}
         ${phone?`<a class="btn wa" href="https://wa.me/${encodeURIComponent(phone)}" target="_blank">💬 Guest</a>`:''}
         ${status==='done'&&phone?`<a class="btn wa" style="background:#FBC62C;color:#0B1E2D" href="https://wa.me/${encodeURIComponent(phone)}?text=${encodeURIComponent(feedbackMsg)}" target="_blank">⭐ Ask Feedback</a>`:''}
       </div>
