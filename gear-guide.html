@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Gear Guide — Aquatic Paradise Rentals</title>
+<style>
+  :root{--navy:#0B1E2D;--teal:#03939E;--coral:#E0351B;--gold:#FBC62C}
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:0;color:var(--navy);background:#f4f4f4}
+  .top{max-width:640px;margin:16px auto 0;padding:0 16px;display:flex;justify-content:space-between;align-items:center}
+  .btn-back{display:inline-block;padding:10px 16px;border-radius:8px;font-weight:700;font-size:0.85rem;text-decoration:none;background:#eee;color:var(--navy)}
+  .page{max-width:640px;margin:12px auto 40px;background:#fff;border-radius:14px;padding:24px 20px 28px;box-shadow:0 2px 10px rgba(0,0,0,0.06)}
+  h1{font-size:1.3rem;margin:0 0 4px}
+  .sub{color:#666;font-size:0.85rem;margin:0 0 18px;line-height:1.5}
+  .mode-tabs{display:flex;gap:8px;margin-bottom:18px}
+  .mode-tab{flex:1;padding:12px 8px;text-align:center;border-radius:10px;font-weight:800;font-size:0.9rem;cursor:pointer;border:2px solid #ddd;background:#fafafa;color:#555}
+  .mode-tab.active{border-color:var(--teal);background:var(--teal);color:#fff}
+  .step-card{background:#f7fbfc;border:1px solid #e0eef0;border-radius:12px;padding:20px 18px;min-height:150px}
+  .step-num{font-size:0.72rem;font-weight:800;color:var(--teal);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px}
+  .step-text{font-size:1.05rem;line-height:1.65;color:#233}
+  .warn{margin-top:10px;font-size:0.82rem;color:var(--coral);font-weight:600}
+  .nav-row{display:flex;gap:10px;margin-top:16px}
+  .nav-btn{flex:1;padding:16px 8px;border-radius:12px;border:none;font-size:1rem;font-weight:800;cursor:pointer}
+  .nav-back{background:#eee;color:var(--navy)}
+  .nav-next{background:var(--navy);color:#fff}
+  .nav-btn:disabled{opacity:0.35}
+  .voice-row{display:flex;gap:10px;margin-top:12px}
+  .voice-btn{flex:1;padding:13px 8px;border-radius:12px;border:2px solid var(--teal);background:#fff;color:var(--teal);font-size:0.9rem;font-weight:800;cursor:pointer}
+  .voice-btn.on{background:var(--teal);color:#fff}
+  .voice-hint{font-size:0.75rem;color:#888;text-align:center;margin-top:8px;line-height:1.5}
+  .progress{display:flex;gap:5px;margin:14px 0 0}
+  .dot{flex:1;height:5px;border-radius:3px;background:#e3e3e3}
+  .dot.done{background:var(--gold)}
+  .footer-note{margin-top:22px;padding-top:14px;border-top:1px solid #eee;font-size:0.8rem;color:#777;line-height:1.6}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <a class="btn-back" href="index.html">← Back to Booking</a>
+</div>
+
+<div class="page">
+  <h1>🏄 Paddle Board Gear Guide</h1>
+  <p class="sub">How to inflate and pack down your inflatable paddle board. Tap <strong>🔊</strong> and your phone reads each step aloud — handy while your hands are on the pump.</p>
+
+  <div class="mode-tabs">
+    <div class="mode-tab active" id="tab-inflate" onclick="setMode('inflate')">💨 Inflate</div>
+    <div class="mode-tab" id="tab-deflate" onclick="setMode('deflate')">📦 Deflate &amp; Pack</div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-num" id="stepNum">Step 1 of 7</div>
+    <div class="step-text" id="stepText"></div>
+    <div class="warn" id="stepWarn" style="display:none"></div>
+  </div>
+
+  <div class="progress" id="progress"></div>
+
+  <div class="nav-row">
+    <button class="nav-btn nav-back" id="btnBack" onclick="go(-1)">← Back</button>
+    <button class="nav-btn nav-next" id="btnNext" onclick="go(1)">Next →</button>
+  </div>
+
+  <div class="voice-row">
+    <button class="voice-btn" id="btnSpeak" onclick="speakStep()">🔊 Read this step</button>
+    <button class="voice-btn" id="btnMic" onclick="toggleMic()" style="display:none">🎤 Voice control</button>
+  </div>
+  <div class="voice-hint" id="voiceHint"></div>
+
+  <div class="footer-note">
+    Your APR team gives you a hands-on demo at every handoff — this guide is a refresher, not a replacement. Questions on the water? WhatsApp us any time. A life jacket is mandatory whenever you're on the water.
+  </div>
+</div>
+
+<script>
+const GUIDES = {
+  inflate: [
+    { t:'Unroll the board flat on smooth ground with the valve end near you.', w:'Keep it away from sharp rocks and shells.' },
+    { t:'Open the valve cap and check the yellow pin inside: press and twist it so the pin sits UP. That keeps air in when you unhook the pump.' },
+    { t:'Screw the pump hose onto the valve until it feels snug — a loose hose leaks air with every stroke.' },
+    { t:'Pump with slow, full strokes using your body weight. It gets stiff near the end — that\'s normal, keep going.' },
+    { t:'Watch the gauge on the pump: stop between 12 and 15 PSI. The board should feel rock-hard — press it with your thumb and it should barely dent.', w:'Never go above 15 PSI.' },
+    { t:'Unscrew the hose quickly — a short hiss is normal — and screw the valve cap on tight.' },
+    { t:'Slide the fin into the fin box until it clicks, clip the leash to the board, and strap the leash to your ankle. You\'re ready — life jacket on before you launch!' },
+  ],
+  deflate: [
+    { t:'Back on shore, take off the leash and slide the fin out of the fin box. Rinse or brush off sand if you can.' },
+    { t:'Unscrew the valve cap.' },
+    { t:'Press the yellow pin down and twist it so it locks DOWN. Air rushes out with a loud hiss — that\'s normal.', w:'Keep your face and loose sand clear of the valve.' },
+    { t:'When the hissing stops, roll the board up starting from the nose (the end away from the valve), pressing out the last air as you go.' },
+    { t:'Screw the valve cap back on so nothing gets inside, strap the roll, and hand it back with the pump, fin and leash. Done — thank you!' },
+  ],
+};
+
+let mode = 'inflate', idx = 0;
+
+function setMode(m){
+  mode = m; idx = 0;
+  document.getElementById('tab-inflate').classList.toggle('active', m==='inflate');
+  document.getElementById('tab-deflate').classList.toggle('active', m==='deflate');
+  render();
+}
+
+function go(d){
+  const steps = GUIDES[mode];
+  idx = Math.max(0, Math.min(steps.length-1, idx+d));
+  render();
+  if (speaking) speakStep();
+}
+
+function render(){
+  const steps = GUIDES[mode], s = steps[idx];
+  document.getElementById('stepNum').textContent = 'Step ' + (idx+1) + ' of ' + steps.length;
+  document.getElementById('stepText').textContent = s.t;
+  const w = document.getElementById('stepWarn');
+  w.style.display = s.w ? 'block' : 'none';
+  w.textContent = s.w ? '⚠️ ' + s.w : '';
+  document.getElementById('btnBack').disabled = idx===0;
+  document.getElementById('btnNext').disabled = idx===steps.length-1;
+  document.getElementById('progress').innerHTML = steps.map((_,i) =>
+    '<div class="dot'+(i<=idx?' done':'')+'"></div>').join('');
+}
+
+// ── READ ALOUD (built-in speech synthesis — free, works offline) ──
+let speaking = false;
+function speakStep(){
+  if (!('speechSynthesis' in window)) {
+    document.getElementById('voiceHint').textContent = 'Read-aloud isn\'t supported on this browser.';
+    return;
+  }
+  speechSynthesis.cancel();
+  const s = GUIDES[mode][idx];
+  const u = new SpeechSynthesisUtterance('Step ' + (idx+1) + '. ' + s.t + (s.w ? ' Important: ' + s.w : ''));
+  u.rate = 0.95;
+  speaking = true;
+  u.onend = () => { speaking = false; };
+  speechSynthesis.speak(u);
+}
+
+// ── VOICE CONTROL (optional — only shown where the browser supports it) ──
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, micOn = false;
+if (SR) {
+  document.getElementById('btnMic').style.display = 'block';
+  document.getElementById('voiceHint').textContent = 'Turn on 🎤 voice control, then say “next”, “back”, or “repeat”.';
+}
+function toggleMic(){
+  if (!SR) return;
+  if (micOn) { micOn = false; rec && rec.stop(); updateMicUi(); return; }
+  rec = new SR();
+  rec.continuous = true;
+  rec.lang = 'en-US';
+  rec.onresult = e => {
+    const said = e.results[e.results.length-1][0].transcript.toLowerCase();
+    if (said.includes('next') || said.includes('forward')) { go(1); speakStep(); }
+    else if (said.includes('back') || said.includes('previous')) { go(-1); speakStep(); }
+    else if (said.includes('repeat') || said.includes('again')) speakStep();
+    else if (said.includes('stop')) { micOn = false; rec.stop(); speechSynthesis.cancel(); updateMicUi(); }
+  };
+  rec.onend = () => { if (micOn) try { rec.start(); } catch(e){} }; // keep listening
+  rec.onerror = () => {};
+  try { rec.start(); micOn = true; } catch(e){ micOn = false; }
+  updateMicUi();
+}
+function updateMicUi(){
+  document.getElementById('btnMic').classList.toggle('on', micOn);
+  document.getElementById('btnMic').textContent = micOn ? '🎤 Listening… (say “stop” to end)' : '🎤 Voice control';
+}
+
+render();
+</script>
+</body>
+</html>
