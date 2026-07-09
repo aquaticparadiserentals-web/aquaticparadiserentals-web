@@ -279,23 +279,12 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
 
 <!-- ═ INVENTORY / FLEET ═ -->
 <div class="asection" id="asec-inventory">
-  <div class="sec-title">Fleet Status</div>
-  <div class="inv-filter">
-    <div class="inv-chip active" onclick="filterInv('ALL')">All</div>
-    <div class="inv-chip" onclick="filterInv('PB')">Paddle Boards</div>
-    <div class="inv-chip" onclick="filterInv('KY')">Kayaks</div>
-    <div class="inv-chip" onclick="filterInv('SK')">Snorkel</div>
-    <div class="inv-chip" onclick="filterInv('FL')">Floaters</div>
-  </div>
-  <div class="inv-grid" id="invGrid"></div>
-  <div class="sec-title" style="margin-top:18px">Summary</div>
+  <div class="sec-title">Fleet Summary</div>
   <div class="dash-grid" id="invSummary"></div>
 
-  <div class="sec-title" style="margin-top:18px">Equipment Inventory</div>
-  <div style="font-size:0.72rem;color:rgba(255,255,255,0.4);margin-bottom:10px">Shared across every device — add or check out any item below (boards, kayaks, snorkel sets, floaters, life jackets by adult/kid).</div>
-  <div id="lifeJacketList"></div>
-  <div class="card" style="margin-top:12px">
-    <select id="newLJCategory" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:8px;box-sizing:border-box">
+  <div class="sec-title" style="margin-top:18px">Restock</div>
+  <div class="card" style="margin-bottom:16px">
+    <select id="restockCategory" style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:8px;box-sizing:border-box">
       <option value="paddle-board">Paddle Board</option>
       <option value="kayak">Kayak</option>
       <option value="snorkel-set">Snorkel Set</option>
@@ -303,12 +292,26 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
       <option value="life-jacket-adult">Life Jacket — Adult</option>
       <option value="life-jacket-kid">Life Jacket — Kid</option>
     </select>
-    <div style="display:flex;gap:8px;margin-bottom:10px">
-      <input type="text" id="newLJNotes" placeholder="Notes (e.g. color, board name) — optional" style="flex:1;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;box-sizing:border-box"/>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <input type="number" id="restockQty" min="1" max="50" value="1" style="width:80px;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;box-sizing:border-box"/>
+      <input type="text" id="restockNotes" placeholder="Notes (e.g. color, board name) — optional" style="flex:1;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;box-sizing:border-box"/>
       <button id="voiceNotesBtn" onclick="startVoiceNotes()" style="display:none;padding:10px 14px;background:#162030;color:#fff;border:2px solid #03939E;border-radius:8px;font-size:1rem;cursor:pointer" title="Speak notes instead of typing">🎤</button>
     </div>
-    <button onclick="addLifeJacket()" style="width:100%;padding:10px;background:#03939E;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.88rem;cursor:pointer">➕ Add Item</button>
+    <button onclick="restockInventory()" style="width:100%;padding:10px;background:#03939E;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.88rem;cursor:pointer">📦 Restock</button>
   </div>
+
+  <div class="sec-title" style="margin-top:18px">Equipment</div>
+  <div style="font-size:0.72rem;color:rgba(255,255,255,0.4);margin-bottom:10px">Shared across every device — check out or return any item below.</div>
+  <div class="inv-filter">
+    <div class="inv-chip active" data-cat="ALL" onclick="filterInv('ALL')">All</div>
+    <div class="inv-chip" data-cat="paddle-board" onclick="filterInv('paddle-board')">Paddle Boards</div>
+    <div class="inv-chip" data-cat="kayak" onclick="filterInv('kayak')">Kayaks</div>
+    <div class="inv-chip" data-cat="snorkel-set" onclick="filterInv('snorkel-set')">Snorkel</div>
+    <div class="inv-chip" data-cat="floater" onclick="filterInv('floater')">Floaters</div>
+    <div class="inv-chip" data-cat="life-jacket-adult" onclick="filterInv('life-jacket-adult')">Life Jackets (Adult)</div>
+    <div class="inv-chip" data-cat="life-jacket-kid" onclick="filterInv('life-jacket-kid')">Life Jackets (Kid)</div>
+  </div>
+  <div id="lifeJacketList"></div>
 </div>
 
 <!-- ═ SAFETY ═ -->
@@ -804,11 +807,10 @@ function var_coral(){return '#E0351B'}
 function onLogin() {
   renderLog();
   updateOnline();
-  renderInventory();
   renderSafety();
   fetchStaff();
   fetchDrivers();
-  fetchLifeJackets();
+  fetchInventory();
   fetchBookings();
   loadWeatherBanner();
   updateQueueCount();
@@ -944,68 +946,7 @@ function updateKPIs() {
   document.getElementById('kpiPending').textContent = pending;
 }
 
-// ── INVENTORY ──
-const FLEET = [
-  ...Array.from({length:8},(_,i)=>({code:`PB-0${i+1}`,name:'Paddle Board',type:'PB'})),
-  ...Array.from({length:6},(_,i)=>({code:`KY-0${i+1}`,name:'Kayak',type:'KY'})),
-  ...Array.from({length:12},(_,i)=>({code:`SK-${String(i+1).padStart(2,'0')}`,name:'Snorkel Set',type:'SK'})),
-  ...Array.from({length:8},(_,i)=>({code:`FL-0${i+1}`,name:'Floater',type:'FL'})),
-];
-
-let invState = safeParseJSON('apr_inv', {});
-let invFilter = 'ALL';
-
-function renderInventory() {
-  const units = invFilter==='ALL' ? FLEET : FLEET.filter(u=>u.type===invFilter);
-  document.getElementById('invGrid').innerHTML = units.map(u => {
-    const out = invState[u.code] === 'out';
-    return `<div class="inv-unit ${out?'out':''}" id="iu-${u.code}">
-      <span class="inv-code">${u.code}</span>
-      <span class="inv-name">${u.name}</span>
-      <label class="toggle-pill">
-        <input type="checkbox" ${!out?'checked':''} onchange="toggleUnit('${u.code}',this.checked)"/>
-        <div class="toggle-track"></div>
-        <div class="toggle-thumb"></div>
-      </label>
-    </div>`;
-  }).join('');
-
-  // Summary
-  const types = [
-    {label:'Paddle Boards',type:'PB',total:8},
-    {label:'Kayaks',type:'KY',total:6},
-    {label:'Snorkel Sets',type:'SK',total:12},
-    {label:'Floaters',type:'FL',total:8},
-  ];
-  const avail = types.map(t=>{
-    const out = FLEET.filter(u=>u.type===t.type&&invState[u.code]==='out').length;
-    return `<div class="kpi-card ${out===t.total?'coral':out===0?'green':''}">
-      <div class="kpi-label">${t.label}</div>
-      <div class="kpi-val">${t.total-out}<span style="font-size:0.9rem;opacity:0.5">/${t.total}</span></div>
-      <div class="kpi-sub">available</div>
-    </div>`;
-  }).join('');
-  document.getElementById('invSummary').innerHTML = avail;
-
-  const totalOut = FLEET.filter(u=>invState[u.code]==='out').length;
-  document.getElementById('kpiAvail').textContent = (FLEET.length-totalOut)+'/'+FLEET.length;
-}
-
-function toggleUnit(code, available) {
-  invState[code] = available ? 'in' : 'out';
-  localStorage.setItem('apr_inv', JSON.stringify(invState));
-  const el = document.getElementById('iu-'+code);
-  if (el) el.className = 'inv-unit'+(available?'':' out');
-  renderInventory();
-  addLog(`${available?'✅':'🔴'} ${code} marked ${available?'available':'out'}`);
-}
-
-function filterInv(type) {
-  invFilter = type;
-  document.querySelectorAll('.inv-chip').forEach(c=>c.classList.remove('active'));
-  event.target.classList.add('active');
-  renderInventory();
-}
+// ── INVENTORY ── (single source of truth: the shared INVENTORY sheet, no local-only state)
 
 // ── SAFETY CHECKLIST ──
 const SAFETY_ITEMS = [
@@ -1237,10 +1178,20 @@ async function loadWeatherBanner() {
   }
 }
 
-// ── LIFE JACKETS (adult/kid split — backed by the shared INVENTORY sheet) ──
+// ── EQUIPMENT (all fleet + safety gear — backed by the shared INVENTORY sheet) ──
 let inventoryCache = [];
+let invFilter = 'ALL';
+const LOW_STOCK_THRESHOLD = 3;
+const FLEET_CATEGORIES = [
+  {key:'paddle-board', label:'Paddle Boards', icon:'🏄'},
+  {key:'kayak', label:'Kayaks', icon:'🛶'},
+  {key:'snorkel-set', label:'Snorkel Sets', icon:'🤿'},
+  {key:'floater', label:'Floaters', icon:'🏊'},
+  {key:'life-jacket-adult', label:'Life Jackets — Adult', icon:'🦺'},
+  {key:'life-jacket-kid', label:'Life Jackets — Kid', icon:'🦺'}
+];
 
-async function fetchLifeJackets() {
+async function fetchInventory() {
   try {
     const res = await fetch(BACKEND+'?action=getInventory&token='+encodeURIComponent(APP_TOKEN),{signal:AbortSignal.timeout(10000)});
     if(!res.ok) throw new Error('HTTP '+res.status);
@@ -1251,37 +1202,52 @@ async function fetchLifeJackets() {
       throw new Error((data && data.error) || 'No data');
     }
   } catch (err) {
-    showToast('Could not load life jacket inventory: '+err.message, 'warn');
+    showToast('Could not load inventory: '+err.message, 'warn');
   }
-  renderLifeJackets();
+  renderInventorySummary();
+  renderInventoryList();
 }
 
-function renderLifeJackets() {
+function renderInventorySummary() {
+  const summaryEl = document.getElementById('invSummary');
+  if (summaryEl) {
+    summaryEl.innerHTML = FLEET_CATEGORIES.map(cat => {
+      const items = inventoryCache.filter(i => i && i.category === cat.key);
+      const total = items.length;
+      const available = items.filter(i => i.status === 'available').length;
+      const lowStock = total < LOW_STOCK_THRESHOLD;
+      return `<div class="kpi-card ${lowStock?'coral':(available===0&&total>0?'coral':'')}">
+        <div class="kpi-label">${cat.icon} ${cat.label}</div>
+        <div class="kpi-val">${available}<span style="font-size:0.9rem;opacity:0.5">/${total}</span></div>
+        <div class="kpi-sub">${lowStock?'⚠️ low stock':'available'}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // Today-dashboard KPI: available/total across the 4 rental-gear categories (excludes life jackets, which aren't rented out individually)
+  const fleetOnly = inventoryCache.filter(i => i && ['paddle-board','kayak','snorkel-set','floater'].includes(i.category));
+  const kpiAvailEl = document.getElementById('kpiAvail');
+  if (kpiAvailEl) kpiAvailEl.textContent = fleetOnly.filter(i=>i.status==='available').length + '/' + fleetOnly.length;
+}
+
+function renderInventoryList() {
   const el = document.getElementById('lifeJacketList');
   if (!el) return;
   if (!inventoryCache.length) {
-    el.innerHTML = '<div style="text-align:center;padding:16px;color:rgba(255,255,255,0.35)">No equipment logged yet — run seedLifeJacketInventory() once from the Apps Script editor for life jackets, or add any item below.</div>';
+    el.innerHTML = '<div style="text-align:center;padding:16px;color:rgba(255,255,255,0.35)">No equipment logged yet — restock above to add some.</div>';
     return;
   }
-  const groups = [
-    {key:'paddle-board', title:'Paddle Boards'},
-    {key:'kayak', title:'Kayaks'},
-    {key:'snorkel-set', title:'Snorkel Sets'},
-    {key:'floater', title:'Floaters'},
-    {key:'life-jacket-adult', title:'Life Jackets — Adult'},
-    {key:'life-jacket-kid', title:'Life Jackets — Kid'}
-  ];
-  const icons = {'paddle-board':'🏄','kayak':'🛶','snorkel-set':'🤿','floater':'🏊','life-jacket-adult':'🦺','life-jacket-kid':'🦺'};
+  const groups = invFilter==='ALL' ? FLEET_CATEGORIES : FLEET_CATEGORIES.filter(g=>g.key===invFilter);
   el.innerHTML = groups.map(g => {
     const items = inventoryCache.filter(j => j && j.category === g.key);
     if (!items.length) return '';
-    return `<div style="font-weight:800;font-size:0.8rem;margin:10px 0 6px;color:rgba(255,255,255,0.6)">${g.title} (${items.length})</div>` +
+    return `<div style="font-weight:800;font-size:0.8rem;margin:10px 0 6px;color:rgba(255,255,255,0.6)">${g.label} (${items.length})</div>` +
       items.map(j => {
         const inUse = j.status === 'in-use';
         const maint = j.status === 'maintenance';
         const idAttr = escapeHtml(j.id).replace(/'/g,'&#39;');
         return `<div class="team-card">
-          <div class="team-avatar">${icons[g.key]||'📦'}</div>
+          <div class="team-avatar">${g.icon}</div>
           <div class="team-info">
             <div class="team-name">${escapeHtml(j.label)}</div>
             <div class="team-role">${escapeHtml(j.notes||'')} · ${maint?'Maintenance':(inUse?'In use':'Available')}</div>
@@ -1290,37 +1256,35 @@ function renderLifeJackets() {
           <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer" onclick="removeLifeJacket('${idAttr}')">🗑️</button>
         </div>`;
       }).join('');
-  }).join('') || '<div style="text-align:center;padding:16px;color:rgba(255,255,255,0.35)">No equipment logged yet.</div>';
+  }).join('') || '<div style="text-align:center;padding:16px;color:rgba(255,255,255,0.35)">No equipment in this category yet.</div>';
 }
 
-const INVENTORY_LABEL_PREFIX = {
-  'paddle-board':'PB-', 'kayak':'KY-', 'snorkel-set':'SK-', 'floater':'FL-',
-  'life-jacket-adult':'LJ-A', 'life-jacket-kid':'LJ-K'
-};
+function filterInv(cat) {
+  invFilter = cat;
+  document.querySelectorAll('.inv-chip').forEach(c=>c.classList.toggle('active', c.dataset.cat===cat));
+  renderInventoryList();
+}
 
-async function addLifeJacket() {
-  const category = document.getElementById('newLJCategory').value;
-  const notes = document.getElementById('newLJNotes').value.trim();
-  const existing = inventoryCache.filter(i => i && i.category === category).length;
-  const prefix = INVENTORY_LABEL_PREFIX[category] || 'IT-';
-  const label = prefix + (existing + 1);
+async function restockInventory() {
+  const category = document.getElementById('restockCategory').value;
+  const qty = Math.max(1, Math.min(50, parseInt(document.getElementById('restockQty').value,10) || 1));
+  const notes = document.getElementById('restockNotes').value.trim();
 
   try {
     const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
-      action:'addInventoryItem', token:APP_TOKEN, label, category, notes
-    }),signal:AbortSignal.timeout(15000)});
+      action:'restockInventory', token:APP_TOKEN, category, qty, notes
+    }),signal:AbortSignal.timeout(20000)});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
-    if (!data || !data.ok) throw new Error((data && data.error) || 'Save failed');
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Restock failed');
+    document.getElementById('restockNotes').value = '';
+    document.getElementById('restockQty').value = '1';
+    await fetchInventory();
+    addLog(`📦 Restocked ${data.added}× ${category}`);
+    showToast(`Added ${data.added} item(s) ✅`,'ok');
   } catch (err) {
-    showToast('Could not add item: '+err.message, 'warn');
-    return;
+    showToast('Could not restock: '+err.message, 'warn');
   }
-
-  document.getElementById('newLJNotes').value = '';
-  await fetchLifeJackets();
-  addLog('📦 Equipment added: '+label);
-  showToast('Item added ✅','ok');
 }
 
 // ── VOICE INPUT (optional — degrades to nothing on unsupported browsers,
@@ -1336,7 +1300,7 @@ if (SpeechRecognitionAPI) {
 function startVoiceNotes() {
   if (!SpeechRecognitionAPI) { showToast('Voice input not supported on this browser', 'warn'); return; }
   const btn = document.getElementById('voiceNotesBtn');
-  const input = document.getElementById('newLJNotes');
+  const input = document.getElementById('restockNotes');
   const recognition = new SpeechRecognitionAPI();
   recognition.lang = 'en-US';
   recognition.interimResults = false;
@@ -1367,7 +1331,7 @@ async function toggleLJStatus(id, status) {
     showToast('Could not update status: '+err.message, 'warn');
     return;
   }
-  await fetchLifeJackets();
+  await fetchInventory();
 }
 
 async function removeLifeJacket(id) {
@@ -1380,11 +1344,11 @@ async function removeLifeJacket(id) {
     const data = await res.json();
     if (!data || !data.ok) throw new Error((data && data.error) || 'Delete failed');
   } catch (err) {
-    showToast('Could not remove life jacket: '+err.message, 'warn');
+    showToast('Could not remove item: '+err.message, 'warn');
     return;
   }
-  await fetchLifeJackets();
-  addLog('🦺 Life jacket removed');
+  await fetchInventory();
+  addLog('📦 Equipment removed');
 }
 
 // ── DELIVERY NOTIFICATION IDEMPOTENCY (ref -> ISO timestamp) ──
@@ -1855,6 +1819,7 @@ function switchATab(tab) {
   });
   if (tab==='bookings') fetchBookings();
   if (tab==='customers') fetchCustomers();
+  if (tab==='inventory') fetchInventory();
   if (tab==='safety') renderSafety();
   if (tab==='drivers') renderDrivers();
   if (tab==='feedback') fetchFeedback();

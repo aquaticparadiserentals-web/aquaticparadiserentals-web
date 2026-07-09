@@ -558,6 +558,11 @@ function getPublicTeam() {
 // Category convention: 'life-jacket-adult', 'life-jacket-kid' today;
 // extend to 'board', 'kayak', 'snorkel-set' etc. later without a schema change.
 var VALID_INVENTORY_STATUSES = ['available', 'in-use', 'maintenance'];
+var INVENTORY_LABEL_PREFIX = {
+  'paddle-board': 'PB-', 'kayak': 'KY-', 'snorkel-set': 'SK-', 'floater': 'FL-',
+  'life-jacket-adult': 'LJ-A', 'life-jacket-kid': 'LJ-K'
+};
+var LOW_STOCK_THRESHOLD = 3;
 
 function _inventorySheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -618,6 +623,41 @@ function addInventoryItem(p) {
     return { ok: true, id: id };
   } catch (err) {
     return _fail('addInventoryItem', err);
+  }
+}
+
+// Adds `qty` auto-numbered units of one category in a single write — the
+// "restock" action. Numbering continues from however many of that category
+// already exist, computed server-side so two staff restocking at once can't
+// race each other into duplicate labels the way client-computed numbering could.
+function restockInventory(p) {
+  try {
+    if (!p || typeof p.category !== 'string' || !p.category.trim()) {
+      return { ok: false, error: 'Invalid category' };
+    }
+    var qty = Number(p.qty);
+    if (!isFinite(qty) || qty < 1 || qty > 50 || Math.round(qty) !== qty) {
+      return { ok: false, error: 'Quantity must be a whole number from 1-50' };
+    }
+
+    var sh = _inventorySheet();
+    var data = sh.getDataRange().getValues();
+    var existing = data.slice(1).filter(function (row) { return row[2] === p.category; }).length;
+    var prefix = INVENTORY_LABEL_PREFIX[p.category] || 'IT-';
+    var notes = _safe(p.notes, '');
+    var now = new Date().toISOString();
+
+    var rows = [];
+    var labels = [];
+    for (var i = 1; i <= qty; i++) {
+      var label = prefix + (existing + i);
+      labels.push(label);
+      rows.push(['inv-' + Date.now() + '-' + i, label, p.category, 'available', notes, now]);
+    }
+    sh.getRange(sh.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+    return { ok: true, added: rows.length, labels: labels };
+  } catch (err) {
+    return _fail('restockInventory', err);
   }
 }
 
@@ -932,6 +972,10 @@ function doPost(e) {
     if (payload.action === 'addInventoryItem') {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json(addInventoryItem(payload));
+    }
+    if (payload.action === 'restockInventory') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(restockInventory(payload));
     }
     if (payload.action === 'updateInventoryStatus') {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
