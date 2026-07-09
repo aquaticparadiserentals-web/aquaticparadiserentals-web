@@ -211,6 +211,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
     <div class="app-nav-inner">
       <div class="anav-tab active" onclick="switchATab('today')">📊 Today</div>
       <div class="anav-tab" onclick="switchATab('bookings')">📋 Bookings</div>
+      <div class="anav-tab" onclick="switchATab('customers')">🧾 Customers</div>
       <div class="anav-tab" onclick="switchATab('inventory')">🏄 Fleet</div>
       <div class="anav-tab" onclick="switchATab('safety')">🛡️ Safety</div>
       <div class="anav-tab" onclick="switchATab('team')">👥 Team</div>
@@ -448,6 +449,30 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
     <div style="font-size:0.75rem;color:rgba(255,255,255,0.5)" id="feedbackCount">No feedback yet</div>
   </div>
   <div id="feedbackList"></div>
+</div>
+
+<!-- ═ CUSTOMERS ═ -->
+<div class="asection" id="asec-customers">
+  <div class="sec-title">Customer Records</div>
+  <input type="text" id="customerSearch" placeholder="🔍 Search name or phone…" oninput="renderCustomers()"
+    style="width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:8px;font-size:0.85rem;margin-bottom:12px;box-sizing:border-box"/>
+  <div class="card" style="margin-bottom:16px;text-align:center">
+    <div style="display:flex;justify-content:space-around">
+      <div>
+        <div style="font-size:1.4rem;font-weight:800;color:var(--teal)" id="custCount">0</div>
+        <div style="font-size:0.68rem;color:rgba(255,255,255,0.5)">Customers</div>
+      </div>
+      <div>
+        <div style="font-size:1.4rem;font-weight:800;color:#FBC62C" id="custRegularCount">0</div>
+        <div style="font-size:0.68rem;color:rgba(255,255,255,0.5)">⭐ Regulars</div>
+      </div>
+      <div>
+        <div style="font-size:1.4rem;font-weight:800;color:var(--coral)" id="custConflictCount">0</div>
+        <div style="font-size:0.68rem;color:rgba(255,255,255,0.5)">⚠️ Conflicts</div>
+      </div>
+    </div>
+  </div>
+  <div id="customerList"></div>
 </div>
 
 <!-- ═ SETTINGS ═ -->
@@ -1744,8 +1769,83 @@ async function removeFeedback(ref, createdAt) {
   showToast('Feedback removed ✅','ok');
 }
 
+// ── CUSTOMERS ── (derived server-side from BOOKINGS, grouped by phone)
+let customersCache = [];
+const expandedCustomers = new Set();
+
+async function fetchCustomers() {
+  try {
+    const res = await fetch(BACKEND+'?action=getCustomers&limit=300&token='+encodeURIComponent(APP_TOKEN),{signal:AbortSignal.timeout(15000)});
+    const data = await res.json();
+    customersCache = (data && data.ok && Array.isArray(data.customers)) ? data.customers : [];
+    renderCustomers();
+  } catch (err) {
+    showToast('Could not load customers', 'warn');
+  }
+}
+
+function renderCustomers() {
+  const listEl = document.getElementById('customerList');
+  if (!listEl) return;
+  const q = (document.getElementById('customerSearch')?.value || '').trim().toLowerCase();
+  const qDigits = q.replace(/\D/g,'');
+  const filtered = !q ? customersCache : customersCache.filter(c => {
+    const name = String(c.name||'').toLowerCase();
+    const phoneDigits = String(c.phone||'').replace(/\D/g,'');
+    return name.includes(q) || (qDigits && phoneDigits.includes(qDigits));
+  });
+
+  document.getElementById('custCount').textContent = customersCache.length;
+  document.getElementById('custRegularCount').textContent = customersCache.filter(c=>c.isRegular).length;
+  document.getElementById('custConflictCount').textContent = customersCache.filter(c=>c.hasConflict).length;
+
+  if (!filtered.length) {
+    listEl.innerHTML = '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.35)">'+
+      (customersCache.length ? 'No customers match your search' : 'No customers yet') + '</div>';
+    return;
+  }
+
+  listEl.innerHTML = filtered.map(c => {
+    const key = String(c.phone||'').replace(/\D/g,'') || String(c.name||'');
+    const keyAttr = escapeHtml(key).replace(/'/g,'&#39;');
+    const expanded = expandedCustomers.has(key);
+    const phoneDigits = String(c.phone||'').replace(/\D/g,'');
+    const bookingsHtml = (c.bookings||[]).slice().reverse().map(b => `
+      <div style="display:flex;justify-content:space-between;gap:8px;font-size:0.76rem;padding:6px 0;border-top:1px solid rgba(255,255,255,0.08)">
+        <span style="color:rgba(255,255,255,0.6)">${escapeHtml(b.ref)} · ${escapeHtml(b.datetime)}</span>
+        <span style="color:rgba(255,255,255,0.85)">${escapeHtml(b.gear||'N/A')} · XCD ${escapeHtml(b.total||0)} · <span style="text-transform:capitalize">${escapeHtml(b.status||'pending')}</span></span>
+      </div>`).join('');
+
+    return `<div class="card" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;cursor:pointer" onclick="toggleCustomer('${keyAttr}')">
+        <div>
+          <div style="font-weight:700;font-size:0.9rem;color:#fff">${escapeHtml(c.name)} ${c.isRegular?'<span title="3+ bookings">⭐</span>':''} ${c.hasConflict?'<span title="Overlapping active bookings">⚠️</span>':''}</div>
+          <div style="font-size:0.72rem;color:rgba(255,255,255,0.5)">${escapeHtml(c.phone)} · ${escapeHtml(c.email)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:0.85rem;font-weight:700;color:var(--teal)">${c.bookingCount} trip${c.bookingCount===1?'':'s'}</div>
+          <div style="font-size:0.72rem;color:rgba(255,255,255,0.5)">XCD ${Number(c.totalSpent||0).toFixed(0)}</div>
+        </div>
+      </div>
+      ${c.hasConflict?'<div style="margin-top:6px;font-size:0.72rem;color:var(--coral)">⚠️ This guest has two active bookings with overlapping times — check before dispatching.</div>':''}
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        ${phoneDigits?`<a class="team-wa" href="https://wa.me/${phoneDigits}" target="_blank" onclick="event.stopPropagation()">💬 Chat</a>`:''}
+        ${c.idPhotoUrl?`<button class="team-wa" style="background:var(--teal);border:none;cursor:pointer" onclick="event.stopPropagation();viewIdPhoto('${escapeHtml(c.idPhotoRef).replace(/'/g,'&#39;')}')">🪪 View ID</button>`:''}
+        <span style="font-size:0.68rem;padding:4px 8px;border-radius:12px;background:${c.waiverOnFile?'rgba(46,204,113,0.15);color:#2ecc71':'rgba(255,255,255,0.08);color:rgba(255,255,255,0.4)'}">${c.waiverOnFile?'✓ Waiver on file':'No waiver on file'}</span>
+      </div>
+      ${expanded ? `<div style="margin-top:10px">${bookingsHtml}</div>` : `<div style="margin-top:6px;font-size:0.7rem;color:rgba(255,255,255,0.35)">Tap to ${expanded?'hide':'view'} booking history</div>`}
+    </div>`;
+  }).join('');
+}
+
+function toggleCustomer(key) {
+  if (expandedCustomers.has(key)) expandedCustomers.delete(key);
+  else expandedCustomers.add(key);
+  renderCustomers();
+}
+
 // ── TAB SWITCH ──
-const ATABS = ['today','bookings','inventory','safety','team','drivers','feedback','settings','rates'];
+const ATABS = ['today','bookings','customers','inventory','safety','team','drivers','feedback','settings','rates'];
 function switchATab(tab) {
   ATABS.forEach(t => {
     document.getElementById('asec-'+t)?.classList.toggle('active', t===tab);
@@ -1754,6 +1854,7 @@ function switchATab(tab) {
     el.classList.toggle('active', ATABS[i]===tab);
   });
   if (tab==='bookings') fetchBookings();
+  if (tab==='customers') fetchCustomers();
   if (tab==='safety') renderSafety();
   if (tab==='drivers') renderDrivers();
   if (tab==='feedback') fetchFeedback();

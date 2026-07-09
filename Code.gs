@@ -810,6 +810,10 @@ function doGet(e) {
       if (!_authOk(p)) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, bookings: getBookings(parseInt(p.limit, 10) || 50) });
     }
+    if (p.action === 'getCustomers') {
+      if (!_authOk(p)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json({ ok: true, customers: getCustomers(parseInt(p.limit, 10) || 300) });
+    }
     if (p.action === 'getDrivers') {
       if (!_dispatchAuthOk(p)) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, drivers: getDrivers() });
@@ -896,6 +900,10 @@ function doPost(e) {
     if (payload.action === 'getBookings') {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, bookings: getBookings(50) });
+    }
+    if (payload.action === 'getCustomers') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json({ ok: true, customers: getCustomers(300) });
     }
     if (payload.action === 'getDrivers') {
       if (!_dispatchAuthOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
@@ -1075,6 +1083,109 @@ function getBookings(limit) {
     });
   } catch (err) {
     _logError('getBookings', err);
+    return [];
+  }
+}
+
+// Best-effort label→minutes map for overlap checks — duration is stored as
+// the free-text label shown at booking time, not a number. Anything
+// unrecognized (e.g. a package's "Full Day") falls back to a conservative
+// 2-hour window so the conflict check stays a useful heuristic rather than
+// silently skipping those bookings.
+var DURATION_MINUTES = { '30 min': 30, '1 Hour': 60, '2 Hours': 120, 'Half Day': 240, 'Full Day': 480 };
+function _durationMinutes(label) {
+  return DURATION_MINUTES[String(label || '').trim()] || 120;
+}
+
+// ── CUSTOMERS — derived view over BOOKINGS, grouped by phone ──
+// No separate sheet on purpose: a second store of guest data would need to
+// be kept in sync with every booking write, and that's a new place for bugs.
+// This computes profiles fresh from BOOKINGS on each read instead. Grouped
+// by phone (digits-only) since most guests give a phone but skip email.
+function getCustomers(limit) {
+  try {
+    var safeLimit = (typeof limit === 'number' && limit > 0 && limit <= 1000) ? limit : 300;
+    var sh = _sheet();
+    var data = sh.getDataRange().getValues();
+    if (data.length <= 1) return [];
+
+    var byPhone = {};
+    var order = [];
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var obj = {};
+      FIELDS.forEach(function (f, idx) { obj[f] = row[idx]; });
+
+      var digits = String(obj.phone || '').replace(/\D/g, '');
+      var key = digits || ('noPhone_' + String(obj.ref || i));
+      if (!byPhone[key]) {
+        byPhone[key] = { phone: obj.phone || 'N/A', name: '', email: '', bookings: [] };
+        order.push(key);
+      }
+      var c = byPhone[key];
+      // Rows are appended in chronological order, so the last row seen for
+      // this phone has the most current name/email — let it win.
+      c.name = String(obj.fname || '') + ' ' + String(obj.lname || '');
+      c.email = obj.email || c.email;
+      c.bookings.push({
+        ref: obj.ref, datetime: obj.datetime, duration: obj.duration, gear: obj.gear,
+        total: obj.total, status: obj.status || 'pending',
+        idPhotoUrl: obj.idPhotoUrl || '', waiverAccepted: obj.waiverAccepted || ''
+      });
+    }
+
+    var customers = order.map(function (key) {
+      var c = byPhone[key];
+      var bookings = c.bookings.slice().sort(function (a, b) {
+        return new Date(a.datetime) - new Date(b.datetime);
+      });
+      var totalSpent = bookings.reduce(function (s, b) { return s + (parseFloat(b.total) || 0); }, 0);
+
+      var idPhotoUrl = '', idPhotoRef = '';
+      for (var j = bookings.length - 1; j >= 0; j--) {
+        if (bookings[j].idPhotoUrl) { idPhotoUrl = bookings[j].idPhotoUrl; idPhotoRef = bookings[j].ref; break; }
+      }
+      var waiverOnFile = bookings.some(function (b) {
+        return b.waiverAccepted === true || String(b.waiverAccepted).toLowerCase() === 'true';
+      });
+
+      // Double-booking conflict: two still-active (pending/confirmed)
+      // bookings for the same guest whose time windows overlap.
+      var active = bookings.filter(function (b) { return b.status === 'pending' || b.status === 'confirmed'; });
+      var hasConflict = false;
+      for (var a = 0; a < active.length && !hasConflict; a++) {
+        var aStart = new Date(active[a].datetime).getTime();
+        if (isNaN(aStart)) continue;
+        var aEnd = aStart + _durationMinutes(active[a].duration) * 60000;
+        for (var b2 = a + 1; b2 < active.length; b2++) {
+          var bStart = new Date(active[b2].datetime).getTime();
+          if (isNaN(bStart)) continue;
+          var bEnd = bStart + _durationMinutes(active[b2].duration) * 60000;
+          if (aStart < bEnd && bStart < aEnd) { hasConflict = true; break; }
+        }
+      }
+
+      return {
+        phone: c.phone,
+        name: c.name.trim() || 'N/A',
+        email: c.email || 'N/A',
+        bookingCount: bookings.length,
+        firstSeen: bookings[0] ? bookings[0].datetime : 'N/A',
+        lastSeen: bookings[bookings.length - 1] ? bookings[bookings.length - 1].datetime : 'N/A',
+        totalSpent: totalSpent,
+        idPhotoUrl: idPhotoUrl,
+        idPhotoRef: idPhotoRef,
+        waiverOnFile: waiverOnFile,
+        isRegular: bookings.length >= 3,
+        hasConflict: hasConflict,
+        bookings: bookings
+      };
+    });
+
+    customers.sort(function (x, y) { return new Date(y.lastSeen) - new Date(x.lastSeen); });
+    return customers.slice(0, safeLimit);
+  } catch (err) {
+    _logError('getCustomers', err);
     return [];
   }
 }
