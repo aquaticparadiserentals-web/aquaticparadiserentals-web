@@ -913,6 +913,10 @@ function doPost(e) {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, feedback: getFeedback(100) });
     }
+    if (payload.action === 'deleteFeedback') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(deleteFeedback(payload));
+    }
     if (payload.action === 'getInventory') {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, inventory: getInventory() });
@@ -1233,6 +1237,29 @@ function getFeedback(limit) {
   }
 }
 
+// Admin-only — removes a single feedback row (matched by ref + createdAt,
+// since ref alone isn't guaranteed unique if a guest submits more than once).
+// Same pattern as deleteDriver/deleteInventoryItem: idempotent, returns ok
+// even if already gone.
+function deleteFeedback(p) {
+  try {
+    if (!p || typeof p.ref !== 'string' || !p.ref.trim() || typeof p.createdAt !== 'string' || !p.createdAt.trim()) {
+      return { ok: false, error: 'Invalid ref/createdAt' };
+    }
+    var sh = _feedbackSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(p.ref) && String(data[i][3]) === String(p.createdAt)) {
+        sh.deleteRow(i + 1);
+        return { ok: true };
+      }
+    }
+    return { ok: true }; // already gone — idempotent
+  } catch (err) {
+    return _fail('deleteFeedback', err);
+  }
+}
+
 // ── ONE-TIME SETUP: Run this once from Apps Script to fix sheet headers ──
 // Safe to run from the standalone script editor (not just a sheet menu) —
 // the UI alert is best-effort only and never blocks the actual header update.
@@ -1300,6 +1327,34 @@ function archiveOldBookingRows() {
   }
 }
 
+// ── WHATSAPP TAP-TO-SEND LINKS (no API, no tokens, no second number) ──
+// Builds a wa.me link that opens WhatsApp with the message pre-filled —
+// whoever taps it sends it themselves, from their own already-active
+// WhatsApp account. Used instead of the Cloud API so nobody has to
+// register a second business number just to notify staff/guests.
+function _waLink(phone, text) {
+  var digits = String(phone || '').replace(/\D/g, '');
+  if (!digits) return '';
+  return 'https://wa.me/' + digits + '?text=' + encodeURIComponent(text);
+}
+
+// One tap-to-send link per staff/driver with a phone number on file.
+// Best-effort per-recipient — one bad number never blocks the rest.
+function _teamWhatsAppLinks(text) {
+  var links = [];
+  try {
+    var recipients = getStaff().concat(getDrivers());
+    recipients.forEach(function (person) {
+      if (!person || !person.phone) return;
+      var link = _waLink(person.phone, text);
+      if (link) links.push((person.name || 'Team member') + ': ' + link);
+    });
+  } catch (err) {
+    _logError('_teamWhatsAppLinks', err);
+  }
+  return links;
+}
+
 // ── IDEMPOTENT, NULL-SAFE EMAIL NOTIFICATION ──
 // Writes a 'SENT' timestamp to the row BEFORE returning, so a retried/duplicate
 // invocation for the same ref sees the flag and skips re-sending.
@@ -1360,6 +1415,15 @@ function sendNotification(p) {
     'Notes:     ' + n(p && p.notes, 'N/A'),
     '', 'Submitted: ' + new Date().toISOString()
   ].join('\n');
+
+  var waText = 'New APR booking ' + n(p && p.ref, 'N/A') + ': ' +
+    n(p && p.fname, 'Guest') + ' ' + n(p && p.lname, '') + ', ' +
+    n(p && p.gear, 'N/A') + ', ' + n(p && p.datetime, 'N/A') + '. Tap to reply if you can take it.';
+  var waLinks = _teamWhatsAppLinks(waText);
+  if (waLinks.length) {
+    body += '\n\nTap to notify via WhatsApp:\n' + waLinks.join('\n');
+  }
+
   GmailApp.sendEmail(NOTIFY_EMAIL, subject, body);
 }
 
@@ -1621,6 +1685,17 @@ function dailyWeatherCheck() {
          'Status: ' + weather.status.toUpperCase() + '\n\n' +
          'Thresholds: caution at ' + WIND_CAUTION_KMH + '+ km/h, unsafe at ' + WIND_UNSAFE_KMH + '+ km/h.\n' +
          'This does not replace the on-the-spot anemometer check before each rental.');
+
+    if (weather.status === 'caution' || weather.status === 'unsafe') {
+      var teamWaText = 'APR conditions today: ' + weather.status.toUpperCase() +
+        ' (wind ~' + (weather.windNowKmh != null ? weather.windNowKmh : 'N/A') + ' km/h, gusts to ' +
+        (weather.gustNowKmh != null ? weather.gustNowKmh : 'N/A') + ' km/h).';
+      var teamWaLinks = _teamWhatsAppLinks(teamWaText);
+      if (teamWaLinks.length) {
+        body += '\n\nTap to notify via WhatsApp:\n' + teamWaLinks.join('\n');
+      }
+    }
+
     GmailApp.sendEmail(NOTIFY_EMAIL, subject, body);
   } catch (mailErr) {
     _logError('dailyWeatherCheck.ownerEmail', mailErr);
@@ -1650,6 +1725,7 @@ function _notifyTodaysGuestsOfConditions(weather) {
   var header = data[0];
   var refIdx = header.indexOf('ref');
   var emailIdx = header.indexOf('email');
+  var phoneIdx = header.indexOf('phone');
   var fnameIdx = header.indexOf('fname');
   var datetimeIdx = header.indexOf('datetime');
   var statusIdx = header.indexOf('status');
@@ -1658,6 +1734,7 @@ function _notifyTodaysGuestsOfConditions(weather) {
   var todayStr = new Date().toDateString();
   var notifiedToday = JSON.parse(PropertiesService.getScriptProperties().getProperty('apr_weather_notified_' + todayStr) || '[]');
   var newlyNotified = notifiedToday.slice();
+  var guestWaLinks = [];
 
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
@@ -1684,6 +1761,16 @@ function _notifyTodaysGuestsOfConditions(weather) {
           : 'Your rental is still on — just flagging so you know what to expect on the water today.') +
         '\n\n— Aquatic Paradise Rentals\n+1 (784) 496-3447';
       GmailApp.sendEmail(email, subject, body);
+
+      var phone = phoneIdx !== -1 ? String(row[phoneIdx] || '').trim() : '';
+      if (phone) {
+        var waText = 'Hi ' + (fname || 'there') + ', conditions update for your Aquatic Paradise Rentals booking today: ' +
+          weather.status.toUpperCase() + ' (wind ~' + weather.windNowKmh + ' km/h, gusts to ' + (weather.gustNowKmh || 'N/A') + ' km/h). ' +
+          (weather.status === 'unsafe' ? 'We may need to adjust timing or gear — let us know a good time to talk.' : 'Your rental is still on, just a heads-up.');
+        var link = _waLink(phone, waText);
+        if (link) guestWaLinks.push(ref + ' (' + (fname || 'guest') + '): ' + link);
+      }
+
       newlyNotified.push(ref);
     } catch (err) {
       _logError('_notifyTodaysGuestsOfConditions.' + ref, err);
@@ -1694,6 +1781,15 @@ function _notifyTodaysGuestsOfConditions(weather) {
     PropertiesService.getScriptProperties().setProperty('apr_weather_notified_' + todayStr, JSON.stringify(newlyNotified));
   } catch (err) {
     _logError('_notifyTodaysGuestsOfConditions.save', err);
+  }
+
+  if (guestWaLinks.length) {
+    try {
+      GmailApp.sendEmail(NOTIFY_EMAIL, 'APR: tap to WhatsApp today\'s guests re: conditions',
+        'Guests already got an email heads-up. Tap a link below to also send them a WhatsApp:\n\n' + guestWaLinks.join('\n\n'));
+    } catch (err) {
+      _logError('_notifyTodaysGuestsOfConditions.digest', err);
+    }
   }
 }
 

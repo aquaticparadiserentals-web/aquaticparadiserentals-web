@@ -1710,12 +1710,35 @@ function renderFeedback(feedback) {
   countEl.textContent = feedback.length + ' review' + (feedback.length===1?'':'s');
   listEl.innerHTML = feedback.map(f => {
     const stars = '★'.repeat(Number(f.rating)||0) + '☆'.repeat(5-(Number(f.rating)||0));
+    const refAttr = escapeHtml(f.ref||'').replace(/'/g,'&#39;');
+    const createdAttr = escapeHtml(f.createdAt||'').replace(/'/g,'&#39;');
     return `<div class="card" style="margin-bottom:10px">
-      <div style="color:#FBC62C;font-size:1rem;letter-spacing:2px">${stars}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="color:#FBC62C;font-size:1rem;letter-spacing:2px">${stars}</div>
+        <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer;padding:2px 8px;font-size:0.72rem" onclick="removeFeedback('${refAttr}','${createdAttr}')">🗑️</button>
+      </div>
       <div style="font-size:0.72rem;color:rgba(255,255,255,0.45);margin:4px 0">${escapeHtml(f.ref)} · ${escapeHtml(f.createdAt)}</div>
       ${f.comment ? `<div style="font-size:0.85rem;color:rgba(255,255,255,0.85)">${escapeHtml(f.comment)}</div>` : ''}
     </div>`;
   }).join('');
+}
+
+async function removeFeedback(ref, createdAt) {
+  if (!ref || !createdAt) return;
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'deleteFeedback', token:APP_TOKEN, ref, createdAt
+    }),signal:AbortSignal.timeout(15000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Delete failed');
+  } catch (err) {
+    showToast('Could not remove feedback: '+err.message, 'warn');
+    return;
+  }
+  await fetchFeedback();
+  addLog('⭐ Feedback removed: '+ref);
+  showToast('Feedback removed ✅','ok');
 }
 
 // ── TAB SWITCH ──
