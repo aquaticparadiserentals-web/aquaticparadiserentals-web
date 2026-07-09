@@ -15,7 +15,7 @@ Growth idea #6 from OPERATIONS.md: cut the repetitive pre-booking back-and-forth
 > 🌊 Welcome to Aquatic Paradise Rentals — Bequia!
 > Paddle boards, kayaks & snorkel gear on Princess Margaret Beach.
 >
-> ⚡ Fastest way to book: https://aquaticparadiserentals-web.github.io/aquaticparadiserentals-web/
+> ⚡ Fastest way to book: https://aquaticparadiserental.vacations/
 >
 > Or reply with a word and we'll get right back to you:
 > 💰 PRICES · 🕐 HOURS · 🚚 DELIVERY · 📋 BOOKING
@@ -26,7 +26,7 @@ Growth idea #6 from OPERATIONS.md: cut the repetitive pre-booking back-and-forth
 
 > Thanks for messaging Aquatic Paradise Rentals! 🌴 We're off the beach right now (open daily 8 AM – 6 PM).
 >
-> You can book anytime — it takes 2 minutes: https://aquaticparadiserentals-web.github.io/aquaticparadiserentals-web/
+> You can book anytime — it takes 2 minutes: https://aquaticparadiserental.vacations/
 >
 > We'll reply as soon as we're back.
 
@@ -49,19 +49,19 @@ Growth idea #6 from OPERATIONS.md: cut the repetitive pre-booking back-and-forth
 > 🏄 Adventure Set (board + kayak + 2 snorkels, 2hr) — $160
 > 💑 Couple Explorer (double kayak + 2 snorkels, 2hr) — $130
 >
-> Full rates & booking: https://aquaticparadiserentals-web.github.io/aquaticparadiserentals-web/
+> Full rates & booking: https://aquaticparadiserental.vacations/
 
 **Shortcut: `/hours`**
 > 🕐 Open daily 8:00 AM – 6:00 PM
 > 📍 Princess Margaret Beach & Admiralty Bay, Bequia, SVG
-> Come find us on the beach, or book ahead: https://aquaticparadiserentals-web.github.io/aquaticparadiserentals-web/
+> Come find us on the beach, or book ahead: https://aquaticparadiserental.vacations/
 
 **Shortcut: `/delivery`**
 > 🚚 Yes, we deliver! Gear can be brought to your villa, yacht, or beach spot around Admiralty Bay. Tell us where you're staying and your preferred time, and we'll confirm.
-> Book with delivery details here: https://aquaticparadiserentals-web.github.io/aquaticparadiserentals-web/
+> Book with delivery details here: https://aquaticparadiserental.vacations/
 
 **Shortcut: `/book`**
-> 📋 Booking takes about 2 minutes: https://aquaticparadiserentals-web.github.io/aquaticparadiserentals-web/
+> 📋 Booking takes about 2 minutes: https://aquaticparadiserental.vacations/
 > Pick your gear, time, and spot — you'll get a booking reference right away. Full payment at rental start; cancellations within 2 hours of start time may carry a 50% charge.
 
 **Shortcut: `/cancel`**
@@ -72,7 +72,7 @@ Growth idea #6 from OPERATIONS.md: cut the repetitive pre-booking back-and-forth
 **Settings → Business tools → Business profile:**
 - Hours: Daily 8:00 AM – 6:00 PM (this powers the away-message schedule)
 - Address: Princess Margaret Beach & Admiralty Bay, Bequia, SVG
-- Website: https://aquaticparadiserentals-web.github.io/aquaticparadiserentals-web/
+- Website: https://aquaticparadiserental.vacations/
 - Email: aquaticparadiserentals@gmail.com
 - Category: Recreation / Sports & Recreation
 
