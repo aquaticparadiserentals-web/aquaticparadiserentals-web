@@ -506,14 +506,24 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
 
   <div class="sec-title">Security</div>
   <div class="setting-card">
-    <h3>🔐 Change PIN</h3>
-    <p style="font-size:0.75rem;color:rgba(255,255,255,0.4);margin-bottom:10px">Enter new 4-digit PIN twice to change</p>
+    <h3>🔐 Change Admin PIN</h3>
+    <p style="font-size:0.75rem;color:rgba(255,255,255,0.4);margin-bottom:10px">Enter new 4-digit PIN twice to change — this unlocks this console (admin.html)</p>
     <div class="pin-change-form">
       <input class="pin-input" type="password" maxlength="4" inputmode="numeric" placeholder="New PIN" id="newPin1"/>
       <input class="pin-input" type="password" maxlength="4" inputmode="numeric" placeholder="Confirm" id="newPin2"/>
       <button class="pin-change-btn" onclick="changePin()">Save</button>
     </div>
     <p id="pinChangeMsg" style="font-size:0.75rem;margin-top:8px;min-height:16px"></p>
+  </div>
+  <div class="setting-card">
+    <h3>🔐 Change Staff/Dispatch PIN</h3>
+    <p style="font-size:0.75rem;color:rgba(255,255,255,0.4);margin-bottom:10px">Enter new 4-digit PIN twice to change — this unlocks dispatch.html for delivery staff. Change this whenever a staff member leaves.</p>
+    <div class="pin-change-form">
+      <input class="pin-input" type="password" maxlength="4" inputmode="numeric" placeholder="New PIN" id="newStaffPin1"/>
+      <input class="pin-input" type="password" maxlength="4" inputmode="numeric" placeholder="Confirm" id="newStaffPin2"/>
+      <button class="pin-change-btn" onclick="changeStaffPin()">Save</button>
+    </div>
+    <p id="staffPinChangeMsg" style="font-size:0.75rem;margin-top:8px;min-height:16px"></p>
   </div>
 
   <div class="sec-title">Documents</div>
@@ -801,6 +811,36 @@ async function changePin() {
   document.getElementById('newPin1').value='';
   document.getElementById('newPin2').value='';
   setTimeout(()=>msg.textContent='',3000);
+}
+
+// Changes the PIN that unlocks dispatch.html for delivery staff. Authorized
+// by the admin's own APP_TOKEN (changePin's role:'staff' branch accepts
+// either token) — no separate staff login needed to rotate it.
+async function changeStaffPin() {
+  const p1 = document.getElementById('newStaffPin1').value;
+  const p2 = document.getElementById('newStaffPin2').value;
+  const msg = document.getElementById('staffPinChangeMsg');
+  if (!p1 || p1.length < 4) { msg.style.color=var_coral(); msg.textContent='PIN must be 4 digits'; return; }
+  if (p1 !== p2) { msg.style.color=var_coral(); msg.textContent="PINs don't match"; return; }
+  if (!/^\d{4}$/.test(p1)) { msg.style.color=var_coral(); msg.textContent='Digits only'; return; }
+
+  try {
+    const res = await fetch(BACKEND, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'changePin', role: 'staff', token: APP_TOKEN, newPin: p1 }),
+      signal: AbortSignal.timeout(10000)
+    });
+    const data = await res.json();
+    if (!data || !data.ok) { msg.style.color=var_coral(); msg.textContent = (data && data.error) || 'Could not update PIN'; return; }
+  } catch (err) {
+    console.error('changeStaffPin server call failed:', err);
+    msg.style.color=var_coral(); msg.textContent='Network error — PIN not changed'; return;
+  }
+  msg.style.color='#4ade80'; msg.textContent='✅ Staff PIN updated! Tell delivery staff the new PIN.';
+  document.getElementById('newStaffPin1').value='';
+  document.getElementById('newStaffPin2').value='';
+  setTimeout(()=>msg.textContent='',5000);
 }
 function var_coral(){return '#E0351B'}
 
