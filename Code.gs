@@ -928,6 +928,16 @@ function doPost(e) {
       if (!_dispatchAuthOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json(updateDriverLocation(payload));
     }
+    if (payload.action === 'reinstall_weather_trigger') {
+      // Admin-only maintenance hook: reinstalls the weather trigger without
+      // needing the Apps Script editor (used when the schedule changes).
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      installWeatherCheckTrigger();
+      var trigCount = ScriptApp.getProjectTriggers().filter(function (t) {
+        return t.getHandlerFunction() === 'dailyWeatherCheck';
+      }).length;
+      return _json({ ok: true, installed: trigCount });
+    }
     if (payload.action === 'submit_feedback') {
       // Public — same posture as booking submission. A guest leaving
       // feedback must never need a token.
@@ -1818,11 +1828,25 @@ function _fetchWeather() {
   }
 }
 
-// Runs on a daily time-based trigger (set up via installWeatherCheckTrigger).
-// Saves the latest reading for the app to display, emails Delroy a daily
-// digest, and — only when conditions are caution/unsafe — emails today's
-// guests with a heads-up so they hear it before they arrive, not after.
+// Runs on an hourly time-based trigger (set up via installWeatherCheckTrigger).
+// Saves the latest reading for the app to display. To keep hourly checks from
+// spamming: the owner email goes out only on the FIRST check of the day (the
+// morning digest) or when the status CHANGES mid-day (e.g. SAFE → CAUTION).
+// Guest heads-ups stay caution/unsafe-only, once per booking per day.
+// Checks outside ~6am–7pm are skipped — nobody is on the water at night.
 function dailyWeatherCheck() {
+  var hourNow = new Date().getHours();
+  if (hourNow < 6 || hourNow >= 19) {
+    Logger.log('dailyWeatherCheck: skipped (outside 6am-7pm window)');
+    return null;
+  }
+
+  var prev = null;
+  try {
+    var prevRaw = PropertiesService.getScriptProperties().getProperty(WEATHER_PROP_KEY);
+    if (prevRaw) prev = JSON.parse(prevRaw);
+  } catch (err) { /* treat as no previous reading */ }
+
   var weather = _fetchWeather();
 
   try {
@@ -1831,8 +1855,19 @@ function dailyWeatherCheck() {
     _logError('dailyWeatherCheck.save', err);
   }
 
+  var firstRunToday = !prev || !prev.checkedAt ||
+    new Date(prev.checkedAt).toDateString() !== new Date().toDateString();
+  var statusChanged = prev && prev.status !== weather.status;
+
+  if (!firstRunToday && !statusChanged) {
+    Logger.log('dailyWeatherCheck: status=' + weather.status + ' (unchanged, no alerts)');
+    return weather;
+  }
+
   try {
-    var subject = '🌊 APR Daily Conditions: ' + weather.status.toUpperCase();
+    var subject = firstRunToday
+      ? '🌊 APR Daily Conditions: ' + weather.status.toUpperCase()
+      : '🌊 APR Conditions CHANGED: ' + (prev && prev.status ? prev.status.toUpperCase() : '?') + ' → ' + weather.status.toUpperCase();
     var body = weather.status === 'unknown'
       ? 'Could not reach the weather service today (' + (weather.error || 'unknown error') + '). Do a manual anemometer check before dispatching.'
       : ('Wind now: ' + weather.windNowKmh + ' km/h (gusts ' + (weather.gustNowKmh || 'N/A') + ' km/h)\n' +
@@ -1963,8 +1998,11 @@ function getWeather() {
   return _fetchWeather();
 }
 
-// ── ONE-TIME SETUP: installs the daily weather-check trigger. Run once from
+// ── ONE-TIME SETUP: installs the hourly weather-check trigger. Run once from
 // the Apps Script editor. Safe to re-run — clears any existing trigger first.
+// The trigger fires hourly around the clock; dailyWeatherCheck() itself skips
+// runs outside ~6am–7pm, and only alerts on the first run of the day or a
+// status change, so hourly does NOT mean hourly emails.
 function installWeatherCheckTrigger() {
   var triggers = ScriptApp.getProjectTriggers();
   triggers.forEach(function (t) {
@@ -1972,11 +2010,10 @@ function installWeatherCheckTrigger() {
   });
   ScriptApp.newTrigger('dailyWeatherCheck')
     .timeBased()
-    .atHour(6)
-    .everyDays(1)
+    .everyHours(1)
     .create();
-  Logger.log('installWeatherCheckTrigger: dailyWeatherCheck() will now run daily around 6am.');
-  try { SpreadsheetApp.getUi().alert('✅ Daily weather check scheduled for ~6am.'); } catch (uiErr) { /* expected outside Sheets UI */ }
+  Logger.log('installWeatherCheckTrigger: dailyWeatherCheck() will now run hourly (active 6am-7pm, alerts on first run or status change).');
+  try { SpreadsheetApp.getUi().alert('✅ Hourly weather check scheduled (active 6am-7pm; alerts only on morning digest or status change).'); } catch (uiErr) { /* expected outside Sheets UI */ }
 }
 
 // ── AUTOMATED BUSINESS REPORT ──
