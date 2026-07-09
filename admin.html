@@ -858,6 +858,8 @@ function renderBookings() {
     const fname = b.fname || 'N/A';
     const waMsg = encodeURIComponent(`Hi ${fname!=='N/A'?fname:'there'}! 👋 Your booking with Aquatic Paradise Rentals is confirmed. Gear: ${b.gear||'N/A'}. Duration: ${b.duration||'N/A'}. Total: XCD ${b.total||'0'}. See you at the beach! 🌊`);
     const phone = String(b.phone||'').replace(/\D/g,'');
+    const hasLoc = b.driverLat && b.driverLat!=='N/A' && b.driverLng && b.driverLng!=='N/A';
+    const mapUrl = hasLoc ? `https://www.google.com/maps?q=${encodeURIComponent(b.driverLat)},${encodeURIComponent(b.driverLng)}` : '';
     return `<div class="booking-card ${state==='pending'?'new':''} ${state==='done'?'done':''}" id="bkc-${escapeHtml(ref)}">
       <div class="bk-header">
         <span class="bk-ref">${escapeHtml(ref)}</span>
@@ -868,6 +870,7 @@ function renderBookings() {
       <div class="bk-detail">🏄 ${escapeHtml(b.gear||'N/A')} · ${escapeHtml(b.duration||'N/A')}</div>
       <div class="bk-detail">📅 ${escapeHtml(b.datetime||'N/A')}</div>
       <div class="bk-detail">👥 Group: ${escapeHtml(b.groupSize||'1')}</div>
+      ${hasLoc?`<div class="bk-detail">📍 Driver: <a href="${mapUrl}" target="_blank" style="color:var(--teal)">view on map</a> (${escapeHtml(b.driverLocAt)})</div>`:''}
       ${b.notes&&b.notes!=='N/A'?'<div class="bk-detail">📝 '+escapeHtml(b.notes)+'</div>':''}
       <div class="bk-total">XCD ${escapeHtml(b.total||0)}</div>
       <div class="bk-actions">
