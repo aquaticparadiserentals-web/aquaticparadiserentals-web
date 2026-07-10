@@ -531,6 +531,13 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
     <a href="rules.html" target="_blank" style="display:block;text-align:center;background:var(--teal);border-radius:8px;color:#fff;padding:10px 16px;font-size:0.85rem;font-weight:700;text-decoration:none">📄 Open Printable Rules &amp; Regulations</a>
   </div>
 
+  <div class="sec-title">Weather</div>
+  <div class="setting-card">
+    <p style="font-size:0.75rem;color:rgba(255,255,255,0.4);margin-bottom:10px">Turns on the hourly conditions check on the server (wind alerts by email/WhatsApp, and the safety banner on the booking page). Run this once — or again if the weather alerts ever stop.</p>
+    <button onclick="reinstallWeatherTrigger()" id="btnWeatherTrigger" style="width:100%;background:var(--teal);border:none;border-radius:8px;color:#fff;padding:10px 16px;font-size:0.85rem;font-weight:700;cursor:pointer">🌦️ Turn On Weather Checks</button>
+    <p id="weatherTriggerMsg" style="font-size:0.75rem;margin-top:8px;min-height:16px"></p>
+  </div>
+
   <div class="sec-title">Offline Queue</div>
   <div class="setting-card">
     <div class="setting-row"><span class="setting-label">Queued bookings</span><span class="setting-val" id="queueCount">0</span></div>
@@ -1186,6 +1193,36 @@ async function fetchDrivers() {
   }
   renderDrivers();
   populateDeliveryDriverSelect();
+}
+
+// ── WEATHER TRIGGER (Settings tab) — installs the hourly server-side
+// conditions check via the reinstall_weather_trigger maintenance action. ──
+async function reinstallWeatherTrigger() {
+  const btn = document.getElementById('btnWeatherTrigger');
+  const msg = document.getElementById('weatherTriggerMsg');
+  btn.disabled = true;
+  msg.style.color = 'rgba(255,255,255,0.5)';
+  msg.textContent = 'Setting up…';
+  try {
+    const res = await fetch(BACKEND, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify({ action: 'reinstall_weather_trigger', token: APP_TOKEN }),
+      signal: AbortSignal.timeout(15000)
+    });
+    const d = await res.json();
+    if (d && d.ok) {
+      msg.style.color = '#4ade80';
+      msg.textContent = '✅ Weather checks are on (' + (d.installed || 1) + ' trigger active). First reading arrives within the hour.';
+    } else {
+      msg.style.color = '#f87171';
+      msg.textContent = '❌ ' + ((d && d.error) || 'Something went wrong — try again.');
+    }
+  } catch (err) {
+    msg.style.color = '#f87171';
+    msg.textContent = '❌ Could not reach the backend — check your connection and try again.';
+  }
+  btn.disabled = false;
 }
 
 // ── CONDITIONS BANNER (public endpoint, no token needed — safety info) ──
