@@ -616,6 +616,12 @@ async function loadTeamPublic() {
     if (!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
     const team = (data && Array.isArray(data.team)) ? data.team : [];
+    // Display fix: the STAFF sheet still has Delroy seeded under the
+    // placeholder name "Operations Manager". Harmless once the sheet row
+    // is renamed via the admin Team tab (this match simply stops firing).
+    team.forEach(t => {
+      if (t.name === 'Operations Manager') { t.name = 'Delroy'; t.role = 'Owner & Operations Manager'; }
+    });
     if (!team.length) { el.innerHTML = '<div style="text-align:center;padding:10px;color:#999;font-size:0.8rem">Team info coming soon.</div>'; return; }
     el.innerHTML = team.map(t => {
       const thumb = driveThumbUrl(t.photoUrl);
