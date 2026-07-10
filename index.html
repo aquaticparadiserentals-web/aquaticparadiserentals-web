@@ -422,7 +422,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
   </div>
 
   <div class="section-title">📍 Contact Us</div>
-  <div class="info-card">
+  <div class="info-card" id="contactCard">
     <div class="contact-row">
       <span>📱</span>
       <a href="https://wa.me/17844963447">WhatsApp: +1 (784) 496-3447</a>
@@ -613,14 +613,42 @@ async function loadTeamPublic() {
 }
 
 // ── CONDITIONS BANNER (public, no login needed — safety info) ──
+// Same location + wind thresholds as the backend (Code.gs): Bequia,
+// caution ≥ 28 km/h (~15 kn), unsafe ≥ 37 km/h (~20 kn).
+async function fetchWeatherDirect() {
+  try {
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=13.0056&longitude=-61.2392' +
+      '&current=wind_speed_10m,wind_gusts_10m&daily=wind_speed_10m_max&timezone=auto&wind_speed_unit=kmh';
+    const res = await fetch(url, {signal:AbortSignal.timeout(8000)});
+    if (!res.ok) return null;
+    const d = await res.json();
+    const windNow = (d.current && typeof d.current.wind_speed_10m === 'number') ? d.current.wind_speed_10m : null;
+    if (windNow === null) return null;
+    const windMax = (d.daily && Array.isArray(d.daily.wind_speed_10m_max) && d.daily.wind_speed_10m_max.length) ? d.daily.wind_speed_10m_max[0] : null;
+    const gustNow = (d.current && typeof d.current.wind_gusts_10m === 'number') ? d.current.wind_gusts_10m : null;
+    const worst = Math.max(windNow, windMax || 0);
+    return {
+      status: worst >= 37 ? 'unsafe' : worst >= 28 ? 'caution' : 'safe',
+      windNowKmh: windNow, gustNowKmh: gustNow, windMaxTodayKmh: windMax
+    };
+  } catch { return null; }
+}
+
 async function loadWeatherBanner() {
   const el = document.getElementById('weatherBanner');
   if (!el) return;
   try {
-    const res = await fetch(BACKEND+'?action=getWeather',{signal:AbortSignal.timeout(8000)});
-    if (!res.ok) throw new Error('HTTP '+res.status);
-    const data = await res.json();
-    const w = data && data.weather;
+    let w = null;
+    try {
+      const res = await fetch(BACKEND+'?action=getWeather',{signal:AbortSignal.timeout(8000)});
+      if (res.ok) {
+        const data = await res.json();
+        w = data && data.weather;
+      }
+    } catch {}
+    // Backend has no saved reading (or its own weather fetch failed) —
+    // check conditions directly from this device instead of showing nothing.
+    if (!w || !w.status || w.status === 'unknown') w = await fetchWeatherDirect();
     if (!w || !w.status) return;
     const styles = {
       safe: {bg:'#0d3b2e', color:'#4ade80', label:'✅ Conditions are safe today'},
@@ -1070,6 +1098,7 @@ function renderRates() {
 
 // ── TAB SWITCH ──
 function switchTab(tab) {
+  window.scrollTo(0, 0);
   ['book','rates','info'].forEach(t => {
     document.getElementById('sec-'+t)?.classList.toggle('active', t===tab);
   });
@@ -1109,6 +1138,16 @@ function showHelpTopic(id) {
   if (id === 'hours') {
     toggleHelp();
     switchTab('info');
+    // Jump to the contact card and flash it — without this, the tab switches
+    // but keeps the old scroll position and looks like nothing happened.
+    setTimeout(() => {
+      const card = document.getElementById('contactCard');
+      if (!card) return;
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      card.style.transition = 'box-shadow 0.3s';
+      card.style.boxShadow = '0 0 0 3px var(--gold)';
+      setTimeout(() => { card.style.boxShadow = ''; }, 2500);
+    }, 80);
     return;
   }
   if (id === 'pricing') {

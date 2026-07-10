@@ -1189,14 +1189,42 @@ async function fetchDrivers() {
 }
 
 // ── CONDITIONS BANNER (public endpoint, no token needed — safety info) ──
+// Same location + wind thresholds as the backend (Code.gs): Bequia,
+// caution ≥ 28 km/h (~15 kn), unsafe ≥ 37 km/h (~20 kn).
+async function fetchWeatherDirect() {
+  try {
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=13.0056&longitude=-61.2392' +
+      '&current=wind_speed_10m,wind_gusts_10m&daily=wind_speed_10m_max&timezone=auto&wind_speed_unit=kmh';
+    const res = await fetch(url, {signal:AbortSignal.timeout(8000)});
+    if (!res.ok) return null;
+    const d = await res.json();
+    const windNow = (d.current && typeof d.current.wind_speed_10m === 'number') ? d.current.wind_speed_10m : null;
+    if (windNow === null) return null;
+    const windMax = (d.daily && Array.isArray(d.daily.wind_speed_10m_max) && d.daily.wind_speed_10m_max.length) ? d.daily.wind_speed_10m_max[0] : null;
+    const gustNow = (d.current && typeof d.current.wind_gusts_10m === 'number') ? d.current.wind_gusts_10m : null;
+    const worst = Math.max(windNow, windMax || 0);
+    return {
+      status: worst >= 37 ? 'unsafe' : worst >= 28 ? 'caution' : 'safe',
+      windNowKmh: windNow, gustNowKmh: gustNow, windMaxTodayKmh: windMax
+    };
+  } catch { return null; }
+}
+
 async function loadWeatherBanner() {
   const el = document.getElementById('weatherBanner');
   if (!el) return;
   try {
-    const res = await fetch(BACKEND+'?action=getWeather',{signal:AbortSignal.timeout(8000)});
-    if (!res.ok) throw new Error('HTTP '+res.status);
-    const data = await res.json();
-    const w = data && data.weather;
+    let w = null;
+    try {
+      const res = await fetch(BACKEND+'?action=getWeather',{signal:AbortSignal.timeout(8000)});
+      if (res.ok) {
+        const data = await res.json();
+        w = data && data.weather;
+      }
+    } catch {}
+    // Backend has no saved reading (or its own weather fetch failed) —
+    // check conditions directly from this device instead of showing nothing.
+    if (!w || !w.status || w.status === 'unknown') w = await fetchWeatherDirect();
     if (!w || !w.status) return;
     const styles = {
       safe: {bg:'#0d3b2e', color:'#4ade80', label:'✅ Safe'},
