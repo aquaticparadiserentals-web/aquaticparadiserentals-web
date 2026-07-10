@@ -1,6 +1,6 @@
 # Aquatic Paradise Rentals — Build Progress
 
-**Last updated:** 2026-07-09 (full audit — every item below verified live on this date)
+**Last updated:** 2026-07-10 (audit — live site, backend, and repo verified this date)
 **Live site:** https://aquaticparadiserental.vacations
 **Repo:** aquaticparadiserentals-web (GitHub: aquaticparadiserentals-web/aquaticparadiserentals-web, branch `main`)
 **Stack:** Google Apps Script (`Code.gs`) + Google Sheets backend · HTML/JS frontend · PWA (`manifest.json`, `sw.js`) · GitHub Pages hosting · deployed via clasp
@@ -44,6 +44,21 @@ Build started 2026-06-20. 55+ commits.
 - **Weather monitoring** — automated daily conditions check + guest heads-up
 - **WhatsApp alerts** — tap-to-send links throughout
 
+## Mobile & guest-experience fixes — DONE 2026-07-10
+
+All verified in a phone-sized browser and live on the domain:
+- **Rates table swipeable on phones** — 7 price columns scroll sideways, gear-name column stays pinned, swipe hint shown on small screens
+- **Tabs open at the top** — booking app and admin dashboard both reset scroll on every tab switch (was landing users mid-page)
+- **Hours & Location** (help widget) — jumps to the contact card and highlights it; card now lists all three beaches
+- **Beach picker on bookings** — required "Choose Your Beach" select (Princess Margaret / Lower Bay / Friendship Bay); stored in booking notes (no backend column change needed)
+- **Payment Options section** (Rates tab) — cash, bank transfer (BOSVG), card. **Bank account details deliberately WhatsApp-only** — guests request them via a prefilled WhatsApp link; do not publish the account number
+- **Rules read-aloud** — 🔊 Listen button on rules.html (speech synthesis, same as gear guide)
+- **New safety rule (caps)** — DO NOT KEEP ANY OF THE EQUIPMENT IN THE SUN, with the heat/UV explanation
+- **Emergency contacts expanded** — Bequia Hospital 784-458-3294 and Bequia Police 784-458-3350 added to rules.html and the admin Safety tab (listed before the St. Vincent numbers)
+- **Meet the Team** — public page shows "Delroy — Owner & Operations Manager" (display override; STAFF sheet still has the old "Operations Manager" row — rename via admin Team tab when convenient)
+- **Weather banner self-heals** — if the backend has no reading, the app checks Open-Meteo directly from the guest's phone (same Bequia coordinates + wind thresholds). Working today (showed Unsafe, ~43 km/h)
+- **Admin Settings → Weather card** — "Turn On Weather Checks" button added (the backend action existed but had no UI). ⚠️ Not yet pressed — backend still returns status "unknown"
+
 ## Automation agents (Claude scheduled tasks) — SET UP 2026-07-09
 
 Run while the Claude desktop app is open (queued to next launch otherwise):
@@ -79,8 +94,10 @@ Run while the Claude desktop app is open (queued to next launch otherwise):
 
 ## Owner's open action list
 
-1. WhatsApp Business setup on the phone (follow `WHATSAPP-AUTOREPLY.md`, ~15 min)
-2. Bitwarden: create account + master password; move credentials out of any docx; then delete those files
-3. Instagram bio + Facebook Book Now button → new domain; Meta Business Suite linking
-4. Confirm gear guide PSI/valve steps match the actual boards
-5. April 2027: domain renewal decision ($48.99 auto-renew vs transfer)
+1. **Tap "Turn On Weather Checks"** — admin → ⚙️ Settings → Weather card (30 seconds; enables server-side wind alerts by email/WhatsApp)
+2. Rename the STAFF sheet entry: admin → 👥 Team → delete "Operations Manager", add "Delroy" (+ photo if you like)
+3. WhatsApp Business setup on the phone (follow `WHATSAPP-AUTOREPLY.md`, ~15 min)
+4. Bitwarden: create account + master password; move credentials out of any docx; then delete those files
+5. Instagram bio + Facebook Book Now button → new domain; Meta Business Suite linking
+6. Confirm gear guide PSI/valve steps match the actual boards
+7. April 2027: domain renewal decision ($48.99 auto-renew vs transfer)
