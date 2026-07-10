@@ -293,6 +293,15 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
       <input type="datetime-local" id="datetime"/>
     </div>
     <div class="form-group">
+      <label>🏖️ Choose Your Beach *</label>
+      <select id="beach">
+        <option value="">-- Select your beach --</option>
+        <option>Princess Margaret Beach</option>
+        <option>Lower Bay</option>
+        <option>Friendship Bay</option>
+      </select>
+    </div>
+    <div class="form-group">
       <label>Group Size (people)</label>
       <select id="groupSize">
         <option value="1">Just me (1)</option>
@@ -408,8 +417,23 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
       <li>Safety whistle provided on each rental</li>
       <li>Group discounts available — ask on WhatsApp</li>
       <li>Hotel partner rates negotiated separately</li>
-      <li>Payment accepted: Cash (XCD/USD), card arrangements via WhatsApp</li>
+      <li>Payment accepted: Cash (XCD/USD), bank transfer, card arrangements via WhatsApp</li>
     </ul>
+  </div>
+
+  <div class="section-title">💳 Payment Options</div>
+  <div class="info-card">
+    <ul>
+      <li><strong>💵 Cash</strong> — XCD or USD, paid at the start of your rental</li>
+      <!-- BANK DETAILS: when ready to publish the account, replace the line
+           below with e.g.:
+           Account name: Aquatic Paradise Rentals · Account #: 12345678
+           (keep the bank name line) -->
+      <li><strong>🏦 Bank Transfer</strong> — Bank of St. Vincent &amp; the Grenadines (BOSVG).
+        <a href="https://wa.me/17844963447?text=Hi%20APR!%20Please%20send%20me%20the%20bank%20transfer%20details%20for%20my%20booking.">Message us on WhatsApp</a> for the account details.</li>
+      <li><strong>💳 Card</strong> — arranged via WhatsApp</li>
+    </ul>
+    <p style="font-size:0.78rem;color:#888;margin-top:8px">Paying by bank transfer? Send us your booking reference (APR-…) with the payment so we can match it.</p>
   </div>
 </div>
 
@@ -850,11 +874,12 @@ function updateBookBtn() {
   const fname = document.getElementById('fname').value.trim();
   const phone = document.getElementById('phone').value.trim();
   const dt = document.getElementById('datetime').value;
-  document.getElementById('btnBook').disabled = !(waiver && fname && phone && dt);
+  const beach = document.getElementById('beach').value;
+  document.getElementById('btnBook').disabled = !(waiver && fname && phone && dt && beach);
 }
-['fname','lname','phone','email','datetime','groupSize'].forEach(id => {
+['fname','lname','phone','email','datetime','groupSize','beach'].forEach(id => {
   const el = document.getElementById(id);
-  if (el) el.addEventListener('input', updateBookBtn);
+  if (el) { el.addEventListener('input', updateBookBtn); el.addEventListener('change', updateBookBtn); }
 });
 
 // ── ID PHOTO UPLOAD (client-side resize/compress before sending) ──
@@ -971,6 +996,12 @@ async function submitBooking() {
         return g ? `${g.name} x${qty}` : id;
       }).join(', ');
 
+  // Beach choice travels inside notes — the BOOKINGS sheet has fixed columns
+  // and the backend writes rows positionally, so a new column would need a
+  // manual Apps Script redeploy. Notes already shows up in admin + dispatch.
+  const beachChoice = document.getElementById('beach').value;
+  const notesVal = document.getElementById('notes').value.trim();
+
   const payload = {
     ref: refNum,
     fname: document.getElementById('fname').value.trim(),
@@ -981,7 +1012,8 @@ async function submitBooking() {
     groupSize: document.getElementById('groupSize').value,
     kidsCount: Number(document.getElementById('kidsCount').value) || 0,
     referral: document.getElementById('referral').value,
-    notes: document.getElementById('notes').value.trim(),
+    beach: beachChoice,
+    notes: (beachChoice ? '🏖️ Beach: ' + beachChoice + (notesVal ? ' — ' : '') : '') + notesVal,
     gear: gear_summary,
     duration: selectedPackage ? (PACKAGES.find(x=>x.id===selectedPackage)?.duration||'') : selectedDuration.label,
     total: getTotal(),
@@ -1167,7 +1199,7 @@ function showHelpTopic(id) {
         <strong>2.</strong> Fill in your details and guest count<br/>
         <strong>3.</strong> Tap Confirm — you'll get a booking reference and our team confirms via WhatsApp
       </div>
-      <div class="help-note">Payment is due at the start of your rental. Cash (XCD/USD) or card arrangements via WhatsApp.</div>
+      <div class="help-note">Payment is due at the start of your rental. Cash (XCD/USD), bank transfer (BOSVG), or card arrangements via WhatsApp.</div>
       <button class="help-topic-btn" style="background:var(--gold);text-align:center" onclick="toggleHelp();switchTab('book')">Start Booking →</button>
     `;
     return;
