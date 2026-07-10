@@ -1917,6 +1917,9 @@ function toggleCustomer(key) {
 // ── TAB SWITCH ──
 const ATABS = ['today','bookings','customers','inventory','safety','team','drivers','feedback','settings','rates'];
 function switchATab(tab) {
+  // Every tab opens as a full page from the top — without this, the scroll
+  // position from the previous tab carries over and you land at the bottom.
+  window.scrollTo(0, 0);
   ATABS.forEach(t => {
     document.getElementById('asec-'+t)?.classList.toggle('active', t===tab);
   });
