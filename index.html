@@ -139,9 +139,14 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 .booking-ref{background:var(--navy);color:var(--gold);padding:12px 20px;border-radius:10px;font-size:1.1rem;font-weight:800;letter-spacing:0.15em;margin:16px auto;display:inline-block}
 
 /* ── RATES TABLE ── */
-.rates-table{width:100%;border-collapse:collapse;font-size:0.85rem;margin-bottom:10px}
-.rates-table th{background:var(--navy);color:var(--gold);padding:10px 12px;text-align:left;font-weight:700}
-.rates-table td{padding:9px 12px;border-bottom:1px solid #eee}
+.rates-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.rates-table{width:100%;min-width:560px;border-collapse:collapse;font-size:0.85rem}
+.rates-table th{background:var(--navy);color:var(--gold);padding:10px 12px;text-align:left;font-weight:700;white-space:nowrap}
+.rates-table td{padding:9px 12px;border-bottom:1px solid #eee;white-space:nowrap}
+.rates-table th:first-child{position:sticky;left:0;z-index:2}
+.rates-table td:first-child{position:sticky;left:0;background:var(--card);z-index:1}
+.rates-swipe-hint{display:none;text-align:center;font-size:0.72rem;color:#888;padding:7px 0}
+@media(max-width:620px){.rates-swipe-hint{display:block}}
 .rates-table tr:nth-child(even) td{background:#f5f5f5}
 .rates-table tr:hover td{background:#e8f7f8}
 
@@ -382,12 +387,15 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 
   <div class="section-title">Individual Gear</div>
   <div class="info-card" style="padding:0;overflow:hidden">
-    <table class="rates-table">
-      <thead><tr><th>Gear</th><th>30 min</th><th>1 hr</th><th>2 hr</th><th>Half Day</th>
-            <th style="color:#03939E">Full Day</th>
-            <th style="color:#FBC62C">Weekly</th></tr></thead>
-      <tbody id="ratesBody"></tbody>
-    </table>
+    <div class="rates-scroll">
+      <table class="rates-table">
+        <thead><tr><th>Gear</th><th>30 min</th><th>1 hr</th><th>2 hr</th><th>Half Day</th>
+              <th style="color:#03939E">Full Day</th>
+              <th style="color:#FBC62C">Weekly</th></tr></thead>
+        <tbody id="ratesBody"></tbody>
+      </table>
+    </div>
+    <div class="rates-swipe-hint">👈 Swipe sideways to see all prices 👉</div>
   </div>
 
   <div class="section-title">Packages</div>
@@ -1041,7 +1049,7 @@ function renderRates() {
       <td style="color:#FBC62C;font-weight:700">${fmt(g.priceWK, true)}</td>
     </tr>
   `).join('');
-  tbody.innerHTML += '<tr style="background:#f0f9ff"><td colspan="7" style="font-size:0.72rem;color:#03939E;padding:8px 12px">💱 USD ≈ XCD ÷ 2.7 · Life Jackets included FREE with all rentals</td></tr>';
+  tbody.innerHTML += '<tr style="background:#f0f9ff"><td colspan="7" style="font-size:0.72rem;color:#03939E;padding:8px 12px;white-space:normal;position:static;background:transparent">💱 USD ≈ XCD ÷ 2.7 · Life Jackets included FREE with all rentals</td></tr>';
 
   const pkgEl = document.getElementById('pkgRatesList');
   if (pkgEl) {
