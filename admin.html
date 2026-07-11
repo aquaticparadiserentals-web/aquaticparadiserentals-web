@@ -225,6 +225,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
   <div class="home-grid">
     <div class="home-tile" onclick="switchATab('today')"><span class="ht-icon">📊</span><span class="ht-label">Today</span><span class="ht-sub">Dashboard &amp; KPIs</span></div>
     <div class="home-tile" onclick="switchATab('bookings')"><span class="ht-icon">📋</span><span class="ht-label">Bookings</span><span class="ht-sub">Live bookings</span></div>
+    <div class="home-tile" onclick="switchATab('dispatch')"><span class="ht-icon">📦</span><span class="ht-label">Dispatch</span><span class="ht-sub">Deliveries &amp; status</span></div>
     <div class="home-tile" onclick="switchATab('customers')"><span class="ht-icon">🧾</span><span class="ht-label">Customers</span><span class="ht-sub">Customer records</span></div>
     <div class="home-tile" onclick="switchATab('inventory')"><span class="ht-icon">🏄</span><span class="ht-label">Fleet</span><span class="ht-sub">Units in/out</span></div>
     <div class="home-tile" onclick="switchATab('safety')"><span class="ht-icon">🛡️</span><span class="ht-label">Safety</span><span class="ht-sub">Daily checklist</span></div>
@@ -283,6 +284,19 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
   </div>
   <div id="bookingsContainer">
     <div style="text-align:center;padding:30px;color:rgba(255,255,255,0.35)">Loading bookings…</div>
+  </div>
+</div>
+
+<!-- ═ DISPATCH ═ -->
+<div class="asection" id="asec-dispatch">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+    <div class="sec-title" style="margin:0">Dispatch — Deliveries</div>
+    <button class="refresh-btn" onclick="fetchDispatchAdmin()">🔄 Refresh</button>
+  </div>
+  <p style="font-size:0.72rem;color:rgba(255,255,255,0.4);margin-bottom:12px">Delivery view — name, gear, time and location. No pricing shown. Same list the drivers see.</p>
+  <a href="dispatch.html" target="_blank" style="display:block;background:#162030;border:1px solid rgba(255,255,255,0.1);color:#fff;padding:12px 16px;border-radius:var(--radius);font-weight:700;font-size:0.85rem;text-decoration:none;text-align:center;margin-bottom:14px">🚚 Open Driver Dispatch Page (for driver devices)</a>
+  <div id="dispatchContainer">
+    <div style="text-align:center;padding:30px;color:rgba(255,255,255,0.35)">Loading deliveries…</div>
   </div>
 </div>
 
@@ -990,6 +1004,111 @@ async function setBkState(ref, state) {
   } catch (err) {
     showToast('Status saved on this device but did not sync: '+err.message, 'warn');
   }
+}
+
+// ── DISPATCH (delivery view — same backend list the driver page uses) ──
+let dispatchBookings = [];
+
+async function fetchDispatchAdmin() {
+  const el = document.getElementById('dispatchContainer');
+  el.innerHTML='<div style="text-align:center;padding:30px;color:rgba(255,255,255,0.35)">⏳ Loading deliveries…</div>';
+  try {
+    const res = await fetch(BACKEND+'?action=getDispatchBookings&limit=50&token='+encodeURIComponent(APP_TOKEN),{signal:AbortSignal.timeout(10000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (!data || !data.ok || !Array.isArray(data.bookings)) throw new Error((data && data.error) || 'No data');
+    dispatchBookings = data.bookings;
+    renderDispatchAdmin();
+    addLog('📦 Dispatch refreshed: '+dispatchBookings.length+' deliveries');
+  } catch(e) {
+    el.innerHTML=`<div style="text-align:center;padding:30px">
+      <div style="color:#ef4444;font-size:0.9rem;margin-bottom:12px">⚠️ Could not load deliveries</div>
+      <div style="color:rgba(255,255,255,0.45);font-size:0.78rem;margin-bottom:16px">${escapeHtml((e&&e.message)||'Network error')}</div>
+      <button onclick="fetchDispatchAdmin()" style="background:var(--teal);color:#fff;border:none;padding:10px 20px;border-radius:8px;font-weight:700;cursor:pointer">🔄 Retry</button>
+    </div>`;
+    addLog('⚠️ Dispatch fetch failed: '+((e&&e.message)||'unknown error'));
+  }
+}
+
+function renderDispatchAdmin() {
+  const el = document.getElementById('dispatchContainer');
+  if (!dispatchBookings.length) {
+    el.innerHTML='<div style="text-align:center;padding:40px;color:rgba(255,255,255,0.35)">No deliveries right now.</div>';
+    return;
+  }
+  el.innerHTML = dispatchBookings.map(b => {
+    b = b || {};
+    const ref = String(b.ref === undefined || b.ref === null || b.ref === '' ? 'N/A' : b.ref);
+    const refAttr = escapeHtml(ref);
+    const status = b.status && b.status !== 'N/A' ? b.status : 'pending';
+    const statusClass = status==='done'?'done':status==='confirmed'?'confirmed':'pending';
+    const phone = String(b.phone||'').replace(/\D/g,'');
+    const hasLoc = b.driverLat && b.driverLat!=='N/A' && b.driverLng && b.driverLng!=='N/A';
+    const mapUrl = hasLoc ? `https://www.google.com/maps?q=${encodeURIComponent(b.driverLat)},${encodeURIComponent(b.driverLng)}` : '';
+    const feedbackUrl = new URL('feedback.html', location.href).href + '?ref=' + encodeURIComponent(ref);
+    const feedbackMsg = encodeURIComponent(`Thanks for renting with Aquatic Paradise! We'd love your feedback: ${feedbackUrl}`);
+    return `<div class="booking-card ${status==='pending'?'new':''} ${status==='done'?'done':''}">
+      <div class="bk-header">
+        <span class="bk-ref">${refAttr}</span>
+        <span class="bk-status ${statusClass}">${escapeHtml(status)}</span>
+      </div>
+      <div class="bk-name">${escapeHtml(b.fname||'N/A')} ${escapeHtml(b.lname||'')}</div>
+      <div class="bk-detail">📱 ${escapeHtml(b.phone||'N/A')}</div>
+      <div class="bk-detail">🏄 ${escapeHtml(b.gear||'N/A')} · ${escapeHtml(b.duration||'N/A')}</div>
+      <div class="bk-detail">📅 ${escapeHtml(b.datetime||'N/A')}</div>
+      <div class="bk-detail">👥 Group: ${escapeHtml(b.groupSize||'1')}${b.kidsCount && b.kidsCount!=='N/A' && Number(b.kidsCount)>0 ? ' ('+escapeHtml(b.kidsCount)+' kid(s) — kid-size life jacket)':''}</div>
+      ${b.notes && b.notes!=='N/A' ? '<div class="bk-detail">📝 '+escapeHtml(b.notes)+'</div>':''}
+      ${hasLoc ? `<div class="bk-detail">📍 Last location: <a href="${mapUrl}" target="_blank" style="color:var(--teal)">view on map</a> (${escapeHtml(b.driverLocAt)})</div>`:''}
+      <div class="bk-actions">
+        ${status!=='confirmed'&&status!=='done'?`<button class="bk-btn confirm" data-ref="${refAttr}" onclick="dspSetStatus(this.dataset.ref,'confirmed')">✅ Confirm</button>`:''}
+        ${status!=='done'?`<button class="bk-btn done-btn" data-ref="${refAttr}" onclick="dspSetStatus(this.dataset.ref,'done')">☑ Done</button>`:''}
+        ${status!=='done'?`<button class="bk-btn" style="background:#3a4a5c;color:#fff" data-ref="${refAttr}" onclick="dspShareLocation(this.dataset.ref)">📍 Share Location</button>`:''}
+        ${phone?`<a class="bk-btn wa" href="https://wa.me/${encodeURIComponent(phone)}" target="_blank">💬 Guest</a>`:''}
+        ${status==='done'&&phone?`<a class="bk-btn" style="background:var(--gold);color:var(--navy)" href="https://wa.me/${encodeURIComponent(phone)}?text=${feedbackMsg}" target="_blank">⭐ Ask Feedback</a>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function dspSetStatus(ref, status) {
+  // Same backend action the bookings tab uses — mirror the result into
+  // bookingStates so both views agree without an extra fetch.
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'update_status', token:APP_TOKEN, ref, status
+    }),signal:AbortSignal.timeout(15000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const d = await res.json();
+    if (!d || !d.ok) throw new Error((d && d.error) || 'Failed');
+    const b = dispatchBookings.find(x=>x && x.ref===ref);
+    if (b) b.status = status;
+    bookingStates[ref] = status;
+    localStorage.setItem('apr_bk_states', JSON.stringify(bookingStates));
+    renderDispatchAdmin();
+    addLog(`📦 Delivery ${ref} → ${status}`);
+    showToast('Updated ✅','ok');
+  } catch (err) {
+    showToast('Could not update: '+err.message,'warn');
+  }
+}
+
+function dspShareLocation(ref) {
+  if (!navigator.geolocation) { showToast('Location not supported on this device','warn'); return; }
+  showToast('Getting location…');
+  navigator.geolocation.getCurrentPosition(async pos => {
+    try {
+      const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+        action:'update_driver_location', token:APP_TOKEN, ref,
+        lat: pos.coords.latitude, lng: pos.coords.longitude
+      }),signal:AbortSignal.timeout(15000)});
+      const data = await res.json();
+      if (!data || !data.ok) throw new Error((data && data.error) || 'Failed');
+      await fetchDispatchAdmin();
+      showToast('Location shared ✅','ok');
+    } catch (err) {
+      showToast('Could not share location: '+err.message,'warn');
+    }
+  }, () => showToast('Location denied or unavailable','warn'), { enableHighAccuracy:true, timeout:10000 });
 }
 
 function updateKPIs() {
@@ -1961,8 +2080,8 @@ function toggleCustomer(key) {
 }
 
 // ── SECTION NAVIGATION (full-screen sections + back button) ──
-const ATABS = ['home','today','bookings','customers','inventory','safety','team','drivers','feedback','settings','rates'];
-const ATAB_LABELS = {home:'Operations Dashboard',today:'📊 Today',bookings:'📋 Bookings',customers:'🧾 Customers',inventory:'🏄 Fleet',safety:'🛡️ Safety',team:'👥 Team',drivers:'🚚 Drivers',feedback:'⭐ Feedback',settings:'⚙️ Settings',rates:'💰 Rates'};
+const ATABS = ['home','today','bookings','dispatch','customers','inventory','safety','team','drivers','feedback','settings','rates'];
+const ATAB_LABELS = {home:'Operations Dashboard',today:'📊 Today',bookings:'📋 Bookings',dispatch:'📦 Dispatch',customers:'🧾 Customers',inventory:'🏄 Fleet',safety:'🛡️ Safety',team:'👥 Team',drivers:'🚚 Drivers',feedback:'⭐ Feedback',settings:'⚙️ Settings',rates:'💰 Rates'};
 function switchATab(tab) {
   // Every section opens as a full page from the top — without this, the scroll
   // position from the previous section carries over and you land at the bottom.
@@ -1973,6 +2092,7 @@ function switchATab(tab) {
   document.getElementById('backBtn').style.display = tab==='home' ? 'none' : 'block';
   document.getElementById('appSubtitle').textContent = ATAB_LABELS[tab] || 'Operations Dashboard';
   if (tab==='bookings') fetchBookings();
+  if (tab==='dispatch') fetchDispatchAdmin();
   if (tab==='customers') fetchCustomers();
   if (tab==='inventory') fetchInventory();
   if (tab==='safety') renderSafety();
