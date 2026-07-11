@@ -938,6 +938,17 @@ function doPost(e) {
       }).length;
       return _json({ ok: true, installed: trigCount });
     }
+    if (payload.action === 'reinstall_backup_trigger') {
+      // Admin-only maintenance hook: turns on the weekly Sheet backup and
+      // takes an immediate first backup so it's proven working right away.
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      installBackupTrigger();
+      weeklyBackup();
+      var bkCount = ScriptApp.getProjectTriggers().filter(function (t) {
+        return t.getHandlerFunction() === 'weeklyBackup';
+      }).length;
+      return _json({ ok: true, installed: bkCount });
+    }
     if (payload.action === 'submit_feedback') {
       // Public — same posture as booking submission. A guest leaving
       // feedback must never need a token.
@@ -1113,6 +1124,14 @@ function saveBooking(p) {
       sendNotificationOnce(p, sh);
     } catch (notifyErr) {
       _logError('saveBooking.notify', notifyErr);
+    }
+
+    // Guest confirmation — reached only on first insert (duplicates return
+    // above), so this can't double-send on client retries.
+    try {
+      sendGuestConfirmation(p);
+    } catch (guestErr) {
+      _logError('saveBooking.guestEmail', guestErr);
     }
 
     return { ok: true, ref: p.ref };
@@ -1592,6 +1611,51 @@ function sendNotification(p) {
   GmailApp.sendEmail(NOTIFY_EMAIL, subject, body);
 }
 
+// ── GUEST CONFIRMATION EMAIL ──
+// The booking row starts as "pending" — this tells the guest exactly that,
+// what confirms it (deposit / WhatsApp), and the bad-weather promise. Skipped
+// silently when no valid email was given (email is optional on the form).
+function sendGuestConfirmation(p) {
+  var email = p && p.email ? String(p.email).trim() : '';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+  var n = function (v, fallback) {
+    if (v === undefined || v === null) return fallback || 'N/A';
+    var s = String(v).trim();
+    return s.length ? s : (fallback || 'N/A');
+  };
+  var subject = '🌊 Booking received — ' + n(p.ref) + ' · Aquatic Paradise Rentals';
+  var body = [
+    'Hi ' + n(p.fname, 'there') + ',',
+    '',
+    'Thanks for booking with Aquatic Paradise Rentals in Bequia! We\'ve received your request:',
+    '',
+    'Ref:       ' + n(p.ref),
+    'Gear:      ' + n(p.gear),
+    'Duration:  ' + n(p.duration),
+    'Date/Time: ' + n(p.datetime),
+    'Group:     ' + n(p.groupSize, '1') + (p.kidsCount && Number(p.kidsCount) > 0 ? ' (incl. ' + p.kidsCount + ' kid(s) — kid-size life jackets included)' : ''),
+    'Total:     XCD ' + n(p.total, '0') + '  (USD ≈ XCD ÷ 2.7)',
+    (p.notes && String(p.notes).trim() ? 'Notes:     ' + n(p.notes) + '\n' : '') +
+    '',
+    'WHAT HAPPENS NEXT',
+    'Your booking is PENDING until we confirm it — we\'ll message you on WhatsApp shortly.',
+    'To secure your slot right away, message us for bank-transfer deposit details:',
+    'https://wa.me/17844963447',
+    '',
+    'OUR BAD-WEATHER PROMISE',
+    'We check wind and sea conditions daily. If conditions are unsafe at your rental time,',
+    'you choose: free rebooking to another day, or a full refund of anything paid.',
+    '',
+    'Need to change or cancel? Just message us on WhatsApp: https://wa.me/17844963447',
+    'Safety rules: https://aquaticparadiserental.vacations/rules.html',
+    '',
+    'See you at the beach!',
+    'Aquatic Paradise Rentals — Bequia, St. Vincent & the Grenadines',
+    'https://aquaticparadiserental.vacations'
+  ].join('\n');
+  GmailApp.sendEmail(email, subject, body, { name: 'Aquatic Paradise Rentals' });
+}
+
 // ── HEALTH CHECK ("AI technician") ──
 // Runs on a time-based trigger (set up once via installHealthCheckTrigger).
 // Checks the systems this business actually depends on and emails Delroy
@@ -2014,6 +2078,49 @@ function installWeatherCheckTrigger() {
     .create();
   Logger.log('installWeatherCheckTrigger: dailyWeatherCheck() will now run hourly (active 6am-7pm, alerts on first run or status change).');
   try { SpreadsheetApp.getUi().alert('✅ Hourly weather check scheduled (active 6am-7pm; alerts only on morning digest or status change).'); } catch (uiErr) { /* expected outside Sheets UI */ }
+}
+
+// ── WEEKLY SPREADSHEET BACKUP ──
+// The whole business lives in one Google Sheet — this copies it to a dated
+// file in an "APR Backups" Drive folder once a week and keeps the last 8,
+// so a bad edit or deleted tab is never more than a week from recoverable.
+var BACKUP_FOLDER_NAME = 'APR Backups';
+var BACKUP_KEEP = 8;
+
+function weeklyBackup() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var file = DriveApp.getFileById(ss.getId());
+    var folders = DriveApp.getFoldersByName(BACKUP_FOLDER_NAME);
+    var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(BACKUP_FOLDER_NAME);
+    var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    file.makeCopy('APR Master Log — backup ' + stamp, folder);
+
+    // Prune: keep only the newest BACKUP_KEEP copies.
+    var backups = [];
+    var it = folder.getFiles();
+    while (it.hasNext()) {
+      var f = it.next();
+      if (f.getName().indexOf('APR Master Log — backup ') === 0) backups.push(f);
+    }
+    backups.sort(function (a, b) { return b.getDateCreated() - a.getDateCreated(); });
+    for (var i = BACKUP_KEEP; i < backups.length; i++) backups[i].setTrashed(true);
+  } catch (err) {
+    _logError('weeklyBackup', err);
+  }
+}
+
+function installBackupTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'weeklyBackup') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('weeklyBackup')
+    .timeBased()
+    .onWeekDay(ScriptApp.WeekDay.SUNDAY)
+    .atHour(3)
+    .create();
+  Logger.log('installBackupTrigger: weeklyBackup() will now run every Sunday ~3 AM.');
+  try { SpreadsheetApp.getUi().alert('✅ Weekly backup scheduled — Sundays ~3 AM, keeps last ' + BACKUP_KEEP + ' copies.'); } catch (uiErr) { /* expected outside Sheets UI */ }
 }
 
 // ── AUTOMATED BUSINESS REPORT ──

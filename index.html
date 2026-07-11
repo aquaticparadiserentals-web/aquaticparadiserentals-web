@@ -352,15 +352,30 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
         3. <strong>EQUIPMENT RESPONSIBILITY:</strong> I agree to use all rental equipment responsibly and in accordance with staff instructions. I am financially responsible for any loss or damage to equipment beyond normal wear.<br/><br/>
         4. <strong>SAFETY COMPLIANCE:</strong> I agree to wear provided safety equipment (life jacket/PFD) at all times when required by staff. I will follow all safety instructions given by APR team members.<br/><br/>
         5. <strong>SWIMMING ABILITY:</strong> I confirm that all members of my party who will use water-based equipment are comfortable in open water and have disclosed any relevant medical conditions.<br/><br/>
-        6. <strong>PAYMENT:</strong> Full payment is due at the start of rental. Cancellations within 2 hours of scheduled start time may be subject to a 50% charge. No refunds for early returns.<br/><br/>
+        6. <strong>PAYMENT &amp; CANCELLATION:</strong> Full payment is due at the start of rental. Cancellations within 2 hours of scheduled start time may be subject to a 50% charge. No refunds for early returns. If Aquatic Paradise Rentals cancels a booking due to unsafe weather or sea conditions, the guest may choose a free rebooking or a full refund of any amount paid.<br/><br/>
         7. <strong>GOVERNING LAW:</strong> This agreement is governed by the laws of St. Vincent and the Grenadines.
       </div>
       <label class="waiver-check" id="waiverCheck">
         <input type="checkbox" id="waiverAccepted" onchange="updateBookBtn()"/>
         <span>I have read, understood, and agree to the Liability Waiver and Safety Agreement above. I confirm all information provided is accurate.</span>
       </label>
+      <div style="margin-top:14px">
+        <label style="display:block;font-size:0.78rem;font-weight:700;color:var(--navy);margin-bottom:6px">✍️ Sign by typing your full legal name <span style="color:var(--coral)">*</span></label>
+        <input type="text" id="waiverSignature" placeholder="e.g. Sarah Anne Mitchell" autocomplete="name" style="width:100%;padding:12px;border:2px solid #ddd;border-radius:10px;font-size:0.9rem;box-sizing:border-box;font-style:italic"/>
+        <p style="font-size:0.7rem;color:#999;margin-top:5px">Your typed name acts as your signature on this agreement (adults booking for minors sign on their behalf).</p>
+      </div>
       <a href="rules.html" target="_blank" style="display:inline-block;margin-top:12px;font-size:0.78rem;color:var(--teal);font-weight:600">📄 View / Print Full Rules &amp; Regulations →</a>
       <a href="gear-guide.html" style="display:block;margin-top:6px;font-size:0.78rem;color:var(--teal);font-weight:600">🏄 Gear Guide — inflate &amp; pack down your board (with read-aloud) →</a>
+      <a href="privacy.html" target="_blank" style="display:block;margin-top:6px;font-size:0.78rem;color:var(--teal);font-weight:600">🔒 Privacy Notice — what we keep &amp; for how long →</a>
+    </div>
+
+    <div class="info-card" style="margin-bottom:22px;border-left:4px solid var(--teal);padding:16px">
+      <h3 style="font-size:0.88rem;font-weight:800;color:var(--navy);margin-bottom:8px">🌦️ Cancellation &amp; Weather Policy</h3>
+      <ul style="font-size:0.8rem;color:#555;line-height:1.7;padding-left:18px;margin:0">
+        <li><strong>Bad weather? You're covered.</strong> We check wind &amp; sea conditions daily. If it's unsafe at your rental time, you choose: free rebooking or a full refund of anything paid.</li>
+        <li><strong>Change of plans?</strong> Cancel free of charge up to 2 hours before your start time — just message us on WhatsApp.</li>
+        <li>Cancellations within 2 hours of start may carry a 50% charge. No refunds for early returns.</li>
+      </ul>
     </div>
 
     <div class="section-title">Booking Total</div>
@@ -375,10 +390,10 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
   <!-- SUCCESS -->
   <div class="success-screen" id="successScreen">
     <div class="success-icon">🌊</div>
-    <h2>You're Booked!</h2>
-    <p>Your reservation is confirmed. Our team will contact you on WhatsApp to finalise details.</p>
+    <h2>Booking Received!</h2>
+    <p>Your booking is <strong>pending</strong> — our team will confirm it on WhatsApp shortly. If you gave an email, a summary is on its way to your inbox.</p>
     <div class="booking-ref" id="bookingRef">APR-XXXXXX</div>
-    <p style="margin-top:16px;font-size:0.82rem;color:#777">Check WhatsApp for your confirmation message from the APR team.</p>
+    <p style="margin-top:16px;font-size:0.82rem;color:#777">Want to lock in your slot right away? Message us for bank-transfer deposit details — a deposit secures your booking.</p>
     <button class="btn-primary" style="margin-top:20px;max-width:320px" onclick="newBooking()">Book Another ↺</button>
     <a href="https://wa.me/17844963447" class="btn-secondary" style="display:block;max-width:320px;margin:8px auto;text-align:center;padding:13px;text-decoration:none;font-weight:700;border:2px solid var(--teal);border-radius:14px;color:var(--teal)">
       💬 Message Us on WhatsApp
@@ -875,6 +890,7 @@ function newBooking() {
   document.getElementById('step-gear').style.display='block';
   document.getElementById('step-details').style.display='none';
   document.getElementById('waiverAccepted').checked=false;
+  document.getElementById('waiverSignature').value='';
   renderGear(); renderPackages(); renderDurations(); updateSummary();
   window.scrollTo(0,0);
 }
@@ -886,9 +902,10 @@ function updateBookBtn() {
   const phone = document.getElementById('phone').value.trim();
   const dt = document.getElementById('datetime').value;
   const beach = document.getElementById('beach').value;
-  document.getElementById('btnBook').disabled = !(waiver && fname && phone && dt && beach);
+  const signature = document.getElementById('waiverSignature').value.trim();
+  document.getElementById('btnBook').disabled = !(waiver && fname && phone && dt && beach && signature.length >= 3);
 }
-['fname','lname','phone','email','datetime','groupSize','beach'].forEach(id => {
+['fname','lname','phone','email','datetime','groupSize','beach','waiverSignature'].forEach(id => {
   const el = document.getElementById(id);
   if (el) { el.addEventListener('input', updateBookBtn); el.addEventListener('change', updateBookBtn); }
 });
@@ -1012,6 +1029,9 @@ async function submitBooking() {
   // manual Apps Script redeploy. Notes already shows up in admin + dispatch.
   const beachChoice = document.getElementById('beach').value;
   const notesVal = document.getElementById('notes').value.trim();
+  // Signature travels inside notes for the same positional-columns reason as
+  // the beach choice; the waiverTimestamp column already records when.
+  const waiverSig = document.getElementById('waiverSignature').value.trim();
 
   const payload = {
     ref: refNum,
@@ -1024,7 +1044,7 @@ async function submitBooking() {
     kidsCount: Number(document.getElementById('kidsCount').value) || 0,
     referral: document.getElementById('referral').value,
     beach: beachChoice,
-    notes: (beachChoice ? '🏖️ Beach: ' + beachChoice + (notesVal ? ' — ' : '') : '') + notesVal,
+    notes: (beachChoice ? '🏖️ Beach: ' + beachChoice + ' — ' : '') + (waiverSig ? '✍️ Signed: ' + waiverSig + (notesVal ? ' — ' : '') : '') + notesVal,
     gear: gear_summary,
     duration: selectedPackage ? (PACKAGES.find(x=>x.id===selectedPackage)?.duration||'') : selectedDuration.label,
     total: getTotal(),

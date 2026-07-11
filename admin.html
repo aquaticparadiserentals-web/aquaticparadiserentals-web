@@ -282,6 +282,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
     <div class="sec-title" style="margin:0">Live Bookings</div>
     <button class="refresh-btn" onclick="fetchBookings()">🔄 Refresh</button>
   </div>
+  <div id="availWarning" style="display:none;background:#3b2f0d;color:#facc15;border-radius:12px;padding:10px 14px;font-size:0.78rem;margin-bottom:12px;line-height:1.6"></div>
   <div id="bookingsContainer">
     <div style="text-align:center;padding:30px;color:rgba(255,255,255,0.35)">Loading bookings…</div>
   </div>
@@ -559,6 +560,13 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
     <p style="font-size:0.75rem;color:rgba(255,255,255,0.4);margin-bottom:10px">Turns on the hourly conditions check on the server (wind alerts by email/WhatsApp, and the safety banner on the booking page). Run this once — or again if the weather alerts ever stop.</p>
     <button onclick="reinstallWeatherTrigger()" id="btnWeatherTrigger" style="width:100%;background:var(--teal);border:none;border-radius:8px;color:#fff;padding:10px 16px;font-size:0.85rem;font-weight:700;cursor:pointer">🌦️ Turn On Weather Checks</button>
     <p id="weatherTriggerMsg" style="font-size:0.75rem;margin-top:8px;min-height:16px"></p>
+  </div>
+
+  <div class="setting-card">
+    <h3>Backups</h3>
+    <p style="font-size:0.75rem;color:rgba(255,255,255,0.4);margin-bottom:10px">Copies the whole business spreadsheet to an "APR Backups" folder in Google Drive every Sunday (~3 AM) and keeps the last 8. Takes a first backup immediately when you turn it on. Run once — or again if backups ever stop appearing.</p>
+    <button onclick="reinstallBackupTrigger()" id="btnBackupTrigger" style="width:100%;background:var(--teal);border:none;border-radius:8px;color:#fff;padding:10px 16px;font-size:0.85rem;font-weight:700;cursor:pointer">💾 Turn On Weekly Backups</button>
+    <p id="backupTriggerMsg" style="font-size:0.75rem;margin-top:8px;min-height:16px"></p>
   </div>
 
   <div class="sec-title">Offline Queue</div>
@@ -1121,6 +1129,57 @@ function updateKPIs() {
   document.getElementById('kpiBookings').textContent = todayBk.length;
   document.getElementById('kpiRevenue').textContent = rev.toFixed(0);
   document.getElementById('kpiPending').textContent = pending;
+  renderAvailabilityWarning();
+}
+
+// ── AVAILABILITY WARNING ──
+// Bookings don't reserve gear, so nothing stops a day being oversold. This
+// compares booked quantities per gear category per upcoming day against the
+// total units in the fleet and flags any day that goes over.
+function renderAvailabilityWarning() {
+  const el = document.getElementById('availWarning');
+  if (!el) return;
+  if (!allBookings.length || !inventoryCache.length) { el.style.display='none'; return; }
+  const CHECK_CATS = {'paddle-board':'paddle boards','kayak':'kayaks','snorkel-set':'snorkel sets','floater':'floaters'};
+  const totals = {};
+  Object.keys(CHECK_CATS).forEach(k => totals[k] = inventoryCache.filter(i=>i&&i.category===k).length);
+  const catOf = s => {
+    s = String(s).toLowerCase();
+    if (s.includes('paddle')||s.includes('sup')) return 'paddle-board';
+    if (s.includes('kayak')) return 'kayak';
+    if (s.includes('snorkel')) return 'snorkel-set';
+    if (s.includes('float')) return 'floater';
+    return null;
+  };
+  const startOfToday = new Date(new Date().toDateString());
+  const byDay = {};
+  allBookings.forEach(b => {
+    if (!b || !b.datetime) return;
+    const st = bookingStates[b.ref] || b.status || 'pending';
+    if (st === 'done') return;
+    const d = new Date(b.datetime);
+    if (isNaN(d) || d < startOfToday) return;
+    const day = d.toDateString();
+    String(b.gear||'').split(',').forEach(part => {
+      const cat = catOf(part);
+      if (!cat) return;
+      const m = part.match(/x\s*(\d+)/i);
+      const qty = m ? parseInt(m[1],10) : 1;
+      byDay[day] = byDay[day] || {};
+      byDay[day][cat] = (byDay[day][cat]||0) + qty;
+    });
+  });
+  const overs = [];
+  Object.entries(byDay).forEach(([day, cats]) => {
+    Object.entries(cats).forEach(([cat, qty]) => {
+      if (totals[cat] > 0 && qty > totals[cat]) {
+        overs.push(`${day}: ${qty} ${CHECK_CATS[cat]} booked, only ${totals[cat]} in fleet`);
+      }
+    });
+  });
+  if (!overs.length) { el.style.display='none'; return; }
+  el.innerHTML = '⚠️ <b>Possible overbooking</b> — ' + overs.map(escapeHtml).join(' · ');
+  el.style.display='block';
 }
 
 // ── INVENTORY ── (single source of truth: the shared INVENTORY sheet, no local-only state)
@@ -1354,6 +1413,34 @@ async function reinstallWeatherTrigger() {
   btn.disabled = false;
 }
 
+async function reinstallBackupTrigger() {
+  const btn = document.getElementById('btnBackupTrigger');
+  const msg = document.getElementById('backupTriggerMsg');
+  btn.disabled = true;
+  msg.style.color = 'rgba(255,255,255,0.5)';
+  msg.textContent = 'Setting up (takes the first backup now, can take ~30s)…';
+  try {
+    const res = await fetch(BACKEND, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify({ action: 'reinstall_backup_trigger', token: APP_TOKEN }),
+      signal: AbortSignal.timeout(60000)
+    });
+    const d = await res.json();
+    if (d && d.ok) {
+      msg.style.color = '#4ade80';
+      msg.textContent = '✅ Weekly backups are on (' + (d.installed || 1) + ' trigger active). First backup saved to "APR Backups" in Drive.';
+    } else {
+      msg.style.color = '#f87171';
+      msg.textContent = '❌ ' + ((d && d.error) || 'Something went wrong — try again.');
+    }
+  } catch (err) {
+    msg.style.color = '#f87171';
+    msg.textContent = '❌ Could not reach the backend — check your connection and try again.';
+  }
+  btn.disabled = false;
+}
+
 // ── CONDITIONS BANNER (public endpoint, no token needed — safety info) ──
 // Same location + wind thresholds as the backend (Code.gs): Bequia,
 // caution ≥ 28 km/h (~15 kn), unsafe ≥ 37 km/h (~20 kn).
@@ -1477,6 +1564,7 @@ async function fetchInventory() {
   }
   renderInventorySummary();
   renderInventoryList();
+  renderAvailabilityWarning();
 }
 
 function renderInventorySummary() {
