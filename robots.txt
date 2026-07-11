@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin.html
+Disallow: /dispatch.html
+
+Sitemap: https://aquaticparadiserental.vacations/sitemap.xml
