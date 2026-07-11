@@ -59,6 +59,21 @@ All verified in a phone-sized browser and live on the domain:
 - **Weather banner self-heals** — if the backend has no reading, the app checks Open-Meteo directly from the guest's phone (same Bequia coordinates + wind thresholds). Working today (showed Unsafe, ~43 km/h)
 - **Admin Settings → Weather card** — "Turn On Weather Checks" button added (the backend action existed but had no UI). ⚠️ Not yet pressed — backend still returns status "unknown"
 
+## Legitimacy pass — DONE 2026-07-10 (evening)
+
+All live (site pushed, backend deployed as web app version 20):
+- **Admin console rebuilt as full-screen sections** — home menu of tiles, each section opens whole-page with a ← Back button (old tab strip had a CSS bug stacking tabs vertically)
+- **New Dispatch section in admin** — same no-pricing delivery list drivers see, with confirm/done/share-location/ask-feedback
+- **Guest confirmation email** — sent automatically on booking (when email given): pending status, deposit-request path, weather promise
+- **Deposit-pending flow** — success screen now says PENDING until confirmed; deposit via WhatsApp secures the slot
+- **Cancellation & weather policy** — published on booking page + waiver clause 6: unsafe conditions = free rebook or full refund; free cancel up to 2h before
+- **Waiver signature** — typed full-name signature required, stored in notes (waiverTimestamp column already existed)
+- **privacy.html** — data collected, why, retention (ID photos deleted within 30 days), guest rights; linked from booking page
+- **Overbooking warning** — admin Bookings flags days where booked gear exceeds fleet stock
+- **Weekly Sheet backup** — Code.gs `weeklyBackup` (Sundays ~3 AM, keeps 8, "APR Backups" Drive folder) + admin Settings "💾 Turn On Weekly Backups" button. ⚠️ Not yet pressed
+- **SEO** — robots.txt + sitemap.xml added (site had ZERO pages indexed; old dead Wix site still ranks #1). ⚠️ Owner: Google Search Console setup + request indexing; use "Remove Outdated Content" tool on aquaticparadiserental.com
+- **Weather banner reliability** — auto-refresh 15 min, tap-to-retry, stale-reading detection, online-event recheck
+
 ## Automation agents (Claude scheduled tasks) — SET UP 2026-07-09
 
 Run while the Claude desktop app is open (queued to next launch otherwise):
