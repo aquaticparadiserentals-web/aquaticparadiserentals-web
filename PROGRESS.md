@@ -74,6 +74,13 @@ All live (site pushed, backend deployed as web app version 20):
 - **SEO** — robots.txt + sitemap.xml added (site had ZERO pages indexed; old dead Wix site still ranks #1). ⚠️ Owner: Google Search Console setup + request indexing; use "Remove Outdated Content" tool on aquaticparadiserental.com
 - **Weather banner reliability** — auto-refresh 15 min, tap-to-retry, stale-reading detection, online-event recheck
 
+## Favicon / logo fix — DONE 2026-07-12
+
+- Real logo now the site icon everywhere: `icons/icon-48/180/192/512.png` regenerated from `logo.jpg` (old 192/512 were a generic teal placeholder — also what installed PWAs showed)
+- index.html's base64 data-URI favicon (invisible to Google) replaced with PNG links; all six other pages had no icon and got the same links
+- sw.js cache bumped to v6 so installed apps refresh the icon
+- ⚠️ Google search results still show the globe until Google recrawls the homepage — Search Console "Request Indexing" (owner action list #2) speeds this up; otherwise expect days–weeks
+
 ## Automation agents (Claude scheduled tasks) — SET UP 2026-07-09
 
 Run while the Claude desktop app is open (queued to next launch otherwise):
