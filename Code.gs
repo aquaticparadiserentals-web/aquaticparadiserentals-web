@@ -34,6 +34,7 @@ var VALID_STATUSES = ['pending', 'confirmed', 'done'];
 var INVENTORY_SHEET_NAME = 'INVENTORY';
 var STAFF_SHEET_NAME = 'STAFF';
 var FEEDBACK_SHEET_NAME = 'FEEDBACK';
+var MESSAGES_SHEET_NAME = 'MESSAGES';
 // Staff/driver photos are intentionally PUBLIC (guests are meant to see who
 // they're dealing with) — opposite posture from guest ID photos, which are
 // sensitive PII and must never be publicly shareable.
@@ -356,6 +357,28 @@ function _feedbackSheet() {
     sh.getRange('1:1').setFontWeight('bold');
   }
   return sh;
+}
+
+function _messagesSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(MESSAGES_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(MESSAGES_SHEET_NAME);
+    sh.appendRow(['ref', 'type', 'to', 'subject', 'createdAt']);
+    sh.getRange('1:1').setFontWeight('bold');
+  }
+  return sh;
+}
+
+// Records that an email actually went out for a booking, so staff can see
+// what was sent without digging through Gmail's sent folder. Best-effort —
+// a logging failure must never block the email itself from sending.
+function _logMessage(ref, type, to, subject) {
+  try {
+    _messagesSheet().appendRow([ref || 'N/A', type, to, subject, new Date().toISOString()]);
+  } catch (err) {
+    _logError('_logMessage', err);
+  }
 }
 
 // Shared by driver/staff photo uploads. PUBLIC on purpose — the whole point
@@ -865,6 +888,10 @@ function doGet(e) {
     if (p.action === 'getFeedback') {
       if (!_authOk(p)) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, feedback: getFeedback(parseInt(p.limit, 10) || 100) });
+    }
+    if (p.action === 'getMessages') {
+      if (!_authOk(p)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json({ ok: true, messages: getMessages(parseInt(p.limit, 10) || 100) });
     }
     if (p.action === 'getInventory') {
       if (!_authOk(p)) return _json({ ok: false, error: 'Unauthorized' });
@@ -1406,6 +1433,21 @@ function saveFeedback(p) {
   }
 }
 
+function getMessages(limit) {
+  try {
+    var safeLimit = (typeof limit === 'number' && limit > 0 && limit <= 500) ? limit : 100;
+    var sh = _messagesSheet();
+    var data = sh.getDataRange().getValues();
+    if (data.length <= 1) return [];
+    return data.slice(1).reverse().slice(0, safeLimit).map(function (row) {
+      return { ref: row[0], type: row[1], to: row[2], subject: row[3] || '', createdAt: row[4] };
+    });
+  } catch (err) {
+    _logError('getMessages', err);
+    return [];
+  }
+}
+
 function getFeedback(limit) {
   try {
     var safeLimit = (typeof limit === 'number' && limit > 0 && limit <= 500) ? limit : 100;
@@ -1609,6 +1651,7 @@ function sendNotification(p) {
   }
 
   GmailApp.sendEmail(NOTIFY_EMAIL, subject, body);
+  _logMessage(p && p.ref, 'email', NOTIFY_EMAIL, subject);
 }
 
 // ── GUEST CONFIRMATION EMAIL ──
@@ -1654,6 +1697,7 @@ function sendGuestConfirmation(p) {
     'https://aquaticparadiserental.vacations'
   ].join('\n');
   GmailApp.sendEmail(email, subject, body, { name: 'Aquatic Paradise Rentals' });
+  _logMessage(p.ref, 'email', email, subject);
 }
 
 // ── HEALTH CHECK ("AI technician") ──

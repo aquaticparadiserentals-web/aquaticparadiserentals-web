@@ -235,6 +235,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
     <div class="home-tile" onclick="switchATab('team')"><span class="ht-icon">👥</span><span class="ht-label">Team</span><span class="ht-sub">Staff contacts</span></div>
     <div class="home-tile" onclick="switchATab('drivers')"><span class="ht-icon">🚚</span><span class="ht-label">Drivers</span><span class="ht-sub">Delivery drivers</span></div>
     <div class="home-tile" onclick="switchATab('feedback')"><span class="ht-icon">⭐</span><span class="ht-label">Feedback</span><span class="ht-sub">Customer reviews</span></div>
+    <div class="home-tile" onclick="switchATab('messages')"><span class="ht-icon">✉️</span><span class="ht-label">Messages</span><span class="ht-sub">Sent history</span></div>
     <div class="home-tile" onclick="switchATab('settings')"><span class="ht-icon">⚙️</span><span class="ht-label">Settings</span><span class="ht-sub">PIN &amp; session</span></div>
     <div class="home-tile" onclick="switchATab('rates')"><span class="ht-icon">💰</span><span class="ht-label">Rates</span><span class="ht-sub">Price list</span></div>
   </div>
@@ -263,6 +264,11 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
       <div class="kpi-val" id="kpiPending">–</div>
       <div class="kpi-sub">need confirmation</div>
     </div>
+  </div>
+
+  <div class="sec-title">Next 7 Days</div>
+  <div id="weekStrip" style="display:flex;gap:6px;overflow-x:auto;margin-bottom:18px;padding-bottom:4px">
+    <div style="text-align:center;padding:16px;color:rgba(255,255,255,0.35);font-size:0.78rem">Loading…</div>
   </div>
 
   <div class="sec-title">Quick Actions</div>
@@ -480,6 +486,16 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
     <div style="font-size:0.75rem;color:rgba(255,255,255,0.5)" id="feedbackCount">No feedback yet</div>
   </div>
   <div id="feedbackList"></div>
+</div>
+
+<!-- ═ MESSAGES ═ -->
+<div class="asection" id="asec-messages">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <div class="sec-title" style="margin:0">Message History</div>
+    <button class="refresh-btn" onclick="fetchMessages()">🔄 Refresh</button>
+  </div>
+  <p style="font-size:0.72rem;color:rgba(255,255,255,0.4);margin-bottom:12px">Emails the system actually sent — booking notifications to you and confirmations to guests. WhatsApp taps aren't logged here since those open outside the app.</p>
+  <div id="messagesList"></div>
 </div>
 
 <!-- ═ CUSTOMERS ═ -->
@@ -932,6 +948,7 @@ async function fetchBookings() {
       localStorage.setItem('apr_bk_states', JSON.stringify(bookingStates));
       renderBookings();
       updateKPIs();
+      renderWeekStrip();
       addLog('📋 Bookings refreshed: '+allBookings.length+' total');
       showToast('Bookings refreshed','ok');
     } else {
@@ -947,9 +964,46 @@ async function fetchBookings() {
       <button onclick="fetchBookings()" style="background:var(--teal);color:#fff;border:none;padding:10px 20px;border-radius:8px;font-weight:700;cursor:pointer">🔄 Retry</button>
       <div style="margin-top:14px"><a href="index.html" style="color:var(--teal);font-size:0.8rem">📋 Open Booking Form →</a></div>
     </div>`;
-    if(cached){ renderBookings(); updateKPIs(); }
+    if(cached){ renderBookings(); updateKPIs(); renderWeekStrip(); }
     addLog('⚠️ Booking fetch failed: '+((e&&e.message)||'unknown error'));
   }
+}
+
+// ── NEXT 7 DAYS STRIP ──
+function renderWeekStrip() {
+  const el = document.getElementById('weekStrip');
+  if (!el) return;
+  const days = [];
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() + i);
+    days.push(d);
+  }
+  const byDay = {};
+  (allBookings||[]).forEach(b => {
+    if (!b || !b.datetime) return;
+    const bd = new Date(b.datetime);
+    if (isNaN(bd)) return;
+    const key = bd.toDateString();
+    (byDay[key] = byDay[key] || []).push(b);
+  });
+  el.innerHTML = days.map(d => {
+    const key = d.toDateString();
+    const items = (byDay[key]||[]).slice().sort((a,b)=>new Date(a.datetime)-new Date(b.datetime));
+    const dayLabel = d.toLocaleDateString(undefined,{weekday:'short'}).toUpperCase();
+    const dateLabel = d.getDate();
+    const isToday = key === today.toDateString();
+    return `<div style="flex:0 0 auto;min-width:88px;background:#162030;border-radius:10px;padding:8px 6px;${isToday?'border:1px solid var(--gold)':''}">
+      <div style="text-align:center;font-size:0.65rem;font-weight:700;color:${isToday?'var(--gold)':'rgba(255,255,255,0.5)'};letter-spacing:1px">${isToday?'TODAY':dayLabel}</div>
+      <div style="text-align:center;font-size:0.7rem;color:rgba(255,255,255,0.35);margin-bottom:6px">${dayLabel} ${dateLabel}</div>
+      ${items.length ? items.map(b=>{
+        const t = new Date(b.datetime).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+        return `<div style="font-size:0.66rem;color:#fff;background:rgba(3,147,158,0.2);border-radius:6px;padding:3px 4px;margin-bottom:3px;white-space:nowrap">${escapeHtml(t)} ${escapeHtml(b.gear||'')}</div>`;
+      }).join('') : '<div style="text-align:center;font-size:0.66rem;color:rgba(255,255,255,0.25)">free</div>'}
+    </div>`;
+  }).join('');
 }
 
 function renderBookings() {
@@ -2064,15 +2118,45 @@ function renderFeedback(feedback) {
   countEl.textContent = feedback.length + ' review' + (feedback.length===1?'':'s');
   listEl.innerHTML = feedback.map(f => {
     const stars = '★'.repeat(Number(f.rating)||0) + '☆'.repeat(5-(Number(f.rating)||0));
-    const refAttr = escapeHtml(f.ref||'').replace(/'/g,'&#39;');
-    const createdAttr = escapeHtml(f.createdAt||'').replace(/'/g,'&#39;');
+    const refAttr = escapeHtml(f.ref||'');
+    const createdAttr = escapeHtml(f.createdAt||'');
     return `<div class="card" style="margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
         <div style="color:#FBC62C;font-size:1rem;letter-spacing:2px">${stars}</div>
-        <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer;padding:2px 8px;font-size:0.72rem" onclick="removeFeedback('${refAttr}','${createdAttr}')">🗑️</button>
+        <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer;padding:2px 8px;font-size:0.72rem" data-ref="${refAttr}" data-created="${createdAttr}" onclick="removeFeedback(this.dataset.ref,this.dataset.created)">🗑️</button>
       </div>
       <div style="font-size:0.72rem;color:rgba(255,255,255,0.45);margin:4px 0">${escapeHtml(f.ref)} · ${escapeHtml(f.createdAt)}</div>
       ${f.comment ? `<div style="font-size:0.85rem;color:rgba(255,255,255,0.85)">${escapeHtml(f.comment)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ── MESSAGES ──
+async function fetchMessages() {
+  try {
+    const res = await fetch(BACKEND+'?action=getMessages&limit=100&token='+encodeURIComponent(APP_TOKEN),{signal:AbortSignal.timeout(10000)});
+    const data = await res.json();
+    renderMessages((data && data.ok && Array.isArray(data.messages)) ? data.messages : []);
+  } catch (err) {
+    showToast('Could not load messages', 'warn');
+  }
+}
+
+function renderMessages(messages) {
+  const listEl = document.getElementById('messagesList');
+  if (!listEl) return;
+  if (!messages.length) {
+    listEl.innerHTML = '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.35)">No messages logged yet</div>';
+    return;
+  }
+  listEl.innerHTML = messages.map(m => {
+    return `<div class="card" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="font-size:0.8rem;font-weight:700;color:#fff">✉️ ${escapeHtml(m.to||'N/A')}</div>
+        <div style="font-size:0.68rem;color:rgba(255,255,255,0.4);white-space:nowrap">${escapeHtml(m.createdAt||'')}</div>
+      </div>
+      <div style="font-size:0.78rem;color:rgba(255,255,255,0.7);margin-top:4px">${escapeHtml(m.subject||'')}</div>
+      <div style="font-size:0.68rem;color:rgba(255,255,255,0.4);margin-top:4px">Ref: ${escapeHtml(m.ref||'N/A')}</div>
     </div>`;
   }).join('');
 }
@@ -2133,7 +2217,7 @@ function renderCustomers() {
 
   listEl.innerHTML = filtered.map(c => {
     const key = String(c.phone||'').replace(/\D/g,'') || String(c.name||'');
-    const keyAttr = escapeHtml(key).replace(/'/g,'&#39;');
+    const keyAttr = escapeHtml(key);
     const expanded = expandedCustomers.has(key);
     const phoneDigits = String(c.phone||'').replace(/\D/g,'');
     const bookingsHtml = (c.bookings||[]).slice().reverse().map(b => `
@@ -2143,7 +2227,7 @@ function renderCustomers() {
       </div>`).join('');
 
     return `<div class="card" style="margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;cursor:pointer" onclick="toggleCustomer('${keyAttr}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;cursor:pointer" data-key="${keyAttr}" onclick="toggleCustomer(this.dataset.key)">
         <div>
           <div style="font-weight:700;font-size:0.9rem;color:#fff">${escapeHtml(c.name)} ${c.isRegular?'<span title="3+ bookings">⭐</span>':''} ${c.hasConflict?'<span title="Overlapping active bookings">⚠️</span>':''}</div>
           <div style="font-size:0.72rem;color:rgba(255,255,255,0.5)">${escapeHtml(c.phone)} · ${escapeHtml(c.email)}</div>
@@ -2156,7 +2240,7 @@ function renderCustomers() {
       ${c.hasConflict?'<div style="margin-top:6px;font-size:0.72rem;color:var(--coral)">⚠️ This guest has two active bookings with overlapping times — check before dispatching.</div>':''}
       <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
         ${phoneDigits?`<a class="team-wa" href="https://wa.me/${phoneDigits}" target="_blank" onclick="event.stopPropagation()">💬 Chat</a>`:''}
-        ${c.idPhotoUrl?`<button class="team-wa" style="background:var(--teal);border:none;cursor:pointer" onclick="event.stopPropagation();viewIdPhoto('${escapeHtml(c.idPhotoRef).replace(/'/g,'&#39;')}')">🪪 View ID</button>`:''}
+        ${c.idPhotoUrl?`<button class="team-wa" style="background:var(--teal);border:none;cursor:pointer" data-idref="${escapeHtml(c.idPhotoRef)}" onclick="event.stopPropagation();viewIdPhoto(this.dataset.idref)">🪪 View ID</button>`:''}
         <span style="font-size:0.68rem;padding:4px 8px;border-radius:12px;background:${c.waiverOnFile?'rgba(46,204,113,0.15);color:#2ecc71':'rgba(255,255,255,0.08);color:rgba(255,255,255,0.4)'}">${c.waiverOnFile?'✓ Waiver on file':'No waiver on file'}</span>
       </div>
       ${expanded ? `<div style="margin-top:10px">${bookingsHtml}</div>` : `<div style="margin-top:6px;font-size:0.7rem;color:rgba(255,255,255,0.35)">Tap to ${expanded?'hide':'view'} booking history</div>`}
@@ -2171,8 +2255,8 @@ function toggleCustomer(key) {
 }
 
 // ── SECTION NAVIGATION (full-screen sections + back button) ──
-const ATABS = ['home','today','bookings','dispatch','customers','inventory','safety','team','drivers','feedback','settings','rates'];
-const ATAB_LABELS = {home:'Operations Dashboard',today:'📊 Today',bookings:'📋 Bookings',dispatch:'📦 Dispatch',customers:'🧾 Customers',inventory:'🏄 Fleet',safety:'🛡️ Safety',team:'👥 Team',drivers:'🚚 Drivers',feedback:'⭐ Feedback',settings:'⚙️ Settings',rates:'💰 Rates'};
+const ATABS = ['home','today','bookings','dispatch','customers','inventory','safety','team','drivers','feedback','messages','settings','rates'];
+const ATAB_LABELS = {home:'Operations Dashboard',today:'📊 Today',bookings:'📋 Bookings',dispatch:'📦 Dispatch',customers:'🧾 Customers',inventory:'🏄 Fleet',safety:'🛡️ Safety',team:'👥 Team',drivers:'🚚 Drivers',feedback:'⭐ Feedback',messages:'✉️ Messages',settings:'⚙️ Settings',rates:'💰 Rates'};
 function switchATab(tab) {
   // Every section opens as a full page from the top — without this, the scroll
   // position from the previous section carries over and you land at the bottom.
@@ -2189,6 +2273,7 @@ function switchATab(tab) {
   if (tab==='safety') renderSafety();
   if (tab==='drivers') renderDrivers();
   if (tab==='feedback') fetchFeedback();
+  if (tab==='messages') fetchMessages();
 }
 function goHome() { switchATab('home'); }
 
