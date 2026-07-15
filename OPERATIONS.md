@@ -151,8 +151,8 @@ The business runs on a self-built Progressive Web App (PWA), not a third-party b
 
 1. Guest fills out the form in `index.html` (name, contact, dates, gear, group size, optional ID photo for verification).
 2. Submission goes to the Apps Script backend, which validates every field, saves it as a new row in the **BOOKINGS** sheet, uploads the ID photo (if provided) to a private Google Drive folder, and emails a notification to `aquaticparadiserentals@gmail.com`.
-3. Staff open `admin.html` (PIN-protected) or delivery staff open `dispatch.html` (separate PIN, weaker scoped token), see the new booking, and progress its status: pending → confirmed → done.
-4. When a driver is delivering, they can tap **Share Location** in `dispatch.html` — a one-time GPS fix (not continuous tracking) is posted to the booking row; admin/dispatch see a "view on map" link.
+3. Staff open `admin.html` (PIN-protected) or delivery staff open `dispatch.html` (separate PIN, weaker scoped token), see the new booking, and progress its status: pending → confirmed → delivering → done.
+4. Tapping **🚚 Start Delivery** (sets status to `delivering`) starts a 60-second auto-GPS ping loop for as long as the tab stays open and foregrounded (added 2026-07-15); the older one-tap **Share Location** button still works as a manual fallback at any time. Either way, admin/dispatch see a "view on map" link to the most recent position.
 5. Once a booking is marked **done**, dispatch staff can tap **Ask Feedback** to send the guest a WhatsApp message with a direct link to `feedback.html?ref=<their booking ref>`. Submitted ratings/comments land in the **FEEDBACK** sheet and show up under the admin **Feedback** tab (average rating + individual reviews).
 6. Drivers/staff/inventory are all shared across every device — stored in the Sheets backend, not stuck on one phone or browser.
 
@@ -167,6 +167,10 @@ Actual token values live in `Code.gs` and the `BACKEND`/token constants at the t
 ### Where guest ID photos go
 
 Uploaded to a Google Drive folder named **"APR Guest ID Photos"**, linked from the booking record. Treat this folder as containing sensitive personal data — it should not be shared publicly or forwarded outside the business.
+
+### Where guest signatures go
+
+As of 2026-07-15, the waiver step captures a drawn signature (canvas signature pad, with a typed-name fallback for accessibility/no-touch devices) and uploads it to a Google Drive folder named **"Aquatic Paradise Signatures"** — same private-by-default handling as ID photos (not a public link; viewed from admin via a token-gated action).
 
 ---
 
@@ -229,7 +233,7 @@ All times are in the script's timezone, **America/New_York** (set in `appsscript
 |---|---|---|---|
 | System health check | `healthCheck` | Every 6 hours | Emails you **only** if something's broken (e.g. a stuck notification). Silent otherwise. |
 | Weather / conditions check | `dailyWeatherCheck` | Daily, ~6 AM | Pulls a wind/gust forecast for Bequia, updates the live safe/caution/unsafe banner on the booking page and admin console, emails you a digest, and auto-emails today's guests if conditions turn caution/unsafe. |
-| Business report | `sendAutoReport` | Either daily at 6 PM **or** weekly Monday at 8 AM (pick one via §6) | Bookings/revenue/gear-usage report emailed to you. Does not include deposits or staff commission — not tracked anywhere in the system yet. |
+| Business report | `sendAutoReport` | Either daily at 6 PM **or** weekly Monday at 8 AM (pick one via §6) | Bookings/revenue/gear-usage report emailed to you. Deliberately excludes deposits and staff commission — those have their own read-only admin reports (Bookings tab, Commission tab, added 2026-07-15) so the auto-email can't be misread as "cash collected." |
 | Rate limiting | `_rateLimitOk` (not a trigger — runs inline per request) | Max 20 submissions/minute per action bucket (booking, feedback) | Blocks abuse/spam without needing a trigger — resets every 60 seconds. |
 
 Non-automated, human-driven rhythm (Delroy's own working schedule, not the software):
@@ -256,9 +260,9 @@ Non-automated, human-driven rhythm (Delroy's own working schedule, not the softw
 Honest list of what this system does **not** do yet, so nobody assumes it's more complete than it is:
 
 - **Custom domain not wired up.** `aquaticparadiserentals.com` is referenced in the site footer but doesn't resolve — the real live URL is the `github.io` one in §4. Fixing this needs: (a) DNS records at the domain registrar pointing at GitHub Pages, and (b) a `CNAME` file added to this repo. Neither exists yet.
-- **Driver location is share-link, not live GPS.** `dispatch.html`'s "Share Location" button captures a single point-in-time position when tapped — it is **not** a continuously updating live map. If real-time tracking becomes necessary, that's a bigger build (background location permission, periodic pings, a live map view) — deliberately not done yet to match the low-complexity/no-developer-maintenance goal.
-- **No deposits or staff commission tracking.** The `total` field on a booking is the only money figure stored. Payroll/commission would need real design work first, not a quick bolt-on.
-- **No payment processing.** Bookings don't collect payment online — presumably still cash/in-person or a separate arrangement. Not represented anywhere in the system.
+- **Driver location auto-refreshes, but only in the foreground.** As of 2026-07-15, tapping "🚚 Start Delivery" in `dispatch.html` (or admin Dispatch) sets a booking to `delivering` and starts a 60-second GPS ping loop, paused via the Page Visibility API whenever the tab isn't on screen. This is still **not** true background tracking — there's no OS-level background location permission in a PWA, so the driver's screen has to stay on and the tab open. The old one-shot "📍 Share Location" button still exists as a manual fallback.
+- **Deposits and staff commission are now tracked, manually.** As of 2026-07-15: bookings carry `depositAmount`/`depositReceivedAt`/`depositStatus`, set from the admin Bookings tab (amount typed in, "Mark Received" stamps the date — no calculated percentage, no gateway). Staff carry a `commissionPct` (Team tab) and bookings carry `staffId`/`staffName` (assigned from the Bookings tab); the admin Commission tab reports sum(booking total × commission %) per staff member for a selected period. Both are read-only reports — no payout automation, no payment gateway.
+- **No payment processing.** Bookings don't collect payment online — presumably still cash/in-person or a separate arrangement. Deposits are recorded manually (see above) after a BOSVG bank transfer, not collected through this system.
 - **Feedback has no moderation or spam filtering beyond rate limiting.** Anyone with a booking ref (which isn't secret — it's shown to the guest) could theoretically submit multiple feedback entries. Low risk given the guest volume, but worth knowing.
 - **No admin history of driver location over time** — only the *last* known point is kept per booking, not a trail.
 - **No automated tests.** Changes to `Code.gs` or the frontend are verified manually (or via a live-preview browser check) rather than an automated test suite. Fine at this scale, but worth naming as a real gap if the codebase grows.

@@ -118,6 +118,11 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 .waiver-check{display:flex;align-items:flex-start;gap:10px;cursor:pointer}
 .waiver-check input{width:20px;height:20px;margin-top:1px;accent-color:var(--coral);flex-shrink:0}
 .waiver-check span{font-size:0.82rem;color:var(--navy);font-weight:600;line-height:1.4}
+.sig-pad-wrap{border:2px solid #ddd;border-radius:10px;overflow:hidden;background:#fff}
+.sig-pad-wrap canvas{display:block;width:100%;height:150px;touch-action:none;cursor:crosshair}
+.sig-clear-btn{padding:7px 16px;background:transparent;color:var(--teal);border:2px solid var(--teal);border-radius:8px;font-size:0.75rem;font-weight:700;cursor:pointer}
+.sig-clear-btn:hover{background:var(--teal);color:#fff}
+.sig-mode-link{font-size:0.72rem;color:var(--teal);font-weight:600;text-decoration:none;cursor:pointer}
 
 /* ── SUMMARY CARD ── */
 .summary-card{background:linear-gradient(135deg,var(--teal),#027a84);border-radius:var(--radius);padding:18px;margin-bottom:20px;color:#fff}
@@ -361,10 +366,20 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
         <input type="checkbox" id="waiverAccepted" onchange="updateBookBtn()"/>
         <span>I have read, understood, and agree to the Liability Waiver and Safety Agreement above. I confirm all information provided is accurate.</span>
       </label>
-      <div style="margin-top:14px">
+      <div style="margin-top:14px" id="sigModeDrawn">
+        <label style="display:block;font-size:0.78rem;font-weight:700;color:var(--navy);margin-bottom:6px">✍️ Sign below <span style="color:var(--coral)">*</span></label>
+        <div class="sig-pad-wrap"><canvas id="waiverSigCanvas"></canvas></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:10px;flex-wrap:wrap">
+          <button type="button" class="sig-clear-btn" onclick="clearWaiverSignature()">Clear</button>
+          <a href="#" class="sig-mode-link" onclick="toggleSignatureMode(event)">Prefer to type your name instead? →</a>
+        </div>
+        <p style="font-size:0.7rem;color:#999;margin-top:5px">Draw your signature above with your finger, stylus, or mouse — this is your legal signature on the agreement (adults booking for minors sign on their behalf).</p>
+      </div>
+      <div style="margin-top:14px;display:none" id="sigModeTyped">
         <label style="display:block;font-size:0.78rem;font-weight:700;color:var(--navy);margin-bottom:6px">✍️ Sign by typing your full legal name <span style="color:var(--coral)">*</span></label>
         <input type="text" id="waiverSignature" placeholder="e.g. Sarah Anne Mitchell" autocomplete="name" style="width:100%;padding:12px;border:2px solid #ddd;border-radius:10px;font-size:0.9rem;box-sizing:border-box;font-style:italic"/>
         <p style="font-size:0.7rem;color:#999;margin-top:5px">Your typed name acts as your signature on this agreement (adults booking for minors sign on their behalf).</p>
+        <a href="#" class="sig-mode-link" onclick="toggleSignatureMode(event)">Prefer to draw your signature instead? →</a>
       </div>
       <a href="rules.html" target="_blank" style="display:inline-block;margin-top:12px;font-size:0.78rem;color:var(--teal);font-weight:600">📄 View / Print Full Rules &amp; Regulations →</a>
       <a href="gear-guide.html" style="display:block;margin-top:6px;font-size:0.78rem;color:var(--teal);font-weight:600">🏄 Gear Guide — inflate &amp; pack down your board (with read-aloud) →</a>
@@ -893,24 +908,142 @@ function newBooking() {
   document.getElementById('step-details').style.display='none';
   document.getElementById('waiverAccepted').checked=false;
   document.getElementById('waiverSignature').value='';
+  if (waiverSigPad) waiverSigPad.clear();
+  sigMode = 'drawn';
+  document.getElementById('sigModeDrawn').style.display='block';
+  document.getElementById('sigModeTyped').style.display='none';
   renderGear(); renderPackages(); renderDurations(); updateSummary();
   window.scrollTo(0,0);
 }
 
+// ── SIGNATURE PAD (reusable — mount into any canvas to capture a drawn
+// signature as a base64 PNG on demand. Built generically so a future
+// agreement/addendum can reuse it without rewriting canvas logic; the waiver
+// below is just the first caller.) ──
+// Minimum cumulative stroke length (CSS px) before a mark counts as a real
+// signature rather than a stray tap/jiggle — this is the legal waiver
+// acceptance, so a near-invisible dot must not satisfy it.
+var SIGNATURE_MIN_INK_PX = 24;
+
+function mountSignaturePad(canvas, opts) {
+  const onChange = (opts && opts.onChange) || function(){};
+  const ctx = canvas.getContext('2d');
+  let drawing = false, hasInk = false, inkLength = 0, last = null;
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const prevData = hasInk ? canvas.toDataURL() : null;
+    canvas.width = Math.max(1, Math.round(rect.width * dpr));
+    canvas.height = Math.max(1, Math.round(rect.height * dpr));
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#0B1E2D';
+    if (prevData) {
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
+      img.src = prevData;
+    }
+  }
+
+  function posFromEvent(e) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function start(e) {
+    drawing = true;
+    last = posFromEvent(e);
+    if (canvas.setPointerCapture && e.pointerId != null) {
+      try { canvas.setPointerCapture(e.pointerId); } catch (capErr) { /* not fatal */ }
+    }
+  }
+  function move(e) {
+    if (!drawing) return;
+    const p = posFromEvent(e);
+    ctx.beginPath();
+    ctx.moveTo(last.x, last.y);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    inkLength += Math.hypot(p.x - last.x, p.y - last.y);
+    last = p;
+    if (inkLength >= SIGNATURE_MIN_INK_PX) hasInk = true;
+    if (e.cancelable) e.preventDefault();
+    onChange();
+  }
+  function end() { drawing = false; last = null; }
+
+  canvas.addEventListener('pointerdown', start);
+  canvas.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', end);
+  canvas.addEventListener('pointerleave', end);
+  window.addEventListener('resize', resize);
+  resize();
+
+  return {
+    clear() {
+      const rect = canvas.getBoundingClientRect();
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      hasInk = false;
+      inkLength = 0;
+      onChange();
+    },
+    isEmpty() { return !hasInk; },
+    getBase64() {
+      if (!hasInk) return null;
+      const dataUrl = canvas.toDataURL('image/png');
+      const commaIdx = dataUrl.indexOf(',');
+      return commaIdx === -1 ? null : dataUrl.slice(commaIdx + 1);
+    }
+  };
+}
+
 // ── WAIVER / BUTTON STATE ──
+let waiverSigPad = null;
+let sigMode = 'drawn'; // 'drawn' or 'typed'
+
+function initWaiverSignaturePad() {
+  const canvas = document.getElementById('waiverSigCanvas');
+  if (!canvas || waiverSigPad) return;
+  waiverSigPad = mountSignaturePad(canvas, { onChange: updateBookBtn });
+}
+
+function clearWaiverSignature() {
+  if (waiverSigPad) waiverSigPad.clear();
+  updateBookBtn();
+}
+
+function toggleSignatureMode(event) {
+  if (event) event.preventDefault();
+  sigMode = sigMode === 'drawn' ? 'typed' : 'drawn';
+  document.getElementById('sigModeDrawn').style.display = sigMode === 'drawn' ? 'block' : 'none';
+  document.getElementById('sigModeTyped').style.display = sigMode === 'typed' ? 'block' : 'none';
+  updateBookBtn();
+}
+
+function hasWaiverSignature() {
+  if (sigMode === 'typed') {
+    return document.getElementById('waiverSignature').value.trim().length >= 3;
+  }
+  return !!(waiverSigPad && !waiverSigPad.isEmpty());
+}
+
 function updateBookBtn() {
   const waiver = document.getElementById('waiverAccepted').checked;
   const fname = document.getElementById('fname').value.trim();
   const phone = document.getElementById('phone').value.trim();
   const dt = document.getElementById('datetime').value;
   const beach = document.getElementById('beach').value;
-  const signature = document.getElementById('waiverSignature').value.trim();
-  document.getElementById('btnBook').disabled = !(waiver && fname && phone && dt && beach && signature.length >= 3);
+  document.getElementById('btnBook').disabled = !(waiver && fname && phone && dt && beach && hasWaiverSignature());
 }
 ['fname','lname','phone','email','datetime','groupSize','beach','waiverSignature'].forEach(id => {
   const el = document.getElementById(id);
   if (el) { el.addEventListener('input', updateBookBtn); el.addEventListener('change', updateBookBtn); }
 });
+initWaiverSignaturePad();
 
 // ── ID PHOTO UPLOAD (client-side resize/compress before sending) ──
 let idPhotoData = null; // { base64, mimeType } or null
@@ -1031,9 +1164,13 @@ async function submitBooking() {
   // manual Apps Script redeploy. Notes already shows up in admin + dispatch.
   const beachChoice = document.getElementById('beach').value;
   const notesVal = document.getElementById('notes').value.trim();
-  // Signature travels inside notes for the same positional-columns reason as
-  // the beach choice; the waiverTimestamp column already records when.
-  const waiverSig = document.getElementById('waiverSignature').value.trim();
+  // Typed-name fallback still travels inside notes for the same
+  // positional-columns reason as the beach choice; the waiverTimestamp
+  // column already records when. A drawn signature (the default/primary
+  // path) is uploaded separately as signatureBase64 below and stored in its
+  // own signatureUrl column, same as the ID photo.
+  const waiverSig = sigMode === 'typed' ? document.getElementById('waiverSignature').value.trim() : '';
+  const drawnSignatureBase64 = (sigMode === 'drawn' && waiverSigPad && !waiverSigPad.isEmpty()) ? waiverSigPad.getBase64() : null;
 
   const payload = {
     ref: refNum,
@@ -1060,13 +1197,18 @@ async function submitBooking() {
     payload.idPhotoBase64 = idPhotoData.base64;
     payload.idPhotoMimeType = idPhotoData.mimeType;
   }
+  if (drawnSignatureBase64) {
+    payload.signatureBase64 = drawnSignatureBase64;
+    payload.signatureMimeType = 'image/png';
+  }
 
   let ok = false;
   try {
-    // A photo payload is too large for a URL query string, so it must go via
-    // POST. Everything else still prefers GET, since GAS reliably returns a
-    // readable JSON response for GET but not for POST (CORS preflight issue).
-    if (payload.idPhotoBase64) {
+    // A photo/signature payload is too large for a URL query string, so it
+    // must go via POST. Everything else still prefers GET, since GAS
+    // reliably returns a readable JSON response for GET but not for POST
+    // (CORS preflight issue).
+    if (payload.idPhotoBase64 || payload.signatureBase64) {
       await fetch(BACKEND, {
         method: 'POST',
         mode: 'no-cors',
@@ -1102,6 +1244,7 @@ async function submitBooking() {
       const q = JSON.parse(localStorage.getItem('apr_queue')||'[]');
       const queuedPayload = Object.assign({}, payload);
       delete queuedPayload.idPhotoBase64;
+      delete queuedPayload.signatureBase64;
       q.push(queuedPayload);
       localStorage.setItem('apr_queue', JSON.stringify(q));
       ok = true; // queued successfully

@@ -1,6 +1,6 @@
 # Aquatic Paradise Rentals — Build Progress
 
-**Last updated:** 2026-07-10 (audit — live site, backend, and repo verified this date)
+**Last updated:** 2026-07-15 (staff commission, deposit tracking, feedback analytics, auto-GPS, drawn e-signature added, commission period fixed to rental date — all staged, not yet deployed/pushed)
 **Live site:** https://aquaticparadiserental.vacations
 **Repo:** aquaticparadiserentals-web (GitHub: aquaticparadiserentals-web/aquaticparadiserentals-web, branch `main`)
 **Stack:** Google Apps Script (`Code.gs`) + Google Sheets backend · HTML/JS frontend · PWA (`manifest.json`, `sw.js`) · GitHub Pages hosting · deployed via clasp
@@ -81,6 +81,33 @@ All live (site pushed, backend deployed as web app version 20):
 - sw.js cache bumped to v6 so installed apps refresh the icon
 - ⚠️ Google search results still show the globe until Google recrawls the homepage — Search Console "Request Indexing" (owner action list #2) speeds this up; otherwise expect days–weeks
 
+## Staff commission, deposits, feedback analytics, live GPS — DONE 2026-07-15
+
+All in `Code.gs`, `admin.html`, `dispatch.html` — not yet deployed/pushed, staged for review.
+
+- **Staff commission tracking** — `STAFF` sheet gets a `commissionPct` column (self-healing migration, same pattern as other sheets), editable per staff member from the Team tab (inline % field + Save). Bookings get `staffId`/`staffName` columns — no prior driver/staff attribution existed on a booking, so this is a new field, assigned via a dropdown on each card in the Bookings tab. New admin **Commission** tab: This Week / This Month / custom date-range report, server-computed (`getCommissionReport` action) as sum(booking.total × staff.commissionPct) for bookings attributed to them in that window, plus an "unassigned bookings" total for visibility. Read-only, no payout automation. Date range keys off the booking's `datetime` (the rental date/time) — fixed 2026-07-15 (was keying off `Timestamp`, when the booking was logged; owner confirmed rental date is the right period definition for payroll).
+- **Deposit tracking (manual, BOSVG bank transfer)** — Bookings get `depositAmount`/`depositReceivedAt`/`depositStatus` columns. Admin Bookings tab: amount field + "Mark Received" button per booking stamps today's date and flips status to `received` (`markDepositReceived` action) — no percentage calculated or required, whatever the owner enters is what's recorded. Deposit status/amount shown on every booking card. Does **not** touch the existing WhatsApp bank-transfer-details flow.
+- **Feedback analytics** — new blocks in the existing Feedback tab: rating distribution (1★–5★ bar counts), trend (average rating by week, simple bar list), and a flagged list of ≤2★ reviews with comments for follow-up. Pure client-side aggregation over the feedback data the tab already fetches — no backend changes, no new data collection.
+- **Auto-refreshing GPS tracking** — new `delivering` status (between `confirmed` and `done`) in both `dispatch.html` and the admin Dispatch view. Tapping "🚚 Start Delivery" sets status to `delivering`, which starts a 60-second `getCurrentPosition()` interval that auto-posts to the same `update_driver_location` action the old one-shot button used. Pauses on `visibilitychange` (tab hidden/screen off) and resumes when the tab is foregrounded again — deliberately foreground-only, not true background tracking (no OS-level permission for that in a PWA). Stops when marked `done`. The manual "📍 Share Location" button is unchanged and still works as a fallback at any time. Auto-tracking also self-resumes on page reload if a booking is already `delivering`.
+
+## Drawn e-signature (waiver + reusable for future agreements) — DONE 2026-07-15
+
+In `Code.gs`, `index.html`, `admin.html` — not yet deployed/pushed, staged for review.
+
+- **Guest booking flow (`index.html`)** — the waiver step's signature capture is now a canvas signature pad (`mountSignaturePad()`), drawn with finger/stylus/mouse via pointer events, with a Clear button. It's the default/primary path; a "Prefer to type your name instead?" link swaps to the original typed-name input (kept as the accessibility/no-touch fallback, unchanged behavior otherwise). Booking submit is blocked until the waiver checkbox is ticked **and** either the pad has ink or the typed name is ≥3 characters — canvas/touch being unavailable never blocks a booking. `mountSignaturePad(canvas, opts)` is a standalone function (mount point + `onChange` callback, returns `{clear, isEmpty, getBase64}`) — reusable for a future damage addendum or group liability form without rewriting canvas logic.
+- **Backend storage (`Code.gs`)** — new `_saveSignature()` mirrors `_saveIdPhoto()` (same base64-decode → Drive blob → return URL pattern, same "never blocks the booking on failure" posture) into a new **"Aquatic Paradise Signatures"** Drive folder, capped at `MAX_SIGNATURE_BASE64_LEN` (~1.1MB decoded — signatures compress fine small, so this cap is far below the ID-photo one). New `signatureUrl` field appended to the end of `FIELDS` (self-healing migration, same pattern as `staffId`/deposit columns). Judgment call: **kept private like ID photos, not public like staff photos** — a signature is guest PII, same trust model as an ID photo, so no `setSharing()` call; a new token-gated `getSignature` action (POST-only, mirrors `getIdPhoto`) is the only way to view it.
+- **Admin viewing (`admin.html`)** — "✍️ View Signature" button next to "🪪 View ID" on both the Bookings tab cards and the Customers tab (shows the guest's most recent signature across bookings). Shares the same fetch-and-overlay code as ID photos (`_viewPhotoOverlay()`, refactored out of the old `viewIdPhoto()` so both actions share one implementation).
+- **Validation (`Code.gs`)** — `signatureBase64`/`signatureMimeType` validated the same way as `idPhotoBase64`/`idPhotoMimeType` (type, size cap, mime allowlist) in `_validateBookingPayload`.
+- Typed-name waiver acceptance (`waiverAccepted` boolean + `waiverTimestamp`) is unchanged — the drawn signature is additive, not a replacement of that existing required field.
+
+### Post-build code review fixes — 2026-07-16
+
+A review pass before deploy caught and fixed:
+- **Critical:** `saveBooking`'s signature write located the row via `sh.getLastRow()`, which a concurrent booking submission (no `LockService` in this file) could shift — misattaching one guest's signature to another guest's row. Fixed to locate the row by matching `ref`, same pattern as `assignBookingStaff`/`markDepositReceived`.
+- **High:** `getCommissionReport`'s end-date parsing round-tripped through `new Date('YYYY-MM-DD')` (parses as UTC), then read back date components in local time — in AST (UTC-4) this silently excluded the actual selected end date from every report. Fixed with a local-date parser (`_parseLocalDateInput`).
+- **Medium:** `markDepositReceived` accepted a blank amount as a valid $0 "received" deposit, and had no guard against silently overwriting an already-recorded deposit. Fixed: amount must be `> 0`, and overwriting a `received` deposit now requires an explicit confirm (admin gets a confirmation prompt showing the existing amount).
+- **Low-medium:** the signature pad counted a single stray tap as "signed." Fixed with a minimum cumulative stroke-length threshold (24px) before a mark counts as ink.
+
 ## Automation agents (Claude scheduled tasks) — SET UP 2026-07-09
 
 Run while the Claude desktop app is open (queued to next launch otherwise):
@@ -109,10 +136,10 @@ Run while the Claude desktop app is open (queued to next launch otherwise):
 
 ## Not built yet / parked
 
-- Live/continuous GPS tracking (only if share-link model proves insufficient)
-- Feedback analytics beyond average rating
+- True background GPS tracking (current auto-refresh, added 2026-07-15, is foreground-only — screen must stay on; a real background tracker needs OS-level permissions a PWA doesn't have)
 - Safe-zones water map (explored 2026-07-09, parked by owner)
-- Payments/deposits online, staff commission tracking
+- Online payment gateway (deposits are tracked manually as of 2026-07-15 — BOSVG bank transfer + admin marks received; no Stripe/gateway integration, deliberately rejected in favor of manual tracking)
+- Automated commission payout (Commission tab, added 2026-07-15, is a read-only report — no payroll/payout automation)
 
 ## Owner's open action list
 

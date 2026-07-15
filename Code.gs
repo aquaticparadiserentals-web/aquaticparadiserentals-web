@@ -8,7 +8,9 @@
  * Columns: ref | fname | lname | phone | email | datetime | groupSize |
  *          gear | duration | total | referral | notes | waiverAccepted |
  *          waiverTimestamp | source | Timestamp | NotifiedAt | idPhotoUrl |
- *          status | kidsCount | driverLat | driverLng | driverLocAt
+ *          status | kidsCount | driverLat | driverLng | driverLocAt |
+ *          staffId | staffName | depositAmount | depositReceivedAt | depositStatus |
+ *          signatureUrl
  */
 
 var SHEET_NAME = 'BOOKINGS';
@@ -25,12 +27,28 @@ var STAFF_TOKEN = 'Dsp_7Kq2mNw94RfL';
 var GENERIC_ERROR = 'Something went wrong. Please try again.';
 var ID_PHOTO_FOLDER_NAME = 'APR Guest ID Photos';
 var MAX_ID_PHOTO_BASE64_LEN = 8000000; // ~6MB decoded — generous cap against abuse
+// Drawn e-signatures (waiver, and any future agreement) — same private-by-
+// default posture as guest ID photos, since a signature is guest PII too.
+// Signatures compress well at low resolution, so the cap is far smaller than
+// the ID photo one.
+var SIGNATURE_FOLDER_NAME = 'Aquatic Paradise Signatures';
+var MAX_SIGNATURE_BASE64_LEN = 1500000; // ~1.1MB decoded
 
 var FIELDS = ['ref','fname','lname','phone','email','datetime','groupSize',
   'gear','duration','total','referral','notes','waiverAccepted','waiverTimestamp',
   'source','Timestamp','NotifiedAt','idPhotoUrl','status','kidsCount',
-  'driverLat','driverLng','driverLocAt'];
-var VALID_STATUSES = ['pending', 'confirmed', 'done'];
+  'driverLat','driverLng','driverLocAt',
+  // Added 2026-07-15: staff commission attribution + manual deposit tracking.
+  // Appended at the end (not inserted earlier) so _sheet()'s self-healing
+  // migration lines up with existing rows — see _sheet() below.
+  'staffId','staffName','depositAmount','depositReceivedAt','depositStatus',
+  // Added 2026-07-15: drawn e-signature (waiver). Also appended at the end
+  // for the same self-healing-migration reason as the row above.
+  'signatureUrl'];
+// 'delivering' sits between confirmed and done — a driver sets it when they
+// actually leave with the gear, which is also what starts auto-GPS sharing
+// in dispatch.html (see updateDriverLocation).
+var VALID_STATUSES = ['pending', 'confirmed', 'delivering', 'done'];
 var INVENTORY_SHEET_NAME = 'INVENTORY';
 var STAFF_SHEET_NAME = 'STAFF';
 var FEEDBACK_SHEET_NAME = 'FEEDBACK';
@@ -216,6 +234,20 @@ function _validateBookingPayload(p) {
       if (p.idPhotoMimeType !== undefined && p.idPhotoMimeType !== null) {
         if (typeof p.idPhotoMimeType !== 'string' || !/^image\/(jpeg|jpg|png|webp)$/i.test(p.idPhotoMimeType)) {
           return { valid: false, error: 'Unsupported ID photo format' };
+        }
+      }
+    }
+
+    if (p.signatureBase64 !== undefined && p.signatureBase64 !== null && p.signatureBase64 !== '') {
+      if (typeof p.signatureBase64 !== 'string') {
+        return { valid: false, error: 'Invalid signature data' };
+      }
+      if (p.signatureBase64.length > MAX_SIGNATURE_BASE64_LEN) {
+        return { valid: false, error: 'Signature image is too large' };
+      }
+      if (p.signatureMimeType !== undefined && p.signatureMimeType !== null) {
+        if (typeof p.signatureMimeType !== 'string' || !/^image\/(png|jpeg|jpg|webp)$/i.test(p.signatureMimeType)) {
+          return { valid: false, error: 'Unsupported signature image format' };
         }
       }
     }
@@ -477,8 +509,17 @@ function _staffSheet() {
   var sh = ss.getSheetByName(STAFF_SHEET_NAME);
   if (!sh) {
     sh = ss.insertSheet(STAFF_SHEET_NAME);
-    sh.appendRow(['id', 'name', 'role', 'phone', 'createdAt', 'photoUrl']);
+    sh.appendRow(['id', 'name', 'role', 'phone', 'createdAt', 'photoUrl', 'commissionPct']);
     sh.getRange('1:1').setFontWeight('bold');
+  } else {
+    // Self-healing migration, same pattern as _driversSheet/_sheet — older
+    // rosters predate commissionPct (added 2026-07-15).
+    var lastCol = sh.getLastColumn();
+    var header = lastCol > 0 ? sh.getRange(1, 1, 1, lastCol).getValues()[0] : [];
+    if (header.indexOf('commissionPct') === -1) {
+      sh.getRange(1, lastCol + 1).setValue('commissionPct');
+      sh.getRange('1:1').setFontWeight('bold');
+    }
   }
   return sh;
 }
@@ -495,6 +536,10 @@ function _validateStaffPayload(p) {
     if (p.phone !== undefined && p.phone !== null) {
       if (typeof p.phone !== 'string' || p.phone.length > 50) return { valid: false, error: 'Invalid phone' };
     }
+    if (p.commissionPct !== undefined && p.commissionPct !== null && p.commissionPct !== '') {
+      var pct = Number(p.commissionPct);
+      if (isNaN(pct) || pct < 0 || pct > 100) return { valid: false, error: 'Commission % must be between 0 and 100' };
+    }
     return { valid: true };
   } catch (err) {
     _logError('validateStaffPayload', err);
@@ -508,7 +553,10 @@ function getStaff() {
     var data = sh.getDataRange().getValues();
     if (data.length <= 1) return [];
     return data.slice(1).map(function (row) {
-      return { id: row[0], name: row[1], role: row[2], phone: row[3], createdAt: row[4], photoUrl: row[5] || '' };
+      return {
+        id: row[0], name: row[1], role: row[2], phone: row[3], createdAt: row[4],
+        photoUrl: row[5] || '', commissionPct: (row[6] === '' || row[6] === undefined || row[6] === null) ? 0 : Number(row[6])
+      };
     }).filter(function (d) { return d.id; });
   } catch (err) {
     _logError('getStaff', err);
@@ -533,11 +581,45 @@ function addStaff(p) {
       _safe(p.role, 'N/A'),
       _safe(p.phone, ''),
       new Date().toISOString(),
-      photoUrl
+      photoUrl,
+      (p.commissionPct !== undefined && p.commissionPct !== null && !isNaN(Number(p.commissionPct))) ? Number(p.commissionPct) : 0
     ]);
     return { ok: true, id: id };
   } catch (err) {
     return _fail('addStaff', err);
+  }
+}
+
+// Patch-style edit — only touches the fields actually provided, so the Team
+// tab can call this just to change commissionPct without resending photo/role.
+function updateStaff(p) {
+  try {
+    if (!p || typeof p.id !== 'string' || !p.id.trim()) return { ok: false, error: 'Invalid id' };
+    if (p.commissionPct !== undefined && p.commissionPct !== null && p.commissionPct !== '') {
+      var pct = Number(p.commissionPct);
+      if (isNaN(pct) || pct < 0 || pct > 100) return { ok: false, error: 'Commission % must be between 0 and 100' };
+    }
+    if (p.name !== undefined && (typeof p.name !== 'string' || !p.name.trim() || p.name.length > 200)) {
+      return { ok: false, error: 'Invalid name' };
+    }
+
+    var sh = _staffSheet();
+    var data = sh.getDataRange().getValues();
+    var header = data[0] || [];
+    var idIdx = header.indexOf('id');
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][idIdx]) === String(p.id)) {
+        var rowNum = i + 1;
+        if (p.name !== undefined) sh.getRange(rowNum, header.indexOf('name') + 1).setValue(_safe(p.name, 'N/A'));
+        if (p.role !== undefined) sh.getRange(rowNum, header.indexOf('role') + 1).setValue(_safe(p.role, 'N/A'));
+        if (p.phone !== undefined) sh.getRange(rowNum, header.indexOf('phone') + 1).setValue(_safe(p.phone, ''));
+        if (p.commissionPct !== undefined) sh.getRange(rowNum, header.indexOf('commissionPct') + 1).setValue(Number(p.commissionPct) || 0);
+        return { ok: true };
+      }
+    }
+    return { ok: false, error: 'Staff member not found' };
+  } catch (err) {
+    return _fail('updateStaff', err);
   }
 }
 
@@ -851,6 +933,48 @@ function _saveIdPhoto(p) {
   }
 }
 
+// ── SIGNATURE UPLOAD (Drive) ──
+// Mirrors _saveIdPhoto: a drawn signature is guest PII like an ID photo, so
+// it stays private (no setSharing call) rather than public like staff
+// photos. Never blocks or fails the booking: any error returns '' and is
+// logged, saveBooking proceeds regardless.
+function _saveSignature(p) {
+  try {
+    if (!p || !p.signatureBase64) return '';
+    var mime = (typeof p.signatureMimeType === 'string' && /^image\/(png|jpeg|jpg|webp)$/i.test(p.signatureMimeType))
+      ? p.signatureMimeType : 'image/png';
+
+    var base64 = String(p.signatureBase64);
+    var commaIdx = base64.indexOf(',');
+    if (base64.slice(0, 5) === 'data:' && commaIdx !== -1) base64 = base64.slice(commaIdx + 1);
+    if (base64.length > MAX_SIGNATURE_BASE64_LEN) return '';
+
+    var bytes;
+    try {
+      bytes = Utilities.base64Decode(base64);
+    } catch (decodeErr) {
+      _logError('_saveSignature.decode', decodeErr);
+      return '';
+    }
+
+    var safeRef = String(p.ref || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '');
+    var ext = mime.indexOf('jpeg') !== -1 || mime.indexOf('jpg') !== -1 ? 'jpg' : (mime.indexOf('webp') !== -1 ? 'webp' : 'png');
+    var blob = Utilities.newBlob(bytes, mime, 'sig_' + safeRef + '_' + Date.now() + '.' + ext);
+
+    var folders = DriveApp.getFoldersByName(SIGNATURE_FOLDER_NAME);
+    var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(SIGNATURE_FOLDER_NAME);
+
+    // Deliberately NOT calling file.setSharing() here — same reasoning as
+    // _saveIdPhoto. Staff view it through getSignature() (token-gated,
+    // POST-only) instead of an open "anyone with the link" URL.
+    var file = folder.createFile(blob);
+    return file.getUrl();
+  } catch (err) {
+    _logError('_saveSignature', err);
+    return '';
+  }
+}
+
 function _safe(val, fallback) {
   var s = (val === undefined || val === null || val === '') ? (fallback !== undefined ? fallback : '') : String(val);
   if (/^\s*[=+\-@\t]/.test(s)) return "'" + s;
@@ -1039,6 +1163,11 @@ function doPost(e) {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json(getIdPhoto(payload));
     }
+    if (payload.action === 'getSignature') {
+      // Same POST-only, token-gated posture as getIdPhoto.
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(getSignature(payload));
+    }
     if (payload.action === 'getStaff') {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, staff: getStaff() });
@@ -1050,6 +1179,22 @@ function doPost(e) {
     if (payload.action === 'deleteStaff') {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json(deleteStaff(payload));
+    }
+    if (payload.action === 'updateStaff') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(updateStaff(payload));
+    }
+    if (payload.action === 'assignBookingStaff') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(assignBookingStaff(payload));
+    }
+    if (payload.action === 'getCommissionReport') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(getCommissionReport(payload));
+    }
+    if (payload.action === 'markDepositReceived') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(markDepositReceived(payload));
     }
     return _json(saveBooking(payload));
   } catch (err) {
@@ -1118,6 +1263,15 @@ function saveBooking(p) {
       _logError('saveBooking.photo', photoErr);
     }
 
+    // Same idea for a drawn waiver signature (if the guest used the
+    // signature pad instead of/alongside the typed-name fallback).
+    var signatureUrl = '';
+    try {
+      signatureUrl = _saveSignature(p);
+    } catch (sigErr) {
+      _logError('saveBooking.signature', sigErr);
+    }
+
     try {
       sh.appendRow([
         _safe(p.ref, 'N/A'),
@@ -1143,6 +1297,34 @@ function saveBooking(p) {
       ]);
     } catch (writeErr) {
       return _fail('saveBooking.write', writeErr);
+    }
+
+    // signatureUrl lands after the staff/deposit columns in FIELDS, past
+    // where the positional appendRow() above stops writing — same
+    // header.indexOf lookup pattern as assignBookingStaff/markDepositReceived
+    // rather than padding the appendRow array with placeholder blanks.
+    // Deliberately locates the row by matching p.ref, NOT sh.getLastRow() —
+    // concurrent doPost executions (no LockService in this file) can append
+    // another booking between this request's appendRow() and this point,
+    // which would otherwise write this guest's signature onto the wrong
+    // (someone else's) row.
+    if (signatureUrl) {
+      try {
+        var freshData = sh.getDataRange().getValues();
+        var freshHdr = freshData[0] || [];
+        var freshRefIdx = freshHdr.indexOf('ref');
+        var sigColIdx = freshHdr.indexOf('signatureUrl');
+        if (freshRefIdx !== -1 && sigColIdx !== -1) {
+          for (var sigRow = freshData.length - 1; sigRow >= 1; sigRow--) {
+            if (String(freshData[sigRow][freshRefIdx]) === String(p.ref)) {
+              sh.getRange(sigRow + 1, sigColIdx + 1).setValue(signatureUrl);
+              break;
+            }
+          }
+        }
+      } catch (sigWriteErr) {
+        _logError('saveBooking.signatureWrite', sigWriteErr);
+      }
     }
 
     // Idempotent notification: only mark/send once, and never let a mail
@@ -1230,7 +1412,8 @@ function getCustomers(limit) {
       c.bookings.push({
         ref: obj.ref, datetime: obj.datetime, duration: obj.duration, gear: obj.gear,
         total: obj.total, status: obj.status || 'pending',
-        idPhotoUrl: obj.idPhotoUrl || '', waiverAccepted: obj.waiverAccepted || ''
+        idPhotoUrl: obj.idPhotoUrl || '', waiverAccepted: obj.waiverAccepted || '',
+        signatureUrl: obj.signatureUrl || ''
       });
     }
 
@@ -1245,13 +1428,17 @@ function getCustomers(limit) {
       for (var j = bookings.length - 1; j >= 0; j--) {
         if (bookings[j].idPhotoUrl) { idPhotoUrl = bookings[j].idPhotoUrl; idPhotoRef = bookings[j].ref; break; }
       }
+      var signatureUrl = '', signatureRef = '';
+      for (var k = bookings.length - 1; k >= 0; k--) {
+        if (bookings[k].signatureUrl) { signatureUrl = bookings[k].signatureUrl; signatureRef = bookings[k].ref; break; }
+      }
       var waiverOnFile = bookings.some(function (b) {
         return b.waiverAccepted === true || String(b.waiverAccepted).toLowerCase() === 'true';
       });
 
       // Double-booking conflict: two still-active (pending/confirmed)
       // bookings for the same guest whose time windows overlap.
-      var active = bookings.filter(function (b) { return b.status === 'pending' || b.status === 'confirmed'; });
+      var active = bookings.filter(function (b) { return b.status === 'pending' || b.status === 'confirmed' || b.status === 'delivering'; });
       var hasConflict = false;
       for (var a = 0; a < active.length && !hasConflict; a++) {
         var aStart = new Date(active[a].datetime).getTime();
@@ -1275,6 +1462,8 @@ function getCustomers(limit) {
         totalSpent: totalSpent,
         idPhotoUrl: idPhotoUrl,
         idPhotoRef: idPhotoRef,
+        signatureUrl: signatureUrl,
+        signatureRef: signatureRef,
         waiverOnFile: waiverOnFile,
         isRegular: bookings.length >= 3,
         hasConflict: hasConflict,
@@ -1292,8 +1481,8 @@ function getCustomers(limit) {
 
 // ── SCOPED DISPATCH VIEW — only what a delivery/dispatch staffer needs.
 // Deliberately excludes: total, referral, waiverAccepted, waiverTimestamp,
-// idPhotoUrl, email. No pricing or revenue figure appears anywhere in this
-// return value — that's the entire point of this endpoint existing.
+// idPhotoUrl, signatureUrl, email. No pricing or revenue figure appears
+// anywhere in this return value — that's the entire point of this endpoint existing.
 var DISPATCH_FIELDS = ['ref', 'fname', 'lname', 'phone', 'datetime', 'groupSize', 'kidsCount', 'gear', 'duration', 'notes', 'status', 'driverLat', 'driverLng', 'driverLocAt'];
 
 function getDispatchBookings(limit) {
@@ -1356,6 +1545,41 @@ function getIdPhoto(p) {
   }
 }
 
+// ── GUEST SIGNATURE VIEW (token-gated, POST-only — never a public link) ──
+// Same pattern as getIdPhoto: looks up the booking's stored signatureUrl,
+// extracts the Drive file ID, and returns the image content directly.
+function getSignature(p) {
+  try {
+    if (!p || typeof p.ref !== 'string' || !p.ref.trim()) return { ok: false, error: 'Invalid ref' };
+
+    var sh = _sheet();
+    var data = sh.getDataRange().getValues();
+    var header = data[0] || [];
+    var refIdx = header.indexOf('ref');
+    var urlIdx = header.indexOf('signatureUrl');
+    if (refIdx === -1 || urlIdx === -1) return { ok: false, error: 'Sheet not initialized' };
+
+    var signatureUrl = '';
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][refIdx]) === String(p.ref)) { signatureUrl = String(data[i][urlIdx] || ''); break; }
+    }
+    if (!signatureUrl) return { ok: false, error: 'No signature on file for this booking' };
+
+    var match = signatureUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (!match) return { ok: false, error: 'Could not resolve signature file' };
+
+    var file = DriveApp.getFileById(match[1]);
+    var blob = file.getBlob();
+    return {
+      ok: true,
+      mimeType: blob.getContentType(),
+      base64: Utilities.base64Encode(blob.getBytes())
+    };
+  } catch (err) {
+    return _fail('getSignature', err);
+  }
+}
+
 function updateStatus(p) {
   try {
     var validation = _validateStatusPayload(p);
@@ -1407,6 +1631,150 @@ function updateDriverLocation(p) {
     return { ok: false, error: 'Booking not found' };
   } catch (err) {
     return _fail('updateDriverLocation', err);
+  }
+}
+
+// ── STAFF COMMISSION ATTRIBUTION (admin-only — sets which staff member gets
+// credit for a booking's sale; drivers/dispatch never see or set this) ──
+function assignBookingStaff(p) {
+  try {
+    if (!p || typeof p.ref !== 'string' || !p.ref.trim()) return { ok: false, error: 'Invalid ref' };
+    // staffId '' is allowed — that's how a booking gets unassigned again.
+    if (p.staffId !== undefined && p.staffId !== null && typeof p.staffId !== 'string') {
+      return { ok: false, error: 'Invalid staffId' };
+    }
+
+    var sh = _sheet();
+    var data = sh.getDataRange().getValues();
+    var header = data[0] || [];
+    var refIdx = header.indexOf('ref');
+    var staffIdIdx = header.indexOf('staffId');
+    var staffNameIdx = header.indexOf('staffName');
+    if (refIdx === -1 || staffIdIdx === -1 || staffNameIdx === -1) return { ok: false, error: 'Sheet not initialized' };
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][refIdx]) === String(p.ref)) {
+        sh.getRange(i + 1, staffIdIdx + 1, 1, 2).setValues([[_safe(p.staffId, ''), _safe(p.staffName, '')]]);
+        return { ok: true };
+      }
+    }
+    return { ok: false, error: 'Booking not found' };
+  } catch (err) {
+    return _fail('assignBookingStaff', err);
+  }
+}
+
+// ── COMMISSION REPORT — read-only, computed fresh from BOOKINGS + STAFF on
+// every call (same "derive, don't duplicate" approach as getCustomers). Sums
+// booking.total for every booking attributed to each staff member whose
+// datetime (the rental date/time, not Timestamp — when the booking was
+// logged) falls inside [startDate, endDate]. Owner's call 2026-07-15: payroll
+// periods should follow when the rental actually happens, not when it was
+// booked. No payout automation — report only.
+// Parses a 'YYYY-MM-DD' date-input string as local midnight, not UTC
+// midnight. new Date('YYYY-MM-DD') parses as UTC per spec, so in a
+// timezone behind UTC (e.g. AST, UTC-4) reading it back with
+// getFullYear/getMonth/getDate silently rolls the date back a day —
+// this bit getCommissionReport's "inclusive end date" before this fix.
+function _parseLocalDateInput(s) {
+  var parts = String(s).split('-');
+  if (parts.length !== 3) return null;
+  var y = Number(parts[0]), m = Number(parts[1]), d = Number(parts[2]);
+  if (!isFinite(y) || !isFinite(m) || !isFinite(d)) return null;
+  return new Date(y, m - 1, d);
+}
+
+function getCommissionReport(p) {
+  try {
+    var start = p && p.startDate ? _parseLocalDateInput(p.startDate) : null;
+    var end = p && p.endDate ? _parseLocalDateInput(p.endDate) : null;
+    if (!start || isNaN(start.getTime()) || !end || isNaN(end.getTime())) {
+      return { ok: false, error: 'Invalid date range' };
+    }
+    // Treat endDate as inclusive of the whole day.
+    end = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999);
+
+    var staff = getStaff();
+    var byId = {};
+    staff.forEach(function (s) {
+      byId[s.id] = { staffId: s.id, name: s.name, commissionPct: s.commissionPct || 0, salesTotal: 0, commissionOwed: 0, bookingCount: 0 };
+    });
+
+    var sh = _sheet();
+    var data = sh.getDataRange().getValues();
+    var idx = {};
+    FIELDS.forEach(function (f, i) { idx[f] = i; });
+
+    var unassignedTotal = 0;
+    if (data.length > 1) {
+      for (var i = 1; i < data.length; i++) {
+        var row = data[i];
+        var rentalDate = row[idx.datetime] ? new Date(row[idx.datetime]) : null;
+        if (!rentalDate || isNaN(rentalDate.getTime()) || rentalDate < start || rentalDate > end) continue;
+
+        var total = Number(row[idx.total]) || 0;
+        var staffId = String(row[idx.staffId] || '').trim();
+        if (staffId && byId[staffId]) {
+          byId[staffId].salesTotal += total;
+          byId[staffId].bookingCount += 1;
+        } else {
+          unassignedTotal += total;
+        }
+      }
+    }
+
+    var report = Object.keys(byId).map(function (id) {
+      var r = byId[id];
+      r.commissionOwed = r.salesTotal * (r.commissionPct / 100);
+      return r;
+    }).sort(function (a, b) { return b.salesTotal - a.salesTotal; });
+
+    return { ok: true, report: report, unassignedTotal: unassignedTotal };
+  } catch (err) {
+    return _fail('getCommissionReport', err);
+  }
+}
+
+// ── DEPOSIT TRACKING (manual — admin enters whatever amount actually landed
+// in the BOSVG bank account by transfer; no gateway, no calculated %) ──
+function markDepositReceived(p) {
+  try {
+    if (!p || typeof p.ref !== 'string' || !p.ref.trim()) return { ok: false, error: 'Invalid ref' };
+    var amount = Number(p.amount);
+    // > 0, not >= 0 — a blank input box coerces to 0 via Number(''), which
+    // must not be recordable as a legitimate "deposit received."
+    if (isNaN(amount) || amount <= 0) return { ok: false, error: 'Enter a deposit amount greater than zero' };
+
+    var sh = _sheet();
+    var data = sh.getDataRange().getValues();
+    var header = data[0] || [];
+    var refIdx = header.indexOf('ref');
+    var amtIdx = header.indexOf('depositAmount');
+    var atIdx = header.indexOf('depositReceivedAt');
+    var statusIdx = header.indexOf('depositStatus');
+    if (refIdx === -1 || amtIdx === -1 || atIdx === -1 || statusIdx === -1) return { ok: false, error: 'Sheet not initialized' };
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][refIdx]) === String(p.ref)) {
+        // A deposit already marked received requires an explicit
+        // confirmOverwrite flag — otherwise a stale tab or accidental
+        // double-tap would silently clobber a correctly-recorded amount.
+        if (String(data[i][statusIdx]) === 'received' && !p.confirmOverwrite) {
+          return {
+            ok: false,
+            error: 'Deposit already marked received',
+            alreadyReceived: true,
+            existingAmount: Number(data[i][amtIdx]) || 0,
+            existingAt: data[i][atIdx] || ''
+          };
+        }
+        sh.getRange(i + 1, amtIdx + 1, 1, 3).setValues([[amount, new Date().toISOString(), 'received']]);
+        return { ok: true };
+      }
+    }
+    return { ok: false, error: 'Booking not found' };
+  } catch (err) {
+    return _fail('markDepositReceived', err);
   }
 }
 
@@ -2169,15 +2537,15 @@ function installBackupTrigger() {
 
 // ── AUTOMATED BUSINESS REPORT ──
 // Adapted to the REAL BOOKINGS schema (named FIELDS columns via _sheet(),
-// not fixed A-G letters). Two things the original draft assumed that don't
-// exist yet in this system, deliberately left out rather than faked:
-//   - Deposits: bookings only ever store one 'total' amount, no deposit field.
-//   - Staff commission: not tracked anywhere. If you want this, it needs a
-//     real payroll design first (see the open payroll conversation) — a
-//     report can't invent numbers that were never captured.
-// 'cancelled' isn't a real status either (VALID_STATUSES is pending/
-// confirmed/done) — so unlike the original draft, this counts all logged
-// bookings as revenue rather than guessing at a cancellation split.
+// not fixed A-G letters). Deposits (depositAmount/depositStatus) and staff
+// commission (STAFF.commissionPct + BOOKINGS.staffId, added 2026-07-15) are
+// now tracked, but deliberately kept out of THIS auto-email — they have
+// their own read-only admin reports (Bookings deposit column, Commission
+// tab) and folding them into the daily/weekly blast risks the owner
+// mis-reading "revenue" as "cash actually collected." 'cancelled' isn't a
+// real status either (VALID_STATUSES is pending/confirmed/delivering/done)
+// — so this counts all logged bookings as revenue rather than guessing at
+// a cancellation split.
 var REPORT_TYPE_PROP_KEY = 'apr_report_type';
 
 function sendAutoReport() {
@@ -2285,7 +2653,7 @@ function _buildReportHtml(reportType, d) {
     bookingRows +
     '</table>' +
 
-    '<p style="margin-top:16px; font-size:12px; color:#888;">Deposits and staff commission are not tracked yet — this report only covers what the booking system actually captures.</p>' +
+    '<p style="margin-top:16px; font-size:12px; color:#888;">Deposits and staff commission have their own admin reports (Bookings tab, Commission tab) — not included in this summary.</p>' +
     '<p style="margin-top:8px; font-size:11px; color:#999;">Automated report — Aquatic Paradise Rentals booking system.</p>' +
     '</div></div>';
 }

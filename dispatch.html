@@ -30,6 +30,7 @@ header p{font-size:0.72rem;color:rgba(255,255,255,0.7);margin-top:2px}
 .status-pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:0.68rem;font-weight:700;text-transform:uppercase;margin-top:6px}
 .status-pill.pending{background:rgba(251,198,44,0.2);color:var(--gold)}
 .status-pill.confirmed{background:rgba(3,147,158,0.3);color:#5fd0da}
+.status-pill.delivering{background:rgba(224,53,27,0.25);color:#ff8a70}
 .status-pill.done{background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.5)}
 .actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
 .btn{flex:1;min-width:90px;padding:9px;border-radius:8px;border:none;font-weight:700;font-size:0.78rem;cursor:pointer;color:#fff}
@@ -155,9 +156,63 @@ async function fetchDispatch() {
     bookings = (bkData && bkData.ok && Array.isArray(bkData.bookings)) ? bkData.bookings : [];
     drivers = (drvData && drvData.ok && Array.isArray(drvData.drivers)) ? drvData.drivers : [];
     render();
+    ensureTracking();
   } catch (err) {
     showToast('Could not load: '+err.message);
   }
+}
+
+// ── AUTO GPS TRACKING while a delivery is in progress ──
+// Foreground-only by design (Page Visibility API pauses/resumes) — a real
+// background tracker needs OS-level location permission this PWA doesn't
+// have. Trade-off accepted: only works while the driver's screen is on and
+// this tab is open, but that beats the old one-shot-per-tap model.
+let deliveringRefs = new Set();
+let trackIntervals = {};
+const TRACK_INTERVAL_MS = 60000;
+
+function ensureTracking() {
+  bookings.forEach(b => {
+    if (!b || !b.ref) return;
+    const status = b.status && b.status !== 'N/A' ? b.status : 'pending';
+    if (status === 'delivering') startAutoTracking(b.ref);
+    else stopAutoTracking(b.ref);
+  });
+}
+function startAutoTracking(ref) {
+  if (deliveringRefs.has(ref)) return;
+  deliveringRefs.add(ref);
+  if (!document.hidden) armInterval(ref);
+}
+function stopAutoTracking(ref) {
+  deliveringRefs.delete(ref);
+  disarmInterval(ref);
+}
+function armInterval(ref) {
+  if (trackIntervals[ref]) return;
+  shareLocationSilent(ref);
+  trackIntervals[ref] = setInterval(() => shareLocationSilent(ref), TRACK_INTERVAL_MS);
+}
+function disarmInterval(ref) {
+  if (trackIntervals[ref]) { clearInterval(trackIntervals[ref]); delete trackIntervals[ref]; }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    Object.keys(trackIntervals).forEach(disarmInterval);
+  } else {
+    deliveringRefs.forEach(armInterval);
+  }
+});
+function shareLocationSilent(ref) {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(async pos => {
+    try {
+      await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+        action:'update_driver_location', token:STAFF_TOKEN, ref,
+        lat: pos.coords.latitude, lng: pos.coords.longitude
+      }),signal:AbortSignal.timeout(15000)});
+    } catch (err) { /* silent — next tick retries, no toast spam every minute */ }
+  }, () => { /* denied/unavailable — silent, driver already granted it once for manual share */ }, { enableHighAccuracy: true, timeout: 10000 });
 }
 
 function render() {
@@ -180,9 +235,11 @@ function render() {
       <div class="detail">👥 Group: ${escapeHtml(b.groupSize)}${b.kidsCount && b.kidsCount!=='N/A' && Number(b.kidsCount)>0 ? ' ('+escapeHtml(b.kidsCount)+' kid(s) — kid-size life jacket)' : ''}</div>
       ${b.notes && b.notes!=='N/A' ? `<div class="detail">📝 ${escapeHtml(b.notes)}</div>` : ''}
       ${hasLoc ? `<div class="detail">📍 Last location: <a href="${mapUrl}" target="_blank" style="color:#5fd0da">view on map</a> (${escapeHtml(b.driverLocAt)})</div>` : ''}
+      ${status==='delivering' ? `<div class="detail" style="color:#ff8a70">🛰️ Auto-sharing location every minute while this tab stays open</div>` : ''}
       <span class="status-pill ${status}">${status}</span>
       <div class="actions">
-        ${status!=='confirmed'&&status!=='done'?`<button class="btn confirm" data-ref="${ref}" onclick="setStatus(this.dataset.ref,'confirmed')">✅ Confirm</button>`:''}
+        ${status==='pending'?`<button class="btn confirm" data-ref="${ref}" onclick="setStatus(this.dataset.ref,'confirmed')">✅ Confirm</button>`:''}
+        ${status==='confirmed'?`<button class="btn" style="background:var(--coral)" data-ref="${ref}" onclick="setStatus(this.dataset.ref,'delivering')">🚚 Start Delivery</button>`:''}
         ${status!=='done'?`<button class="btn done-btn" data-ref="${ref}" onclick="setStatus(this.dataset.ref,'done')">☑ Done</button>`:''}
         ${status!=='done'?`<button class="btn" style="background:#3a4a5c" data-ref="${ref}" onclick="shareLocation(this.dataset.ref)">📍 Share Location</button>`:''}
         ${phone?`<a class="btn wa" href="https://wa.me/${encodeURIComponent(phone)}" target="_blank">💬 Guest</a>`:''}

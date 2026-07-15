@@ -89,6 +89,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
 .bk-status{font-size:0.65rem;padding:3px 8px;border-radius:8px;font-weight:700}
 .bk-status.pending{background:rgba(251,198,44,0.2);color:var(--gold)}
 .bk-status.confirmed{background:rgba(10,122,66,0.2);color:#4ade80}
+.bk-status.delivering{background:rgba(3,147,158,0.25);color:#5fd0da}
 .bk-status.done{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.4)}
 .bk-name{font-size:0.95rem;font-weight:700;color:#fff;margin-bottom:2px}
 .bk-detail{font-size:0.78rem;color:rgba(255,255,255,0.55);line-height:1.5}
@@ -129,7 +130,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
 .safety-submit:hover.ready{background:#0a6a38}
 
 /* TEAM */
-.team-card{background:#162030;border-radius:var(--radius);padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:14px}
+.team-card{background:#162030;border-radius:var(--radius);padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .team-avatar{width:46px;height:46px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;border:2px solid rgba(255,255,255,0.1)}
 .team-info{flex:1}
 .team-name{font-weight:700;color:#fff;font-size:0.92rem}
@@ -235,6 +236,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
     <div class="home-tile" onclick="switchATab('team')"><span class="ht-icon">👥</span><span class="ht-label">Team</span><span class="ht-sub">Staff contacts</span></div>
     <div class="home-tile" onclick="switchATab('drivers')"><span class="ht-icon">🚚</span><span class="ht-label">Drivers</span><span class="ht-sub">Delivery drivers</span></div>
     <div class="home-tile" onclick="switchATab('feedback')"><span class="ht-icon">⭐</span><span class="ht-label">Feedback</span><span class="ht-sub">Customer reviews</span></div>
+    <div class="home-tile" onclick="switchATab('commission')"><span class="ht-icon">💵</span><span class="ht-label">Commission</span><span class="ht-sub">Staff sales &amp; commission</span></div>
     <div class="home-tile" onclick="switchATab('messages')"><span class="ht-icon">✉️</span><span class="ht-label">Messages</span><span class="ht-sub">Sent history</span></div>
     <div class="home-tile" onclick="switchATab('settings')"><span class="ht-icon">⚙️</span><span class="ht-label">Settings</span><span class="ht-sub">PIN &amp; session</span></div>
     <div class="home-tile" onclick="switchATab('rates')"><span class="ht-icon">💰</span><span class="ht-label">Rates</span><span class="ht-sub">Price list</span></div>
@@ -485,7 +487,41 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1b2a;color:#e8edf
     <div style="font-size:1.6rem;font-weight:800;color:#FBC62C" id="feedbackAvg">–</div>
     <div style="font-size:0.75rem;color:rgba(255,255,255,0.5)" id="feedbackCount">No feedback yet</div>
   </div>
+
+  <div class="sec-title">Rating Distribution</div>
+  <div class="card" id="feedbackDistribution" style="margin-bottom:16px"></div>
+
+  <div class="sec-title">Trend (avg rating by week)</div>
+  <div class="card" id="feedbackTrend" style="margin-bottom:16px"></div>
+
+  <div class="sec-title">⚠️ Needs Follow-up (≤2★)</div>
+  <div id="feedbackFlagged" style="margin-bottom:16px"></div>
+
+  <div class="sec-title">All Reviews</div>
   <div id="feedbackList"></div>
+</div>
+
+<!-- ═ COMMISSION ═ -->
+<div class="asection" id="asec-commission">
+  <div class="sec-title">Staff Sales &amp; Commission</div>
+  <p style="font-size:0.72rem;color:rgba(255,255,255,0.4);margin-bottom:12px">Read-only report — sum(booking total × commission %) for bookings assigned to each staff member in the selected period. Assign staff to a booking from the Bookings tab. No payout automation.</p>
+
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <button class="bk-btn" style="flex:0 0 auto;padding:8px 14px" onclick="setCommissionPeriod('week')">This Week</button>
+      <button class="bk-btn" style="flex:0 0 auto;padding:8px 14px" onclick="setCommissionPeriod('month')">This Month</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input type="date" id="commissionStart" style="padding:8px;border:2px solid #ddd;border-radius:6px;font-size:0.8rem"/>
+      <span style="color:rgba(255,255,255,0.5);font-size:0.8rem">to</span>
+      <input type="date" id="commissionEnd" style="padding:8px;border:2px solid #ddd;border-radius:6px;font-size:0.8rem"/>
+      <button class="refresh-btn" onclick="fetchCommissionReport()">🔄 Run Report</button>
+    </div>
+  </div>
+
+  <div id="commissionContainer">
+    <div style="text-align:center;padding:30px;color:rgba(255,255,255,0.35)">Loading commission report…</div>
+  </div>
 </div>
 
 <!-- ═ MESSAGES ═ -->
@@ -1017,8 +1053,8 @@ function renderBookings() {
     const ref = String(b.ref === undefined || b.ref === null || b.ref === '' ? 'N/A' : b.ref);
     const refAttr = escapeHtml(ref);
     const state = bookingStates[ref] || 'pending';
-    const statusClass = state==='done'?'done':state==='confirmed'?'confirmed':'pending';
-    const statusLabel = state==='done'?'Done':state==='confirmed'?'Confirmed':'Pending';
+    const statusClass = state==='done'?'done':state==='delivering'?'delivering':state==='confirmed'?'confirmed':'pending';
+    const statusLabel = state==='done'?'Done':state==='delivering'?'Delivering':state==='confirmed'?'Confirmed':'Pending';
     const fname = b.fname || 'N/A';
     const waMsg = encodeURIComponent(`Hi ${fname!=='N/A'?fname:'there'}! 👋 Your booking with Aquatic Paradise Rentals is confirmed. Gear: ${b.gear||'N/A'}. Duration: ${b.duration||'N/A'}. Total: XCD ${b.total||'0'}. See you at the beach! 🌊`);
     const phone = String(b.phone||'').replace(/\D/g,'');
@@ -1037,15 +1073,92 @@ function renderBookings() {
       ${hasLoc?`<div class="bk-detail">📍 Driver: <a href="${mapUrl}" target="_blank" style="color:var(--teal)">view on map</a> (${escapeHtml(b.driverLocAt)})</div>`:''}
       ${b.notes&&b.notes!=='N/A'?'<div class="bk-detail">📝 '+escapeHtml(b.notes)+'</div>':''}
       <div class="bk-total">XCD ${escapeHtml(b.total||0)}</div>
+      ${depositBadge(b)}
       <div class="bk-actions">
-        ${state!=='confirmed'&&state!=='done'?`<button class="bk-btn confirm" data-ref="${refAttr}" onclick="setBkState(this.dataset.ref,'confirmed')">✅ Confirm</button>`:''}
+        ${state==='pending'?`<button class="bk-btn confirm" data-ref="${refAttr}" onclick="setBkState(this.dataset.ref,'confirmed')">✅ Confirm</button>`:''}
         ${state!=='done'?`<button class="bk-btn done-btn" data-ref="${refAttr}" onclick="setBkState(this.dataset.ref,'done')">☑ Done</button>`:''}
         ${phone?`<a class="bk-btn wa" href="https://wa.me/${encodeURIComponent(phone)}?text=${waMsg}" target="_blank">💬 WhatsApp</a>`:''}
         <button class="bk-btn" data-ref="${refAttr}" onclick="notifyDelivery(this.dataset.ref)">🚚 Notify Driver</button>
         ${b.idPhotoUrl && b.idPhotoUrl!=='N/A'?`<button class="bk-btn" data-ref="${refAttr}" onclick="viewIdPhoto(this.dataset.ref)">🪪 View ID</button>`:''}
+        ${b.signatureUrl && b.signatureUrl!=='N/A'?`<button class="bk-btn" data-ref="${refAttr}" onclick="viewSignature(this.dataset.ref)">✍️ View Signature</button>`:''}
+      </div>
+      <div style="flex:1 1 100%;display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08)">
+        <span style="font-size:0.72rem;color:rgba(255,255,255,0.5)">Staff credit</span>
+        <select id="staffSel-${refAttr}" onchange="assignBookingStaffUI('${refAttr}')" style="flex:1;padding:6px 8px;border:2px solid #ddd;border-radius:6px;font-size:0.78rem">
+          <option value="">— Unassigned —</option>
+          ${staffCache.map(s => `<option value="${escapeHtml(s.id)}" ${b.staffId===s.id?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div style="flex:1 1 100%;display:flex;align-items:center;gap:8px;margin-top:6px">
+        <span style="font-size:0.72rem;color:rgba(255,255,255,0.5)">Deposit</span>
+        <input type="number" min="0" step="0.01" id="depAmt-${refAttr}" placeholder="Amount" value="${(b.depositAmount&&b.depositAmount!=='N/A')?escapeHtml(b.depositAmount):''}" style="width:90px;padding:6px 8px;border:2px solid #ddd;border-radius:6px;font-size:0.78rem"/>
+        <button class="bk-btn" style="flex:0 0 auto" data-ref="${refAttr}" onclick="markDepositReceivedUI(this.dataset.ref)">💰 Mark Received</button>
       </div>
     </div>`;
   }).join('');
+}
+
+function depositBadge(b) {
+  const status = (b.depositStatus && b.depositStatus !== 'N/A') ? b.depositStatus : 'pending';
+  const amt = (b.depositAmount && b.depositAmount !== 'N/A') ? Number(b.depositAmount).toFixed(2) : null;
+  if (status === 'received') {
+    return `<div class="bk-detail" style="color:#4ade80">✅ Deposit received: XCD ${amt||'0.00'}${b.depositReceivedAt&&b.depositReceivedAt!=='N/A'?' ('+escapeHtml(b.depositReceivedAt)+')':''}</div>`;
+  }
+  return `<div class="bk-detail" style="color:rgba(255,255,255,0.4)">⏳ Deposit pending</div>`;
+}
+
+async function assignBookingStaffUI(ref) {
+  const sel = document.getElementById('staffSel-'+ref);
+  if (!sel) return;
+  const staffId = sel.value;
+  const staff = staffCache.find(s => s && s.id === staffId);
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'assignBookingStaff', token:APP_TOKEN, ref, staffId, staffName: staff ? staff.name : ''
+    }),signal:AbortSignal.timeout(15000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Save failed');
+  } catch (err) {
+    showToast('Could not assign staff: '+err.message, 'warn');
+    return;
+  }
+  const b = allBookings.find(x=>x && x.ref===ref);
+  if (b) { b.staffId = staffId; b.staffName = staff ? staff.name : ''; }
+  addLog(`👥 Booking ${ref} credited to `+(staff?staff.name:'unassigned'));
+  showToast('Staff assigned ✅','ok');
+}
+
+async function markDepositReceivedUI(ref, confirmOverwrite) {
+  const input = document.getElementById('depAmt-'+ref);
+  if (!input) return;
+  const amount = Number(input.value);
+  if (!input.value.trim() || isNaN(amount) || amount <= 0) { showToast('Enter a deposit amount greater than zero', 'warn'); return; }
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'markDepositReceived', token:APP_TOKEN, ref, amount, confirmOverwrite: !!confirmOverwrite
+    }),signal:AbortSignal.timeout(15000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (!data || !data.ok) {
+      if (data && data.alreadyReceived) {
+        const existing = Number(data.existingAmount||0).toFixed(2);
+        if (confirm(`A deposit of XCD ${existing} is already marked received for ${ref}. Overwrite it with XCD ${amount.toFixed(2)}?`)) {
+          return markDepositReceivedUI(ref, true);
+        }
+        return;
+      }
+      throw new Error((data && data.error) || 'Save failed');
+    }
+  } catch (err) {
+    showToast('Could not save deposit: '+err.message, 'warn');
+    return;
+  }
+  const b = allBookings.find(x=>x && x.ref===ref);
+  if (b) { b.depositAmount = amount; b.depositStatus = 'received'; b.depositReceivedAt = new Date().toISOString(); }
+  renderBookings();
+  addLog(`💰 Deposit recorded for ${ref}: XCD ${amount.toFixed(2)}`);
+  showToast('Deposit marked received ✅','ok');
 }
 
 async function setBkState(ref, state) {
@@ -1084,6 +1197,7 @@ async function fetchDispatchAdmin() {
     if (!data || !data.ok || !Array.isArray(data.bookings)) throw new Error((data && data.error) || 'No data');
     dispatchBookings = data.bookings;
     renderDispatchAdmin();
+    ensureTrackingAdmin();
     addLog('📦 Dispatch refreshed: '+dispatchBookings.length+' deliveries');
   } catch(e) {
     el.innerHTML=`<div style="text-align:center;padding:30px">
@@ -1106,7 +1220,7 @@ function renderDispatchAdmin() {
     const ref = String(b.ref === undefined || b.ref === null || b.ref === '' ? 'N/A' : b.ref);
     const refAttr = escapeHtml(ref);
     const status = b.status && b.status !== 'N/A' ? b.status : 'pending';
-    const statusClass = status==='done'?'done':status==='confirmed'?'confirmed':'pending';
+    const statusClass = status==='done'?'done':status==='delivering'?'delivering':status==='confirmed'?'confirmed':'pending';
     const phone = String(b.phone||'').replace(/\D/g,'');
     const hasLoc = b.driverLat && b.driverLat!=='N/A' && b.driverLng && b.driverLng!=='N/A';
     const mapUrl = hasLoc ? `https://www.google.com/maps?q=${encodeURIComponent(b.driverLat)},${encodeURIComponent(b.driverLng)}` : '';
@@ -1124,8 +1238,10 @@ function renderDispatchAdmin() {
       <div class="bk-detail">👥 Group: ${escapeHtml(b.groupSize||'1')}${b.kidsCount && b.kidsCount!=='N/A' && Number(b.kidsCount)>0 ? ' ('+escapeHtml(b.kidsCount)+' kid(s) — kid-size life jacket)':''}</div>
       ${b.notes && b.notes!=='N/A' ? '<div class="bk-detail">📝 '+escapeHtml(b.notes)+'</div>':''}
       ${hasLoc ? `<div class="bk-detail">📍 Last location: <a href="${mapUrl}" target="_blank" style="color:var(--teal)">view on map</a> (${escapeHtml(b.driverLocAt)})</div>`:''}
+      ${status==='delivering' ? `<div class="bk-detail" style="color:#ff8a70">🛰️ Auto-sharing location every minute while this tab stays open</div>` : ''}
       <div class="bk-actions">
-        ${status!=='confirmed'&&status!=='done'?`<button class="bk-btn confirm" data-ref="${refAttr}" onclick="dspSetStatus(this.dataset.ref,'confirmed')">✅ Confirm</button>`:''}
+        ${status==='pending'?`<button class="bk-btn confirm" data-ref="${refAttr}" onclick="dspSetStatus(this.dataset.ref,'confirmed')">✅ Confirm</button>`:''}
+        ${status==='confirmed'?`<button class="bk-btn" style="background:var(--coral);color:#fff" data-ref="${refAttr}" onclick="dspSetStatus(this.dataset.ref,'delivering')">🚚 Start Delivery</button>`:''}
         ${status!=='done'?`<button class="bk-btn done-btn" data-ref="${refAttr}" onclick="dspSetStatus(this.dataset.ref,'done')">☑ Done</button>`:''}
         ${status!=='done'?`<button class="bk-btn" style="background:#3a4a5c;color:#fff" data-ref="${refAttr}" onclick="dspShareLocation(this.dataset.ref)">📍 Share Location</button>`:''}
         ${phone?`<a class="bk-btn wa" href="https://wa.me/${encodeURIComponent(phone)}" target="_blank">💬 Guest</a>`:''}
@@ -1133,6 +1249,58 @@ function renderDispatchAdmin() {
       </div>
     </div>`;
   }).join('');
+}
+
+// ── AUTO GPS TRACKING (admin Dispatch view — same pattern as dispatch.html;
+// mainly useful if staff run deliveries from the admin console on a phone
+// instead of the dedicated dispatch.html page). Foreground-only — see the
+// note in dispatch.html for why. ──
+let deliveringRefsAdmin = new Set();
+let trackIntervalsAdmin = {};
+const TRACK_INTERVAL_MS_ADMIN = 60000;
+
+function ensureTrackingAdmin() {
+  dispatchBookings.forEach(b => {
+    if (!b || !b.ref) return;
+    const status = b.status && b.status !== 'N/A' ? b.status : 'pending';
+    if (status === 'delivering') startAutoTrackingAdmin(b.ref);
+    else stopAutoTrackingAdmin(b.ref);
+  });
+}
+function startAutoTrackingAdmin(ref) {
+  if (deliveringRefsAdmin.has(ref)) return;
+  deliveringRefsAdmin.add(ref);
+  if (!document.hidden) armIntervalAdmin(ref);
+}
+function stopAutoTrackingAdmin(ref) {
+  deliveringRefsAdmin.delete(ref);
+  disarmIntervalAdmin(ref);
+}
+function armIntervalAdmin(ref) {
+  if (trackIntervalsAdmin[ref]) return;
+  shareLocationSilentAdmin(ref);
+  trackIntervalsAdmin[ref] = setInterval(() => shareLocationSilentAdmin(ref), TRACK_INTERVAL_MS_ADMIN);
+}
+function disarmIntervalAdmin(ref) {
+  if (trackIntervalsAdmin[ref]) { clearInterval(trackIntervalsAdmin[ref]); delete trackIntervalsAdmin[ref]; }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    Object.keys(trackIntervalsAdmin).forEach(disarmIntervalAdmin);
+  } else {
+    deliveringRefsAdmin.forEach(armIntervalAdmin);
+  }
+});
+function shareLocationSilentAdmin(ref) {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(async pos => {
+    try {
+      await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+        action:'update_driver_location', token:APP_TOKEN, ref,
+        lat: pos.coords.latitude, lng: pos.coords.longitude
+      }),signal:AbortSignal.timeout(15000)});
+    } catch (err) { /* silent — next tick retries */ }
+  }, () => { /* denied/unavailable — silent */ }, { enableHighAccuracy: true, timeout: 10000 });
 }
 
 async function dspSetStatus(ref, status) {
@@ -1348,6 +1516,7 @@ function renderTeam() {
     const wa = (t && t.phone) || '';
     const id = (t && t.id) || '';
     const idAttr = escapeHtml(id).replace(/'/g,'&#39;');
+    const commissionPct = (t && t.commissionPct) || 0;
     return `<div class="team-card">
       ${avatarHtml(t.photoUrl, '🙂')}
       <div class="team-info">
@@ -1358,8 +1527,35 @@ function renderTeam() {
       <a class="team-wa" style="background:var(--gold);color:#0B1E2D" href="${notifyLink(wa,'🔔 APR Alert: Please check the staff console for an update — '+name)}">🔔 Notify</a>`
       :'<span style="font-size:0.72rem;color:rgba(255,255,255,0.4)">No phone on file</span>'}
       <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer" onclick="removeStaffMember('${idAttr}')">🗑️</button>
+      <div style="flex:1 1 100%;display:flex;align-items:center;gap:8px;margin-top:6px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08)">
+        <span style="font-size:0.72rem;color:rgba(255,255,255,0.5)">Commission %</span>
+        <input type="number" min="0" max="100" step="0.5" value="${escapeHtml(commissionPct)}" id="commission-${idAttr}" style="width:70px;padding:6px 8px;border:2px solid #ddd;border-radius:6px;font-size:0.8rem"/>
+        <button class="team-wa" style="background:var(--teal);border:none;cursor:pointer" onclick="saveStaffCommission('${idAttr}')">💾 Save</button>
+      </div>
     </div>`;
   }).join('');
+}
+
+async function saveStaffCommission(id) {
+  const input = document.getElementById('commission-'+id);
+  if (!input) return;
+  const pct = Number(input.value);
+  if (isNaN(pct) || pct < 0 || pct > 100) { showToast('Commission % must be between 0 and 100', 'warn'); return; }
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'updateStaff', token:APP_TOKEN, id, commissionPct:pct
+    }),signal:AbortSignal.timeout(15000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Save failed');
+  } catch (err) {
+    showToast('Could not save commission: '+err.message, 'warn');
+    return;
+  }
+  const s = staffCache.find(x => x && x.id === id);
+  if (s) s.commissionPct = pct;
+  addLog('👥 Commission updated: '+id+' → '+pct+'%');
+  showToast('Commission saved ✅','ok');
 }
 
 async function addStaffMember() {
@@ -1894,27 +2090,38 @@ function populateDeliveryDriverSelect() {
 // the token-gated backend and shown in an inline overlay (data URI only,
 // never written to a URL/history).
 async function viewIdPhoto(ref) {
+  return _viewPhotoOverlay(ref, 'getIdPhoto', 'idPhotoOverlay', 'ID photo');
+}
+
+// Same private-fetch-and-overlay pattern as viewIdPhoto — a drawn waiver
+// signature is guest PII too, so it's never a public Drive link either.
+async function viewSignature(ref) {
+  return _viewPhotoOverlay(ref, 'getSignature', 'signatureOverlay', 'signature');
+}
+
+async function _viewPhotoOverlay(ref, action, overlayId, label) {
   if (!ref) return;
-  showToast('Loading ID photo…', 'ok');
+  showToast('Loading '+label+'…', 'ok');
   try {
     const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
-      action:'getIdPhoto', token:APP_TOKEN, ref
+      action, token:APP_TOKEN, ref
     }),signal:AbortSignal.timeout(20000)});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
-    if (!data || !data.ok || !data.base64) throw new Error((data && data.error) || 'No photo available');
+    if (!data || !data.ok || !data.base64) throw new Error((data && data.error) || 'No '+label+' available');
 
-    let overlay = document.getElementById('idPhotoOverlay');
+    let overlay = document.getElementById(overlayId);
     if (!overlay) {
       overlay = document.createElement('div');
-      overlay.id = 'idPhotoOverlay';
+      overlay.id = overlayId;
       overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px';
       overlay.onclick = () => overlay.remove();
       document.body.appendChild(overlay);
     }
-    overlay.innerHTML = `<img src="data:${data.mimeType};base64,${data.base64}" style="max-width:100%;max-height:90vh;border-radius:8px"/>`;
+    const bg = overlayId === 'signatureOverlay' ? 'background:#fff;padding:16px;' : '';
+    overlay.innerHTML = `<img src="data:${data.mimeType};base64,${data.base64}" style="max-width:100%;max-height:90vh;border-radius:8px;${bg}"/>`;
   } catch (err) {
-    showToast('Could not load ID photo: '+err.message, 'warn');
+    showToast('Could not load '+label+': '+err.message, 'warn');
   }
 }
 
@@ -2107,15 +2314,88 @@ function renderFeedback(feedback) {
   const avgEl = document.getElementById('feedbackAvg');
   const countEl = document.getElementById('feedbackCount');
   const listEl = document.getElementById('feedbackList');
+  const distEl = document.getElementById('feedbackDistribution');
+  const trendEl = document.getElementById('feedbackTrend');
+  const flagEl = document.getElementById('feedbackFlagged');
   if (!feedback.length) {
     avgEl.textContent = '–';
     countEl.textContent = 'No feedback yet';
     listEl.innerHTML = '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.35)">No feedback submitted yet</div>';
+    if (distEl) distEl.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.35);font-size:0.8rem">No data yet</div>';
+    if (trendEl) trendEl.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.35);font-size:0.8rem">No data yet</div>';
+    if (flagEl) flagEl.innerHTML = '';
     return;
   }
   const avg = feedback.reduce((sum,f)=>sum+Number(f.rating||0),0) / feedback.length;
   avgEl.textContent = '⭐ ' + avg.toFixed(1);
   countEl.textContent = feedback.length + ' review' + (feedback.length===1?'':'s');
+
+  // ── Rating distribution (1★–5★ counts) ──
+  if (distEl) {
+    const counts = {1:0,2:0,3:0,4:0,5:0};
+    feedback.forEach(f => { const r = Number(f.rating)||0; if (counts[r]!==undefined) counts[r]++; });
+    const max = Math.max(1, ...Object.values(counts));
+    distEl.innerHTML = [5,4,3,2,1].map(r => {
+      const c = counts[r];
+      const pct = Math.round((c/max)*100);
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="width:28px;font-size:0.78rem;color:#FBC62C">${r}★</span>
+        <div style="flex:1;background:rgba(255,255,255,0.08);border-radius:6px;height:14px;overflow:hidden">
+          <div style="width:${pct}%;background:${r<=2?'var(--coral)':'var(--teal)'};height:100%"></div>
+        </div>
+        <span style="width:24px;text-align:right;font-size:0.76rem;color:rgba(255,255,255,0.6)">${c}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Trend: average rating grouped by ISO week (oldest → newest) ──
+  if (trendEl) {
+    const byWeek = {};
+    feedback.forEach(f => {
+      const d = new Date(f.createdAt);
+      if (isNaN(d)) return;
+      const weekStart = new Date(d);
+      weekStart.setDate(d.getDate() - d.getDay());
+      const key = weekStart.toISOString().slice(0,10);
+      (byWeek[key] = byWeek[key] || []).push(Number(f.rating)||0);
+    });
+    const weeks = Object.keys(byWeek).sort();
+    if (!weeks.length) {
+      trendEl.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.35);font-size:0.8rem">No data yet</div>';
+    } else {
+      trendEl.innerHTML = weeks.map(wk => {
+        const ratings = byWeek[wk];
+        const wAvg = ratings.reduce((s,r)=>s+r,0) / ratings.length;
+        const label = new Date(wk).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+        const pct = Math.round((wAvg/5)*100);
+        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="width:60px;font-size:0.72rem;color:rgba(255,255,255,0.5)">${label}</span>
+          <div style="flex:1;background:rgba(255,255,255,0.08);border-radius:6px;height:12px;overflow:hidden">
+            <div style="width:${pct}%;background:var(--gold);height:100%"></div>
+          </div>
+          <span style="width:52px;text-align:right;font-size:0.72rem;color:rgba(255,255,255,0.6)">${wAvg.toFixed(1)}★ (${ratings.length})</span>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  // ── Flagged: ≤2★ reviews with comments, so the owner can follow up ──
+  if (flagEl) {
+    const flagged = feedback.filter(f => Number(f.rating) <= 2);
+    if (!flagged.length) {
+      flagEl.innerHTML = '<div style="text-align:center;padding:14px;color:rgba(255,255,255,0.35);font-size:0.8rem">No low ratings — nothing to follow up on 🎉</div>';
+    } else {
+      flagEl.innerHTML = flagged.map(f => {
+        const stars = '★'.repeat(Number(f.rating)||0) + '☆'.repeat(5-(Number(f.rating)||0));
+        return `<div class="card" style="margin-bottom:10px;border-left:3px solid var(--coral)">
+          <div style="color:var(--coral);font-size:1rem;letter-spacing:2px">${stars}</div>
+          <div style="font-size:0.72rem;color:rgba(255,255,255,0.45);margin:4px 0">${escapeHtml(f.ref||'')} · ${escapeHtml(f.createdAt||'')}</div>
+          ${f.comment ? `<div style="font-size:0.85rem;color:rgba(255,255,255,0.85)">${escapeHtml(f.comment)}</div>` : '<div style="font-size:0.78rem;color:rgba(255,255,255,0.4);font-style:italic">No comment left</div>'}
+        </div>`;
+      }).join('');
+    }
+  }
+
   listEl.innerHTML = feedback.map(f => {
     const stars = '★'.repeat(Number(f.rating)||0) + '☆'.repeat(5-(Number(f.rating)||0));
     const refAttr = escapeHtml(f.ref||'');
@@ -2129,6 +2409,85 @@ function renderFeedback(feedback) {
       ${f.comment ? `<div style="font-size:0.85rem;color:rgba(255,255,255,0.85)">${escapeHtml(f.comment)}</div>` : ''}
     </div>`;
   }).join('');
+}
+
+// ── COMMISSION REPORT (read-only, computed server-side from BOOKINGS + STAFF) ──
+function _dateInputStr(d) { return d.toISOString().slice(0,10); }
+
+function setCommissionPeriod(period) {
+  const today = new Date();
+  let start, end;
+  if (period === 'week') {
+    start = new Date(today); start.setDate(today.getDate() - today.getDay());
+    end = new Date(start); end.setDate(start.getDate() + 6);
+  } else {
+    start = new Date(today.getFullYear(), today.getMonth(), 1);
+    end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  }
+  document.getElementById('commissionStart').value = _dateInputStr(start);
+  document.getElementById('commissionEnd').value = _dateInputStr(end);
+  fetchCommissionReport();
+}
+
+async function fetchCommissionReport() {
+  const startEl = document.getElementById('commissionStart');
+  const endEl = document.getElementById('commissionEnd');
+  if (!startEl.value || !endEl.value) {
+    // First open — default to this week.
+    setCommissionPeriod('week');
+    return;
+  }
+  const el = document.getElementById('commissionContainer');
+  el.innerHTML = '<div style="text-align:center;padding:30px;color:rgba(255,255,255,0.35)">⏳ Running report…</div>';
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'getCommissionReport', token:APP_TOKEN, startDate:startEl.value, endDate:endEl.value
+    }),signal:AbortSignal.timeout(15000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (!data || !data.ok || !Array.isArray(data.report)) throw new Error((data && data.error) || 'No data');
+    renderCommissionReport(data.report, data.unassignedTotal || 0);
+  } catch (err) {
+    el.innerHTML = `<div style="text-align:center;padding:30px">
+      <div style="color:#ef4444;font-size:0.9rem;margin-bottom:12px">⚠️ Could not load commission report</div>
+      <div style="color:rgba(255,255,255,0.45);font-size:0.78rem">${escapeHtml(err.message)}</div>
+    </div>`;
+  }
+}
+
+function renderCommissionReport(report, unassignedTotal) {
+  const el = document.getElementById('commissionContainer');
+  if (!report.length) {
+    el.innerHTML = '<div style="text-align:center;padding:30px;color:rgba(255,255,255,0.35)">No staff on file yet — add staff in the Team tab.</div>';
+    return;
+  }
+  const rows = report.map(r => `
+    <tr>
+      <td style="padding:8px 10px">${escapeHtml(r.name)}</td>
+      <td style="padding:8px 6px;text-align:center">${r.bookingCount}</td>
+      <td style="padding:8px 6px;text-align:center">${Number(r.commissionPct).toFixed(1)}%</td>
+      <td style="padding:8px 6px;text-align:right">XCD ${Number(r.salesTotal).toFixed(2)}</td>
+      <td style="padding:8px 10px;text-align:right;font-weight:800;color:var(--gold)">XCD ${Number(r.commissionOwed).toFixed(2)}</td>
+    </tr>`).join('');
+  const totalOwed = report.reduce((s,r)=>s+Number(r.commissionOwed||0),0);
+  el.innerHTML = `<div class="card" style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
+      <thead>
+        <tr style="background:#03939E;color:#fff">
+          <th style="padding:8px 10px;text-align:left">Staff</th>
+          <th style="padding:8px 6px;text-align:center">Bookings</th>
+          <th style="padding:8px 6px;text-align:center">Rate</th>
+          <th style="padding:8px 6px;text-align:right">Sales</th>
+          <th style="padding:8px 10px;text-align:right">Commission Owed</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>
+  <div style="display:flex;justify-content:space-between;margin-top:12px;font-size:0.8rem;color:rgba(255,255,255,0.6)">
+    <span>Unassigned bookings (no staff credited): <strong style="color:#fff">XCD ${Number(unassignedTotal).toFixed(2)}</strong></span>
+    <span>Total commission owed: <strong style="color:var(--gold)">XCD ${totalOwed.toFixed(2)}</strong></span>
+  </div>`;
 }
 
 // ── MESSAGES ──
@@ -2241,6 +2600,7 @@ function renderCustomers() {
       <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
         ${phoneDigits?`<a class="team-wa" href="https://wa.me/${phoneDigits}" target="_blank" onclick="event.stopPropagation()">💬 Chat</a>`:''}
         ${c.idPhotoUrl?`<button class="team-wa" style="background:var(--teal);border:none;cursor:pointer" data-idref="${escapeHtml(c.idPhotoRef)}" onclick="event.stopPropagation();viewIdPhoto(this.dataset.idref)">🪪 View ID</button>`:''}
+        ${c.signatureUrl?`<button class="team-wa" style="background:var(--teal);border:none;cursor:pointer" data-sigref="${escapeHtml(c.signatureRef)}" onclick="event.stopPropagation();viewSignature(this.dataset.sigref)">✍️ View Signature</button>`:''}
         <span style="font-size:0.68rem;padding:4px 8px;border-radius:12px;background:${c.waiverOnFile?'rgba(46,204,113,0.15);color:#2ecc71':'rgba(255,255,255,0.08);color:rgba(255,255,255,0.4)'}">${c.waiverOnFile?'✓ Waiver on file':'No waiver on file'}</span>
       </div>
       ${expanded ? `<div style="margin-top:10px">${bookingsHtml}</div>` : `<div style="margin-top:6px;font-size:0.7rem;color:rgba(255,255,255,0.35)">Tap to ${expanded?'hide':'view'} booking history</div>`}
@@ -2255,8 +2615,8 @@ function toggleCustomer(key) {
 }
 
 // ── SECTION NAVIGATION (full-screen sections + back button) ──
-const ATABS = ['home','today','bookings','dispatch','customers','inventory','safety','team','drivers','feedback','messages','settings','rates'];
-const ATAB_LABELS = {home:'Operations Dashboard',today:'📊 Today',bookings:'📋 Bookings',dispatch:'📦 Dispatch',customers:'🧾 Customers',inventory:'🏄 Fleet',safety:'🛡️ Safety',team:'👥 Team',drivers:'🚚 Drivers',feedback:'⭐ Feedback',messages:'✉️ Messages',settings:'⚙️ Settings',rates:'💰 Rates'};
+const ATABS = ['home','today','bookings','dispatch','customers','inventory','safety','team','drivers','feedback','commission','messages','settings','rates'];
+const ATAB_LABELS = {home:'Operations Dashboard',today:'📊 Today',bookings:'📋 Bookings',dispatch:'📦 Dispatch',customers:'🧾 Customers',inventory:'🏄 Fleet',safety:'🛡️ Safety',team:'👥 Team',drivers:'🚚 Drivers',feedback:'⭐ Feedback',commission:'💵 Commission',messages:'✉️ Messages',settings:'⚙️ Settings',rates:'💰 Rates'};
 function switchATab(tab) {
   // Every section opens as a full page from the top — without this, the scroll
   // position from the previous section carries over and you land at the bottom.
@@ -2273,6 +2633,7 @@ function switchATab(tab) {
   if (tab==='safety') renderSafety();
   if (tab==='drivers') renderDrivers();
   if (tab==='feedback') fetchFeedback();
+  if (tab==='commission') fetchCommissionReport();
   if (tab==='messages') fetchMessages();
 }
 function goHome() { switchATab('home'); }
