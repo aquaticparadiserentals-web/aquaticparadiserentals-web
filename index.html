@@ -587,6 +587,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
   </div>
 </div>
 
+<script src="offline-queue.js"></script>
 <script>
 // ── CONFIG ──
 const BACKEND = 'https://script.google.com/macros/s/AKfycbzr1KHela518-pgQ3dJyvv77tm9z2JWo_TTovRNys6RwYNBIUfdyJKxGF_ETzNk9m47Ww/exec';
@@ -1203,19 +1204,20 @@ async function submitBooking() {
   }
 
   let ok = false;
+  let queued = false;
   try {
     // A photo/signature payload is too large for a URL query string, so it
     // must go via POST. Everything else still prefers GET, since GAS
     // reliably returns a readable JSON response for GET but not for POST
-    // (CORS preflight issue).
+    // (CORS preflight issue). Both paths route their offline fallback
+    // through the shared IndexedDB queue (offline-queue.js) instead of the
+    // old localStorage one — refNum is fixed above, before any attempt, and
+    // reused verbatim on every retry, which is what makes saveBooking's
+    // existing duplicate-ref check in Code.gs safe to rely on here.
     if (payload.idPhotoBase64 || payload.signatureBase64) {
-      await fetch(BACKEND, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(payload),
-      });
-      ok = true; // no-cors means we can't read response, assume ok
+      const result = await AQPQueue.queueOrSend(BACKEND, payload, { forceNoCors: true, dedupeKey: refNum });
+      ok = result.ok;
+      queued = result.queued === true;
     } else {
       const params = new URLSearchParams();
       params.append('data', JSON.stringify(payload));
@@ -1223,31 +1225,39 @@ async function submitBooking() {
       try {
         const res = await fetch(getUrl, { method: 'GET' });
         const data = await res.json();
-        ok = data.ok === true;
+        if (data && data.ok === true) {
+          ok = true;
+        } else if (data && data.ok === false && data.error === 'Offline') {
+          // sw.js's synthetic offline Response — the GET never actually
+          // reached the network, so this is a real connectivity gap, not a
+          // validation failure. Queue it instead of reporting a hard fail.
+          await AQPQueue.enqueue(BACKEND, payload, refNum);
+          ok = true; queued = true;
+        } else {
+          ok = false; // real server-side error — do not queue, report it
+        }
       } catch(e1) {
-        // Fallback: POST with no-cors (fire-and-forget, assume success)
-        await fetch(BACKEND, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify(payload),
-        });
-        ok = true; // no-cors means we can't read response, assume ok
+        // Real thrown network error on the GET itself. Try the old no-cors
+        // POST fallback once; if that also fails, queue.
+        try {
+          await fetch(BACKEND, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify(payload),
+          });
+          ok = true; // no-cors means we can't read response, assume ok
+        } catch (e2) {
+          await AQPQueue.enqueue(BACKEND, payload, refNum);
+          ok = true; queued = true;
+        }
       }
     }
   } catch(e) {
     console.error('API error:', e);
-    // Store locally as offline queue (drop the photo from the queued copy —
-    // it's already resized/compressed but still too heavy to keep retrying
-    // indefinitely in localStorage; the booking itself is preserved).
     try {
-      const q = JSON.parse(localStorage.getItem('apr_queue')||'[]');
-      const queuedPayload = Object.assign({}, payload);
-      delete queuedPayload.idPhotoBase64;
-      delete queuedPayload.signatureBase64;
-      q.push(queuedPayload);
-      localStorage.setItem('apr_queue', JSON.stringify(q));
-      ok = true; // queued successfully
+      await AQPQueue.enqueue(BACKEND, payload, refNum);
+      ok = true; queued = true;
     } catch(e2) { ok = false; }
   }
 
@@ -1257,7 +1267,7 @@ async function submitBooking() {
     document.getElementById('step-details').style.display='none';
     document.getElementById('successScreen').classList.add('show');
     window.scrollTo(0,0);
-    showToast('Booking confirmed! ✅','success');
+    showToast(queued ? 'Saved — will send once you\'re back online 📶' : 'Booking confirmed! ✅', queued ? '' : 'success');
   } else {
     btn.disabled = false;
     btn.innerHTML = '🎯 Confirm Booking';
@@ -1406,21 +1416,18 @@ function showToast(msg, type='') {
   setTimeout(() => t.className='toast', 3000);
 }
 
-// ── PWA: retry queued bookings on reconnect ──
-window.addEventListener('online', async () => {
-  const q = JSON.parse(localStorage.getItem('apr_queue')||'[]');
-  if (!q.length) return;
-  const remaining = [];
-  for (const payload of q) {
-    try {
-      const res = await fetch(BACKEND, {method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
-      const d = await res.json();
-      if (!d.ok) remaining.push(payload);
-    } catch { remaining.push(payload); }
-  }
-  localStorage.setItem('apr_queue', JSON.stringify(remaining));
-  if (q.length - remaining.length > 0) showToast(`${q.length-remaining.length} queued booking(s) synced ✅`,'success');
-});
+// ── One-time migration: move anything left in the old localStorage queue
+// (pre-2026-07-16) into the new shared IndexedDB queue so it isn't lost —
+// offline-queue.js's own 'online' listener + 30s interval take over from here.
+(function migrateOldQueue() {
+  try {
+    const q = JSON.parse(localStorage.getItem('apr_queue')||'[]');
+    if (q.length && window.AQPQueue) {
+      q.forEach(payload => AQPQueue.enqueue(BACKEND, payload, payload.ref));
+    }
+    localStorage.removeItem('apr_queue');
+  } catch (e) { /* nothing to migrate */ }
+})();
 </script>
 
 <script>

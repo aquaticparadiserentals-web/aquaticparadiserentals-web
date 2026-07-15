@@ -78,6 +78,7 @@ header p{font-size:0.72rem;color:rgba(255,255,255,0.7);margin-top:2px}
 
 <div class="toast" id="toast"></div>
 
+<script src="offline-queue.js"></script>
 <script>
 const BACKEND = 'https://script.google.com/macros/s/AKfycbzr1KHela518-pgQ3dJyvv77tm9z2JWo_TTovRNys6RwYNBIUfdyJKxGF_ETzNk9m47Ww/exec';
 // No longer a hardcoded constant — this page's source used to hand out the
@@ -207,10 +208,13 @@ function shareLocationSilent(ref) {
   if (!navigator.geolocation) return;
   navigator.geolocation.getCurrentPosition(async pos => {
     try {
-      await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      // dedupeKey means if several of these stack up offline, only the
+      // most recent position for this booking survives in the queue —
+      // no value replaying 10 stale pings once back online.
+      await AQPQueue.queueOrSend(BACKEND, {
         action:'update_driver_location', token:STAFF_TOKEN, ref,
         lat: pos.coords.latitude, lng: pos.coords.longitude
-      }),signal:AbortSignal.timeout(15000)});
+      }, { dedupeKey: 'gps:' + ref, timeoutMs: 15000 });
     } catch (err) { /* silent — next tick retries, no toast spam every minute */ }
   }, () => { /* denied/unavailable — silent, driver already granted it once for manual share */ }, { enableHighAccuracy: true, timeout: 10000 });
 }
@@ -254,14 +258,17 @@ function shareLocation(ref) {
   showToast('Getting location…');
   navigator.geolocation.getCurrentPosition(async pos => {
     try {
-      const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      const data = await AQPQueue.queueOrSend(BACKEND, {
         action:'update_driver_location', token:STAFF_TOKEN, ref,
         lat: pos.coords.latitude, lng: pos.coords.longitude
-      }),signal:AbortSignal.timeout(15000)});
-      const data = await res.json();
+      }, { dedupeKey: 'gps:' + ref, timeoutMs: 15000 });
       if (!data || !data.ok) throw new Error((data&&data.error)||'Failed');
-      await fetchDispatch();
-      showToast('Location shared ✅');
+      if (data.queued) {
+        showToast('Saved — will send once you\'re back online 📶');
+      } else {
+        await fetchDispatch();
+        showToast('Location shared ✅');
+      }
     } catch (err) {
       showToast('Could not share location: '+err.message);
     }

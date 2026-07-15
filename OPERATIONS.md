@@ -145,6 +145,7 @@ The business runs on a self-built Progressive Web App (PWA), not a third-party b
 | `Code.gs` | All backend logic, running on Google Apps Script (free, part of Google's ecosystem). |
 | Google Sheet ("APR Master Log") | The database. Tabs: `BOOKINGS`, `DRIVERS`, `STAFF`, `INVENTORY`, `FEEDBACK`. No separate database to pay for or maintain. |
 | `sw.js` | Service worker — makes the site installable and lets it work with a spotty connection (common on a beach). |
+| `offline-queue.js` | Shared IndexedDB write-queue (added 2026-07-16), loaded by `index.html`/`feedback.html`/`dispatch.html`. When a booking, feedback submission, or driver GPS ping can't reach the backend (no signal), it's queued locally and auto-retried once connectivity returns instead of being silently lost. |
 | `manifest.json` | PWA metadata (app name, icons, install behavior). |
 
 ### How a booking flows

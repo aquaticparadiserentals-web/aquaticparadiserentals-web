@@ -555,7 +555,17 @@ function getStaff() {
     return data.slice(1).map(function (row) {
       return {
         id: row[0], name: row[1], role: row[2], phone: row[3], createdAt: row[4],
-        photoUrl: row[5] || '', commissionPct: (row[6] === '' || row[6] === undefined || row[6] === null) ? 0 : Number(row[6])
+        // Defensive NaN guard: the STAFF sheet can be hand-edited directly in
+        // Google Sheets (bypassing _validateStaffPayload's 0-100 numeric
+        // check), e.g. typing "10%" into the cell. Number("10%") is NaN,
+        // which would otherwise flow straight into the commission report's
+        // salesTotal * (commissionPct/100) math and render as "NaN%" /
+        // "XCD NaN" for that row instead of a clear, safe value.
+        photoUrl: row[5] || '', commissionPct: (function () {
+          if (row[6] === '' || row[6] === undefined || row[6] === null) return 0;
+          var n = Number(row[6]);
+          return isNaN(n) ? 0 : n;
+        })()
       };
     }).filter(function (d) { return d.id; });
   } catch (err) {
@@ -1690,6 +1700,9 @@ function getCommissionReport(p) {
     var end = p && p.endDate ? _parseLocalDateInput(p.endDate) : null;
     if (!start || isNaN(start.getTime()) || !end || isNaN(end.getTime())) {
       return { ok: false, error: 'Invalid date range' };
+    }
+    if (start > end) {
+      return { ok: false, error: 'Start date must be on or before end date' };
     }
     // Treat endDate as inclusive of the whole day.
     end = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999);

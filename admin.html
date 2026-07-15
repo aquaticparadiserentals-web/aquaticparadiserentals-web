@@ -1072,7 +1072,7 @@ function renderBookings() {
       <div class="bk-detail">👥 Group: ${escapeHtml(b.groupSize||'1')}</div>
       ${hasLoc?`<div class="bk-detail">📍 Driver: <a href="${mapUrl}" target="_blank" style="color:var(--teal)">view on map</a> (${escapeHtml(b.driverLocAt)})</div>`:''}
       ${b.notes&&b.notes!=='N/A'?'<div class="bk-detail">📝 '+escapeHtml(b.notes)+'</div>':''}
-      <div class="bk-total">XCD ${escapeHtml(b.total||0)}</div>
+      <div class="bk-total">XCD ${Number(b.total||0).toFixed(2)}</div>
       ${depositBadge(b)}
       <div class="bk-actions">
         ${state==='pending'?`<button class="bk-btn confirm" data-ref="${refAttr}" onclick="setBkState(this.dataset.ref,'confirmed')">✅ Confirm</button>`:''}
@@ -2582,7 +2582,7 @@ function renderCustomers() {
     const bookingsHtml = (c.bookings||[]).slice().reverse().map(b => `
       <div style="display:flex;justify-content:space-between;gap:8px;font-size:0.76rem;padding:6px 0;border-top:1px solid rgba(255,255,255,0.08)">
         <span style="color:rgba(255,255,255,0.6)">${escapeHtml(b.ref)} · ${escapeHtml(b.datetime)}</span>
-        <span style="color:rgba(255,255,255,0.85)">${escapeHtml(b.gear||'N/A')} · XCD ${escapeHtml(b.total||0)} · <span style="text-transform:capitalize">${escapeHtml(b.status||'pending')}</span></span>
+        <span style="color:rgba(255,255,255,0.85)">${escapeHtml(b.gear||'N/A')} · XCD ${Number(b.total||0).toFixed(2)} · <span style="text-transform:capitalize">${escapeHtml(b.status||'pending')}</span></span>
       </div>`).join('');
 
     return `<div class="card" style="margin-bottom:10px">

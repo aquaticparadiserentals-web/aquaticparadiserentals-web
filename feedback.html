@@ -60,6 +60,7 @@ textarea::placeholder{color:rgba(255,255,255,0.35)}
 
 <div class="toast" id="toast"></div>
 
+<script src="offline-queue.js"></script>
 <script>
 const BACKEND = 'https://script.google.com/macros/s/AKfycbzr1KHela518-pgQ3dJyvv77tm9z2JWo_TTovRNys6RwYNBIUfdyJKxGF_ETzNk9m47Ww/exec';
 
@@ -93,16 +94,13 @@ submitBtn.addEventListener('click', async () => {
   submitBtn.disabled = true;
   submitBtn.textContent = 'Submitting…';
   try {
-    const res = await fetch(BACKEND, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'submit_feedback', ref, rating, comment: document.getElementById('comment').value }),
-      signal: AbortSignal.timeout(15000)
-    });
-    const data = await res.json();
+    const data = await AQPQueue.queueOrSend(BACKEND, { action: 'submit_feedback', ref, rating, comment: document.getElementById('comment').value }, { dedupeKey: 'feedback:' + ref });
     if (!data || !data.ok) throw new Error((data && data.error) || 'Failed');
     document.getElementById('formCard').style.display = 'none';
     document.getElementById('doneCard').style.display = 'block';
+    if (data.queued) {
+      document.querySelector('#doneCard p').textContent = "Saved — will send once you're back online. Thanks for renting with us in Bequia 🌊";
+    }
   } catch (err) {
     showToast('Could not submit: ' + err.message);
     submitBtn.disabled = false;
