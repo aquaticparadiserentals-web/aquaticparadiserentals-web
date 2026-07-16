@@ -971,7 +971,7 @@ async function fetchBookings() {
   const el = document.getElementById('bookingsContainer');
   el.innerHTML='<div style="text-align:center;padding:30px;color:rgba(255,255,255,0.35)">⏳ Loading bookings…</div>';
   try {
-    const res = await fetch(BACKEND+'?action=getBookings&limit=50&token='+encodeURIComponent(APP_TOKEN),{signal:AbortSignal.timeout(10000)});
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'getBookings',token:APP_TOKEN,limit:50}),signal:AbortSignal.timeout(10000)});
     if(!res.ok) throw new Error('HTTP '+res.status);
     let data;
     try { data = await res.json(); } catch (parseErr) { throw new Error('Malformed response from server'); }
@@ -1084,7 +1084,7 @@ function renderBookings() {
       </div>
       <div style="flex:1 1 100%;display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08)">
         <span style="font-size:0.72rem;color:rgba(255,255,255,0.5)">Staff credit</span>
-        <select id="staffSel-${refAttr}" onchange="assignBookingStaffUI('${refAttr}')" style="flex:1;padding:6px 8px;border:2px solid #ddd;border-radius:6px;font-size:0.78rem">
+        <select id="staffSel-${refAttr}" data-ref="${refAttr}" onchange="assignBookingStaffUI(this.dataset.ref)" style="flex:1;padding:6px 8px;border:2px solid #ddd;border-radius:6px;font-size:0.78rem">
           <option value="">— Unassigned —</option>
           ${staffCache.map(s => `<option value="${escapeHtml(s.id)}" ${b.staffId===s.id?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
         </select>
@@ -1191,7 +1191,7 @@ async function fetchDispatchAdmin() {
   const el = document.getElementById('dispatchContainer');
   el.innerHTML='<div style="text-align:center;padding:30px;color:rgba(255,255,255,0.35)">⏳ Loading deliveries…</div>';
   try {
-    const res = await fetch(BACKEND+'?action=getDispatchBookings&limit=50&token='+encodeURIComponent(APP_TOKEN),{signal:AbortSignal.timeout(10000)});
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'getDispatchBookings',token:APP_TOKEN,limit:50}),signal:AbortSignal.timeout(10000)});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
     if (!data || !data.ok || !Array.isArray(data.bookings)) throw new Error((data && data.error) || 'No data');
@@ -1467,7 +1467,7 @@ let staffCache = [];
 
 async function fetchStaff() {
   try {
-    const res = await fetch(BACKEND+'?action=getStaff&token='+encodeURIComponent(APP_TOKEN),{signal:AbortSignal.timeout(10000)});
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'getStaff',token:APP_TOKEN}),signal:AbortSignal.timeout(10000)});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
     if (data && data.ok && Array.isArray(data.staff)) {
@@ -1621,7 +1621,7 @@ let driversCache = [];
 
 async function fetchDrivers() {
   try {
-    const res = await fetch(BACKEND+'?action=getDrivers&token='+encodeURIComponent(APP_TOKEN),{signal:AbortSignal.timeout(10000)});
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'getDrivers',token:APP_TOKEN}),signal:AbortSignal.timeout(10000)});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
     if (data && data.ok && Array.isArray(data.drivers)) {
@@ -1804,7 +1804,7 @@ const FLEET_CATEGORIES = [
 
 async function fetchInventory() {
   try {
-    const res = await fetch(BACKEND+'?action=getInventory&token='+encodeURIComponent(APP_TOKEN),{signal:AbortSignal.timeout(10000)});
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'getInventory',token:APP_TOKEN}),signal:AbortSignal.timeout(10000)});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
     if (data && data.ok && Array.isArray(data.inventory)) {
@@ -2302,7 +2302,7 @@ function exportCSV() {
 // ── FEEDBACK ──
 async function fetchFeedback() {
   try {
-    const res = await fetch(BACKEND+'?action=getFeedback&limit=100&token='+encodeURIComponent(APP_TOKEN),{signal:AbortSignal.timeout(10000)});
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'getFeedback',token:APP_TOKEN,limit:100}),signal:AbortSignal.timeout(10000)});
     const data = await res.json();
     renderFeedback((data && data.ok && Array.isArray(data.feedback)) ? data.feedback : []);
   } catch (err) {
@@ -2493,7 +2493,7 @@ function renderCommissionReport(report, unassignedTotal) {
 // ── MESSAGES ──
 async function fetchMessages() {
   try {
-    const res = await fetch(BACKEND+'?action=getMessages&limit=100&token='+encodeURIComponent(APP_TOKEN),{signal:AbortSignal.timeout(10000)});
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'getMessages',token:APP_TOKEN,limit:100}),signal:AbortSignal.timeout(10000)});
     const data = await res.json();
     renderMessages((data && data.ok && Array.isArray(data.messages)) ? data.messages : []);
   } catch (err) {
@@ -2544,7 +2544,7 @@ const expandedCustomers = new Set();
 
 async function fetchCustomers() {
   try {
-    const res = await fetch(BACKEND+'?action=getCustomers&limit=300&token='+encodeURIComponent(APP_TOKEN),{signal:AbortSignal.timeout(15000)});
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'getCustomers',token:APP_TOKEN,limit:300}),signal:AbortSignal.timeout(15000)});
     const data = await res.json();
     customersCache = (data && data.ok && Array.isArray(data.customers)) ? data.customers : [];
     renderCustomers();

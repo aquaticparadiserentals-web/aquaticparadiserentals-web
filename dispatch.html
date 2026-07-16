@@ -149,8 +149,8 @@ function notifyLink(wa, msg) {
 async function fetchDispatch() {
   try {
     const [bkRes, drvRes] = await Promise.all([
-      fetch(BACKEND+'?action=getDispatchBookings&limit=50&token='+encodeURIComponent(STAFF_TOKEN),{signal:AbortSignal.timeout(10000)}),
-      fetch(BACKEND+'?action=getDrivers&token='+encodeURIComponent(STAFF_TOKEN),{signal:AbortSignal.timeout(10000)})
+      fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'getDispatchBookings',token:STAFF_TOKEN,limit:50}),signal:AbortSignal.timeout(10000)}),
+      fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'getDrivers',token:STAFF_TOKEN}),signal:AbortSignal.timeout(10000)})
     ]);
     const bkData = await bkRes.json();
     const drvData = await drvRes.json();
