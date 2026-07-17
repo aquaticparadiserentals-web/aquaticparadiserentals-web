@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Emergency &amp; CPR Guide — Aquatic Paradise Rentals</title>
+<link rel="icon" type="image/png" sizes="48x48" href="/icons/icon-48.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png"/>
+<link rel="apple-touch-icon" href="/icons/icon-180.png"/>
+<style>
+  :root{--navy:#0B1E2D;--teal:#03939E;--coral:#E0351B;--gold:#FBC62C}
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:0;color:var(--navy);background:#f4f4f4}
+  .top{max-width:640px;margin:16px auto 0;padding:0 16px;display:flex;justify-content:space-between;align-items:center}
+  .btn-back{display:inline-block;padding:10px 16px;border-radius:8px;font-weight:700;font-size:0.85rem;text-decoration:none;background:#eee;color:var(--navy)}
+  .page{max-width:640px;margin:12px auto 40px;background:#fff;border-radius:14px;padding:24px 20px 28px;box-shadow:0 2px 10px rgba(0,0,0,0.06)}
+  h1{font-size:1.3rem;margin:0 0 4px}
+  .sub{color:#666;font-size:0.85rem;margin:0 0 14px;line-height:1.5}
+  .emergency-banner{background:var(--coral);color:#fff;border-radius:12px;padding:14px 16px;font-weight:800;font-size:0.95rem;line-height:1.5;margin-bottom:18px}
+  .emergency-banner a{color:#fff;text-decoration:underline}
+  .mode-tabs{display:flex;gap:8px;margin-bottom:18px}
+  .mode-tab{flex:1;padding:12px 6px;text-align:center;border-radius:10px;font-weight:800;font-size:0.82rem;cursor:pointer;border:2px solid #ddd;background:#fafafa;color:#555}
+  .mode-tab.active{border-color:var(--coral);background:var(--coral);color:#fff}
+  .step-card{background:#fff7f6;border:1px solid #f3d9d5;border-radius:12px;padding:20px 18px;min-height:170px}
+  .step-num{font-size:0.72rem;font-weight:800;color:var(--coral);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px}
+  .step-text{font-size:1.05rem;line-height:1.65;color:#233}
+  .warn{margin-top:10px;font-size:0.82rem;color:var(--coral);font-weight:700}
+  .nav-row{display:flex;gap:10px;margin-top:16px}
+  .nav-btn{flex:1;padding:16px 8px;border-radius:12px;border:none;font-size:1rem;font-weight:800;cursor:pointer}
+  .nav-back{background:#eee;color:var(--navy)}
+  .nav-next{background:var(--navy);color:#fff}
+  .nav-btn:disabled{opacity:0.35}
+  .voice-row{display:flex;gap:10px;margin-top:12px}
+  .voice-btn{flex:1;padding:13px 8px;border-radius:12px;border:2px solid var(--coral);background:#fff;color:var(--coral);font-size:0.9rem;font-weight:800;cursor:pointer}
+  .voice-btn.on{background:var(--coral);color:#fff}
+  .voice-hint{font-size:0.75rem;color:#888;text-align:center;margin-top:8px;line-height:1.5}
+  .progress{display:flex;gap:5px;margin:14px 0 0}
+  .dot{flex:1;height:5px;border-radius:3px;background:#e3e3e3}
+  .dot.done{background:var(--gold)}
+  .footer-note{margin-top:22px;padding-top:14px;border-top:1px solid #eee;font-size:0.8rem;color:#777;line-height:1.6}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <a class="btn-back" href="index.html">← Back to Booking</a>
+</div>
+
+<div class="page">
+  <h1>🚨 Emergency &amp; CPR Guide</h1>
+  <p class="sub">Step-by-step help for a water emergency or someone in distress. Tap <strong>🔊</strong> so your hands stay free, or turn on <strong>🎤</strong> voice control and say "next" / "back" / "repeat".</p>
+
+  <div class="emergency-banner">
+    📞 If this is happening right now: send someone to call <strong>911</strong> (local emergency services) immediately — do this before or while you start helping. This guide is a quick reference, not a substitute for certified CPR/first-aid training. Get certified through the Red Cross or an equivalent local provider.
+  </div>
+
+  <div class="mode-tabs">
+    <div class="mode-tab active" id="tab-water" onclick="setMode('water')">🌊 Water Rescue</div>
+    <div class="mode-tab" id="tab-cpr" onclick="setMode('cpr')">❤️ CPR Steps</div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-num" id="stepNum">Step 1 of 7</div>
+    <div class="step-text" id="stepText"></div>
+    <div class="warn" id="stepWarn" style="display:none"></div>
+  </div>
+
+  <div class="progress" id="progress"></div>
+
+  <div class="nav-row">
+    <button class="nav-btn nav-back" id="btnBack" onclick="go(-1)">← Back</button>
+    <button class="nav-btn nav-next" id="btnNext" onclick="go(1)">Next →</button>
+  </div>
+
+  <div class="voice-row">
+    <button class="voice-btn" id="btnSpeak" onclick="speakStep()">🔊 Read this step</button>
+    <button class="voice-btn" id="btnMic" onclick="toggleMic()" style="display:none">🎤 Voice control</button>
+  </div>
+  <div class="voice-hint" id="voiceHint"></div>
+
+  <div class="footer-note">
+    This guide covers general layperson CPR guidance for adults. It does not cover infant/child CPR, which uses different techniques. If the person recovers and seems fine, they still need to see a doctor — water in the lungs can cause serious problems hours later even after someone seems okay. Get certified: a hands-on Red Cross (or equivalent) CPR/first-aid course takes a few hours and is the real preparation — this page is only a memory-jogger in the moment.
+  </div>
+</div>
+
+<script>
+const GUIDES = {
+  water: [
+    { t:'Stay safe first. Do not jump in after someone unless you are a trained water rescuer — a panicking swimmer can pull you under too. Look for a life ring, paddle board, kayak, or anything that floats to reach or throw to them instead.', w:'"Reach or throw, don\'t go" — most drowning rescuers become a second victim by swimming in untrained.' },
+    { t:'Shout for help immediately and get someone to call 911 while you work. If there are two of you, one calls for help while the other starts helping.' },
+    { t:'Get the person to a stable surface — the boat, dock, or shore — as fast as you safely can. If you suspect a diving or impact injury, try to keep their head and neck as still as possible while moving them, but getting them out of the water and breathing again always comes first.' },
+    { t:'Once out of the water, check if they respond: tap their shoulder firmly and shout "Are you okay?"' },
+    { t:'Look, listen, and feel for normal breathing for up to 10 seconds. Gasping or irregular gulping is NOT normal breathing — treat it as if they are not breathing.' },
+    { t:'If they are breathing normally, put them in the recovery position on their side, keep them warm, and stay with them until help arrives — they can still vomit water even while conscious.', w:'Anyone pulled from the water — even if they seem completely fine — needs to see a doctor. Water in the lungs can cause dangerous swelling hours later.' },
+    { t:'If they are NOT breathing normally, switch to the CPR Steps tab above and start immediately. Every second counts.' },
+  ],
+  cpr: [
+    { t:'Confirm the scene is safe and the person is unresponsive and not breathing normally. Make sure someone has called 911 and is bringing an AED (defibrillator) if one is available nearby.' },
+    { t:'Lay the person flat on their back on a firm, stable surface. Kneel beside their chest.' },
+    { t:'Place the heel of one hand on the center of their chest, between the nipples. Put your other hand on top and interlock your fingers. Keep your arms straight and shoulders directly over your hands.' },
+    { t:'Push hard and fast: at least 2 inches deep, at a rate of 100 to 120 compressions per minute — think of the beat of the song "Stayin\' Alive." Let the chest fully rise between pushes. Do 30 compressions.', w:'Do not stop compressions for more than a few seconds at a time.' },
+    { t:'After 30 compressions, give 2 rescue breaths if you are trained and willing: tilt the head back, lift the chin, pinch the nose shut, and give one breath for about 1 second, watching the chest rise. Then repeat for the second breath.', w:'If you are not trained in rescue breaths or unable to do them safely, continuous hands-only compressions are still effective — keep doing compressions without stopping.' },
+    { t:'Keep repeating cycles of 30 compressions and 2 breaths. If they vomit, roll them onto their side briefly to clear their mouth, then continue.' },
+    { t:'Keep going until: the person starts breathing normally on their own, emergency services or someone trained takes over, an AED arrives and is ready to use, or you are physically too exhausted to continue.' },
+  ],
+};
+
+let mode = 'water', idx = 0;
+
+function setMode(m){
+  mode = m; idx = 0;
+  document.getElementById('tab-water').classList.toggle('active', m==='water');
+  document.getElementById('tab-cpr').classList.toggle('active', m==='cpr');
+  render();
+}
+
+function go(d){
+  const steps = GUIDES[mode];
+  idx = Math.max(0, Math.min(steps.length-1, idx+d));
+  render();
+  if (speaking) speakStep();
+}
+
+function render(){
+  const steps = GUIDES[mode], s = steps[idx];
+  document.getElementById('stepNum').textContent = 'Step ' + (idx+1) + ' of ' + steps.length;
+  document.getElementById('stepText').textContent = s.t;
+  const w = document.getElementById('stepWarn');
+  w.style.display = s.w ? 'block' : 'none';
+  w.textContent = s.w ? '⚠️ ' + s.w : '';
+  document.getElementById('btnBack').disabled = idx===0;
+  document.getElementById('btnNext').disabled = idx===steps.length-1;
+  document.getElementById('progress').innerHTML = steps.map((_,i) =>
+    '<div class="dot'+(i<=idx?' done':'')+'"></div>').join('');
+}
+
+// ── READ ALOUD (built-in speech synthesis — free, works offline) ──
+let speaking = false;
+function speakStep(){
+  if (!('speechSynthesis' in window)) {
+    document.getElementById('voiceHint').textContent = 'Read-aloud isn\'t supported on this browser.';
+    return;
+  }
+  speechSynthesis.cancel();
+  const s = GUIDES[mode][idx];
+  const u = new SpeechSynthesisUtterance('Step ' + (idx+1) + '. ' + s.t + (s.w ? ' Important: ' + s.w : ''));
+  u.rate = 0.95;
+  speaking = true;
+  u.onend = () => { speaking = false; };
+  speechSynthesis.speak(u);
+}
+
+// ── VOICE CONTROL (optional — only shown where the browser supports it) ──
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, micOn = false;
+if (SR) {
+  document.getElementById('btnMic').style.display = 'block';
+  document.getElementById('voiceHint').textContent = 'Turn on 🎤 voice control, then say "next", "back", or "repeat".';
+}
+function toggleMic(){
+  if (!SR) return;
+  if (micOn) { micOn = false; rec && rec.stop(); updateMicUi(); return; }
+  rec = new SR();
+  rec.continuous = true;
+  rec.lang = 'en-US';
+  rec.onresult = e => {
+    const said = e.results[e.results.length-1][0].transcript.toLowerCase();
+    if (said.includes('next') || said.includes('forward')) { go(1); speakStep(); }
+    else if (said.includes('back') || said.includes('previous')) { go(-1); speakStep(); }
+    else if (said.includes('repeat') || said.includes('again')) speakStep();
+    else if (said.includes('stop')) { micOn = false; rec.stop(); speechSynthesis.cancel(); updateMicUi(); }
+  };
+  rec.onend = () => { if (micOn) try { rec.start(); } catch(e){} }; // keep listening
+  rec.onerror = () => {};
+  try { rec.start(); micOn = true; } catch(e){ micOn = false; }
+  updateMicUi();
+}
+function updateMicUi(){
+  document.getElementById('btnMic').classList.toggle('on', micOn);
+  document.getElementById('btnMic').textContent = micOn ? '🎤 Listening… (say "stop" to end)' : '🎤 Voice control';
+}
+
+render();
+</script>
+</body>
+</html>
