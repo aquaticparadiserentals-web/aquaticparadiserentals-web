@@ -1801,6 +1801,17 @@ function saveFeedback(p) {
     var validation = _validateFeedbackPayload(p);
     if (!validation.valid) return { ok: false, error: validation.error };
 
+    var bookingSh = _sheet();
+    var bookingData = bookingSh.getDataRange().getValues();
+    var bookingRefIdx = bookingData[0] ? bookingData[0].indexOf('ref') : -1;
+    var refFound = false;
+    if (bookingRefIdx !== -1) {
+      for (var i = 1; i < bookingData.length; i++) {
+        if (String(bookingData[i][bookingRefIdx]) === String(p.ref)) { refFound = true; break; }
+      }
+    }
+    if (!refFound) return { ok: false, error: 'Booking not found' };
+
     var sh = _feedbackSheet();
     sh.appendRow([
       _safe(p.ref, 'N/A'),
