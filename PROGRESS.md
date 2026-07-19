@@ -1,6 +1,6 @@
 # Aquatic Paradise Rentals — Build Progress
 
-**Last updated:** 2026-07-16 (offline queue for guest bookings/feedback/driver GPS added — staged, not yet deployed/pushed; 2026-07-15 staff commission, deposit tracking, feedback analytics, auto-GPS, drawn e-signature also still staged)
+**Last updated:** 2026-07-19 — all previously-staged backend work (2026-07-15 staff commission/deposits/feedback analytics/auto-GPS/e-signature, 2026-07-16 offline queue + booking-ref feedback check) is now **live**: `clasp push` + `clasp deploy -i` to the existing deployment ran today (now @24), confirmed the live `/exec` URL responds and matches the ID used by `index.html`.
 **Live site:** https://aquaticparadiserental.vacations
 **Repo:** aquaticparadiserentals-web (GitHub: aquaticparadiserentals-web/aquaticparadiserentals-web, branch `main`)
 **Stack:** Google Apps Script (`Code.gs`) + Google Sheets backend · HTML/JS frontend · PWA (`manifest.json`, `sw.js`) · GitHub Pages hosting · deployed via clasp
@@ -83,7 +83,7 @@ All live (site pushed, backend deployed as web app version 20):
 
 ## Staff commission, deposits, feedback analytics, live GPS — DONE 2026-07-15
 
-All in `Code.gs`, `admin.html`, `dispatch.html` — not yet deployed/pushed, staged for review.
+All in `Code.gs`, `admin.html`, `dispatch.html` — pushed and live as of 2026-07-19 (clasp deploy @24).
 
 - **Staff commission tracking** — `STAFF` sheet gets a `commissionPct` column (self-healing migration, same pattern as other sheets), editable per staff member from the Team tab (inline % field + Save). Bookings get `staffId`/`staffName` columns — no prior driver/staff attribution existed on a booking, so this is a new field, assigned via a dropdown on each card in the Bookings tab. New admin **Commission** tab: This Week / This Month / custom date-range report, server-computed (`getCommissionReport` action) as sum(booking.total × staff.commissionPct) for bookings attributed to them in that window, plus an "unassigned bookings" total for visibility. Read-only, no payout automation. Date range keys off the booking's `datetime` (the rental date/time) — fixed 2026-07-15 (was keying off `Timestamp`, when the booking was logged; owner confirmed rental date is the right period definition for payroll).
 - **Deposit tracking (manual, BOSVG bank transfer)** — Bookings get `depositAmount`/`depositReceivedAt`/`depositStatus` columns. Admin Bookings tab: amount field + "Mark Received" button per booking stamps today's date and flips status to `received` (`markDepositReceived` action) — no percentage calculated or required, whatever the owner enters is what's recorded. Deposit status/amount shown on every booking card. Does **not** touch the existing WhatsApp bank-transfer-details flow.
@@ -92,7 +92,7 @@ All in `Code.gs`, `admin.html`, `dispatch.html` — not yet deployed/pushed, sta
 
 ## Drawn e-signature (waiver + reusable for future agreements) — DONE 2026-07-15
 
-In `Code.gs`, `index.html`, `admin.html` — not yet deployed/pushed, staged for review.
+In `Code.gs`, `index.html`, `admin.html` — pushed and live as of 2026-07-19 (clasp deploy @24).
 
 - **Guest booking flow (`index.html`)** — the waiver step's signature capture is now a canvas signature pad (`mountSignaturePad()`), drawn with finger/stylus/mouse via pointer events, with a Clear button. It's the default/primary path; a "Prefer to type your name instead?" link swaps to the original typed-name input (kept as the accessibility/no-touch fallback, unchanged behavior otherwise). Booking submit is blocked until the waiver checkbox is ticked **and** either the pad has ink or the typed name is ≥3 characters — canvas/touch being unavailable never blocks a booking. `mountSignaturePad(canvas, opts)` is a standalone function (mount point + `onChange` callback, returns `{clear, isEmpty, getBase64}`) — reusable for a future damage addendum or group liability form without rewriting canvas logic.
 - **Backend storage (`Code.gs`)** — new `_saveSignature()` mirrors `_saveIdPhoto()` (same base64-decode → Drive blob → return URL pattern, same "never blocks the booking on failure" posture) into a new **"Aquatic Paradise Signatures"** Drive folder, capped at `MAX_SIGNATURE_BASE64_LEN` (~1.1MB decoded — signatures compress fine small, so this cap is far below the ID-photo one). New `signatureUrl` field appended to the end of `FIELDS` (self-healing migration, same pattern as `staffId`/deposit columns). Judgment call: **kept private like ID photos, not public like staff photos** — a signature is guest PII, same trust model as an ID photo, so no `setSharing()` call; a new token-gated `getSignature` action (POST-only, mirrors `getIdPhoto`) is the only way to view it.
@@ -110,7 +110,7 @@ A review pass before deploy caught and fixed:
 
 ## Offline queue for guest/driver writes — DONE 2026-07-16
 
-Not yet deployed/pushed, staged for review, in `offline-queue.js` (new), `sw.js`, `index.html`, `feedback.html`, `dispatch.html`.
+Pushed and live as of 2026-07-19 (clasp deploy @24), in `offline-queue.js` (new), `sw.js`, `index.html`, `feedback.html`, `dispatch.html`.
 
 - **The problem:** `sw.js` already intercepts every `script.google.com` request and, on a real network failure, resolves with a synthetic `{ ok:false, error:'Offline' }` Response instead of letting the fetch reject — so a plain `fetch()` never throws when truly offline, it just quietly reports a fake failure. Guest bookings, guest feedback, and driver GPS pings submitted with no signal (a driver at a beach with no bars, a guest on the boat) were being silently dropped.
 - **`offline-queue.js`** — new shared module (`<script src="offline-queue.js">` on `index.html`, `feedback.html`, `dispatch.html`), IndexedDB-backed (not localStorage — payloads carry base64 photos/signatures too large/slow for it). Exposes `AQPQueue.queueOrSend(url, bodyObj, opts)`: tries a real fetch first; only queues on an actual connectivity failure (a thrown network error, or sw.js's synthetic offline marker specifically) — a real HTTP/validation error from the backend is returned as-is and never queued. Drains automatically on the `online` event and every 30s while the tab is open, with an in-flight guard (`draining` flag) so two drains can't run concurrently, and breaks out of a drain cycle on the first real network failure instead of hammering every queued item. `opts.dedupeKey` replaces any earlier queued entry with the same key — used by GPS pings so only the latest position per booking ref survives a stack of offline retries. A small "⏳ N pending sync" badge auto-mounts bottom-left on any page that loads the module.
