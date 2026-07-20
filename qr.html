@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#0B1E33"/>
+<title>QR Code — Aquatic Paradise Rentals</title>
+<link rel="icon" type="image/png" sizes="48x48" href="/icons/icon-48.png"/>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+:root {
+  --navy: #0B1E33; --navy-2: #13294B; --teal: #0E7C90;
+  --ink: #101828; --muted: #667085; --line: #E4E7EC;
+  --light: #F7F8FA; --card: #FFFFFF; --radius: 8px;
+  --shadow: 0 1px 2px rgba(16,24,40,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --navy: #070E1A; --navy-2: #0F1B2E; --teal: #4FB8CC;
+    --ink: #E7EBF3; --muted: #93A0B5; --line: #232E44;
+    --light: #0B1220; --card: #111A2C;
+    --shadow: 0 1px 2px rgba(0,0,0,.35);
+  }
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',-apple-system,'Segoe UI',Helvetica,sans-serif;background:var(--light);color:var(--ink);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:32px;max-width:420px;width:100%;text-align:center}
+.logo{width:56px;height:56px;border-radius:10px;border:1px solid var(--line);margin:0 auto 14px;display:block}
+h1{font-size:1.05rem;font-weight:600;margin-bottom:4px}
+.sub{font-size:.82rem;color:var(--muted);margin-bottom:20px}
+.qr-wrap{background:#fff;border:1px solid var(--line);border-radius:6px;padding:12px;display:inline-block}
+img.qr{width:280px;height:280px;display:block}
+.cta-label{margin-top:18px;font-weight:600;font-size:.98rem;color:var(--ink)}
+.url{margin-top:6px;font-size:.76rem;color:var(--muted);word-break:break-all}
+.actions{display:flex;gap:10px;margin-top:22px}
+.btn{flex:1;padding:9px 14px;border-radius:6px;text-decoration:none;font-weight:600;font-size:.85rem;border:1px solid transparent;cursor:pointer;font-family:inherit}
+.btn.primary{background:var(--navy);color:#fff}
+.btn.primary:hover{background:var(--navy-2)}
+.btn.secondary{background:var(--card);color:var(--ink);border-color:var(--line)}
+.btn.secondary:hover{background:var(--light)}
+.status{font-size:.76rem;color:var(--muted);margin-top:10px;min-height:14px}
+@media print {
+  body{background:#fff;padding:0}
+  .actions,.status{display:none}
+  .card{box-shadow:none;border:none}
+}
+</style>
+</head>
+<body>
+  <div class="card">
+    <img class="logo" src="logo.jpg" alt="Aquatic Paradise Rentals logo">
+    <h1>Aquatic Paradise Rentals</h1>
+    <p class="sub">Scan to book — no app to download</p>
+    <div class="qr-wrap">
+      <img class="qr" id="qrImg" src="https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=https%3A%2F%2Faquaticparadiserental.vacations%2F" alt="QR code linking to the booking page">
+    </div>
+    <div class="cta-label">Scan to book</div>
+    <div class="url">https://aquaticparadiserental.vacations</div>
+    <div class="actions">
+      <a class="btn secondary" id="downloadBtn" href="#" download="aquatic-paradise-qr-code.png">Download PNG</a>
+      <button class="btn primary" onclick="window.print()">Print</button>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+<script>
+// api.qrserver.com images are cross-origin; fetch → blob so the download
+// attribute actually saves a file instead of just navigating to the image.
+const downloadBtn = document.getElementById('downloadBtn');
+const statusEl = document.getElementById('status');
+downloadBtn.addEventListener('click', async (e) => {
+  e.preventDefault();
+  statusEl.textContent = 'Preparing download...';
+  try {
+    const resp = await fetch(document.getElementById('qrImg').src);
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'aquatic-paradise-qr-code.png';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    statusEl.textContent = '';
+  } catch (err) {
+    statusEl.textContent = 'Download failed — right-click the QR code and "Save image as" instead.';
+  }
+});
+</script>
+</body>
+</html>
