@@ -8,45 +8,51 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png"/>
 <link rel="apple-touch-icon" href="/icons/icon-180.png"/>
 <style>
-:root{ --teal:#03939E; --gold:#FBC62C; --coral:#E0351B; --navy:#0B1E2D; }
+/* Retinted to match the aquatic-platform SaaS design system and admin.html
+   (Stripe/Linear register: navy + ocean teal, flat surfaces, thin borders,
+   no gradients). Class names kept identical — only values changed. */
+:root{
+  --teal:#4FB8CC; --gold:#F0A93B; --coral:#F0655F; --navy:#070E1A;
+  --surface:#111A2C; --bg:#0B1220; --line:#232E44; --muted:#93A0B5; --ink:#E7EBF3;
+}
 *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
-body{background:var(--navy);color:#fff;min-height:100vh}
-header{background:linear-gradient(135deg,var(--teal),#027480);padding:16px 18px;text-align:center}
+body{background:var(--bg);color:var(--ink);min-height:100vh}
+header{background:var(--navy);border-bottom:1px solid var(--line);padding:16px 18px;text-align:center}
 header h1{font-size:1.1rem}
-header p{font-size:0.72rem;color:rgba(255,255,255,0.7);margin-top:2px}
+header p{font-size:0.72rem;color:var(--muted);margin-top:2px}
 .pin-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;gap:16px;padding:20px}
 .pin-dots{display:flex;gap:12px;margin-bottom:10px}
-.pin-dot{width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,0.15);border:2px solid rgba(255,255,255,0.3)}
-.pin-dot.filled{background:var(--gold);border-color:var(--gold)}
+.pin-dot{width:14px;height:14px;border-radius:50%;background:var(--line);border:2px solid var(--line)}
+.pin-dot.filled{background:var(--teal);border-color:var(--teal)}
 .pin-pad{display:grid;grid-template-columns:repeat(3,64px);gap:12px}
-.pin-btn{width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,0.08);color:#fff;border:none;font-size:1.3rem;font-weight:700;cursor:pointer}
+.pin-btn{width:64px;height:64px;border-radius:8px;background:var(--surface);color:var(--ink);border:1px solid var(--line);font-size:1.3rem;font-weight:700;cursor:pointer}
 .pin-btn:active{background:var(--teal)}
 #app{display:none;padding:14px}
-.card{background:#162030;border-radius:14px;padding:14px;margin-bottom:12px;border-left:4px solid var(--gold)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius, 8px);padding:14px;margin-bottom:12px;border-left:3px solid var(--gold)}
 .card.done{border-left-color:var(--teal);opacity:0.7}
-.ref{font-weight:800;font-size:0.85rem;color:var(--gold)}
+.ref{font-weight:800;font-size:0.85rem;color:var(--teal)}
 .name{font-weight:700;font-size:1rem;margin:4px 0}
-.detail{font-size:0.8rem;color:rgba(255,255,255,0.65);margin-bottom:3px}
+.detail{font-size:0.8rem;color:var(--muted);margin-bottom:3px}
 .status-pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:0.68rem;font-weight:700;text-transform:uppercase;margin-top:6px}
-.status-pill.pending{background:rgba(251,198,44,0.2);color:var(--gold)}
-.status-pill.confirmed{background:rgba(3,147,158,0.3);color:#5fd0da}
-.status-pill.delivering{background:rgba(224,53,27,0.25);color:#ff8a70}
-.status-pill.done{background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.5)}
+.status-pill.pending{background:rgba(240,169,59,0.18);color:var(--gold)}
+.status-pill.confirmed{background:rgba(79,184,204,0.18);color:var(--teal)}
+.status-pill.delivering{background:rgba(240,101,95,0.18);color:var(--coral)}
+.status-pill.done{background:var(--line);color:var(--muted)}
 .actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
 .btn{flex:1;min-width:90px;padding:9px;border-radius:8px;border:none;font-weight:700;font-size:0.78rem;cursor:pointer;color:#fff}
 .btn.confirm{background:var(--teal)}
 .btn.done-btn{background:var(--gold);color:var(--navy)}
 .btn.wa{background:#25D366;text-decoration:none;text-align:center;display:flex;align-items:center;justify-content:center}
-.empty{text-align:center;padding:40px 20px;color:rgba(255,255,255,0.35);font-size:0.85rem}
-.refresh{width:100%;padding:10px;background:rgba(255,255,255,0.08);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.82rem;margin-bottom:14px}
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#162030;color:#fff;padding:10px 18px;border-radius:8px;font-size:0.8rem;z-index:999;display:none}
+.empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:0.85rem}
+.refresh{width:100%;padding:10px;background:var(--surface);border:1px solid var(--line);color:var(--ink);border-radius:8px;font-weight:700;font-size:0.82rem;margin-bottom:14px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--line);color:var(--ink);padding:10px 18px;border-radius:8px;font-size:0.8rem;z-index:999;display:none}
 </style>
 </head>
 <body>
 
 <div class="pin-screen" id="pinScreen">
   <h1>🚚 APR Dispatch</h1>
-  <p style="font-size:0.78rem;color:rgba(255,255,255,0.5)">Enter your PIN</p>
+  <p style="font-size:0.78rem;color:var(--muted)">Enter your PIN</p>
   <div class="pin-dots" id="pinDots"></div>
   <div class="pin-pad">
     <button class="pin-btn" onclick="pinPress('1')">1</button>
@@ -62,7 +68,7 @@ header p{font-size:0.72rem;color:rgba(255,255,255,0.7);margin-top:2px}
     <button class="pin-btn" onclick="pinPress('0')">0</button>
     <button class="pin-btn" onclick="pinBackspace()">⌫</button>
   </div>
-  <a href="https://wa.me/17844963447?text=Hi%2C%20I%20forgot%20my%20dispatch%20PIN%20and%20need%20it%20reset." target="_blank" style="font-size:0.72rem;color:rgba(255,255,255,0.4);text-decoration:underline">Forgot PIN? Message for a reset</a>
+  <a href="https://wa.me/17844963447?text=Hi%2C%20I%20forgot%20my%20dispatch%20PIN%20and%20need%20it%20reset." target="_blank" style="font-size:0.72rem;color:var(--muted);text-decoration:underline">Forgot PIN? Message for a reset</a>
 </div>
 
 <div id="app">
@@ -247,7 +253,7 @@ function render() {
         ${status!=='done'?`<button class="btn done-btn" data-ref="${ref}" onclick="setStatus(this.dataset.ref,'done')">☑ Done</button>`:''}
         ${status!=='done'?`<button class="btn" style="background:#3a4a5c" data-ref="${ref}" onclick="shareLocation(this.dataset.ref)">📍 Share Location</button>`:''}
         ${phone?`<a class="btn wa" href="https://wa.me/${encodeURIComponent(phone)}" target="_blank">💬 Guest</a>`:''}
-        ${status==='done'&&phone?`<a class="btn wa" style="background:#FBC62C;color:#0B1E2D" href="https://wa.me/${encodeURIComponent(phone)}?text=${encodeURIComponent(feedbackMsg)}" target="_blank">⭐ Ask Feedback</a>`:''}
+        ${status==='done'&&phone?`<a class="btn wa" style="background:var(--gold);color:var(--navy)" href="https://wa.me/${encodeURIComponent(phone)}?text=${encodeURIComponent(feedbackMsg)}" target="_blank">⭐ Ask Feedback</a>`:''}
       </div>
     </div>`;
   }).join('');
