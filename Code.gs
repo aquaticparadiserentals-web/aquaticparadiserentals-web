@@ -58,6 +58,9 @@ var MESSAGES_SHEET_NAME = 'MESSAGES';
 // sensitive PII and must never be publicly shareable.
 var STAFF_PHOTO_FOLDER_NAME = 'APR Staff Photos';
 var MAX_STAFF_PHOTO_BASE64_LEN = 4000000; // ~3MB decoded — headshots, not ID scans
+var SITE_PHOTO_FOLDER_NAME = 'APR Site Photos';
+var MAX_SITE_PHOTO_BASE64_LEN = 6000000; // ~4.5MB decoded — hero/gear marketing photos
+var SITE_PHOTO_KEYS = ['hero', 'gear_SUP', 'gear_KAY', 'gear_KAY2', 'gear_SNK', 'gear_FLT'];
 
 // ── FAIL-SAFE HELPERS ──
 
@@ -481,6 +484,64 @@ function _saveStaffPhoto(base64Raw, mimeTypeRaw, namePrefix) {
     _logError('_saveStaffPhoto', err);
     return '';
   }
+}
+
+// ── SITE PHOTOS (hero + gear card images, admin-uploaded via admin.html) ──
+// PUBLIC on purpose, same as staff photos — these are marketing images meant
+// to show on the public booking page. Keyed in PropertiesService (small,
+// infrequently-changed config — a Sheet would be overkill).
+function _saveSitePhoto(base64Raw, mimeTypeRaw, key) {
+  try {
+    if (!base64Raw) return '';
+    var mime = (typeof mimeTypeRaw === 'string' && /^image\/(jpeg|jpg|png|webp)$/i.test(mimeTypeRaw)) ? mimeTypeRaw : 'image/jpeg';
+    var base64 = String(base64Raw);
+    var commaIdx = base64.indexOf(',');
+    if (base64.slice(0, 5) === 'data:' && commaIdx !== -1) base64 = base64.slice(commaIdx + 1);
+    if (base64.length > MAX_SITE_PHOTO_BASE64_LEN) return '';
+
+    var bytes;
+    try { bytes = Utilities.base64Decode(base64); }
+    catch (decodeErr) { _logError('_saveSitePhoto.decode', decodeErr); return ''; }
+
+    var ext = mime.indexOf('png') !== -1 ? 'png' : (mime.indexOf('webp') !== -1 ? 'webp' : 'jpg');
+    var safeKey = String(key || 'photo').replace(/[^a-zA-Z0-9_-]/g, '');
+    var blob = Utilities.newBlob(bytes, mime, safeKey + '_' + Date.now() + '.' + ext);
+
+    var folders = DriveApp.getFoldersByName(SITE_PHOTO_FOLDER_NAME);
+    var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(SITE_PHOTO_FOLDER_NAME);
+    var file = folder.createFile(blob);
+    try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); }
+    catch (shareErr) { _logError('_saveSitePhoto.share', shareErr); }
+    return file.getUrl();
+  } catch (err) {
+    _logError('_saveSitePhoto', err);
+    return '';
+  }
+}
+
+function uploadSitePhoto(p) {
+  try {
+    var key = String((p && p.key) || '');
+    if (SITE_PHOTO_KEYS.indexOf(key) === -1) return { ok: false, error: 'Unknown photo slot.' };
+    if (!p.photoBase64) return { ok: false, error: 'No photo received.' };
+    var url = _saveSitePhoto(p.photoBase64, p.photoMimeType, key);
+    if (!url) return { ok: false, error: 'Could not save photo. Try a smaller image.' };
+    PropertiesService.getScriptProperties().setProperty('site_photo_' + key, url);
+    return { ok: true, url: url };
+  } catch (err) {
+    _logError('uploadSitePhoto', err);
+    return { ok: false, error: GENERIC_ERROR };
+  }
+}
+
+function getSitePhotos() {
+  var props = PropertiesService.getScriptProperties();
+  var out = {};
+  SITE_PHOTO_KEYS.forEach(function (key) {
+    var url = props.getProperty('site_photo_' + key);
+    if (url) out[key] = url;
+  });
+  return out;
 }
 
 // ── DRIVERS (shared across staff — same sheet/GAS backend as bookings) ──
@@ -1042,6 +1103,11 @@ function doGet(e) {
       }
       return _json(saveBooking(parsed));
     }
+    if (p.action === 'getSitePhotos') {
+      // Public, no token — these are marketing images meant for the
+      // public booking page to display.
+      return _json({ ok: true, photos: getSitePhotos() });
+    }
     if (p.action === 'getBookings') {
       if (!_authOk(p)) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, bookings: getBookings(parseInt(p.limit, 10) || 50) });
@@ -1148,6 +1214,10 @@ function doPost(e) {
         return t.getHandlerFunction() === 'weeklyBackup';
       }).length;
       return _json({ ok: true, installed: bkCount });
+    }
+    if (payload.action === 'uploadSitePhoto') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(uploadSitePhoto(payload));
     }
     if (payload.action === 'submit_feedback') {
       // Public — same posture as booking submission. A guest leaving

@@ -87,6 +87,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 .gear-card{background:var(--card);border-radius:var(--radius);padding:16px 14px;box-shadow:var(--shadow);border:1px solid var(--line);cursor:pointer;transition:border-color .15s,box-shadow .15s;position:relative}
 .gear-card.selected{border-color:var(--teal);box-shadow:0 0 0 3px rgba(14,124,144,.12)}
 .gear-card .gear-icon{font-size:1.6rem;margin-bottom:8px}
+.gear-card .gear-photo{width:100%;height:84px;object-fit:cover;border-radius:6px;margin-bottom:8px;display:block}
 .gear-card .gear-name{font-size:0.9rem;font-weight:600;color:var(--ink)}
 .gear-card .gear-price{font-size:0.78rem;color:var(--teal);font-weight:600;margin-top:3px}
 .gear-card .qty-controls{display:flex;align-items:center;gap:8px;margin-top:10px}
@@ -653,13 +654,32 @@ window.addEventListener('DOMContentLoaded', () => {
 
   loadWeatherBanner();
   loadTeamPublic();
+  loadSitePhotos();
 });
 
 // ── MEET THE TEAM (public, no login needed) ──
-function driveThumbUrl(url) {
+function driveThumbUrl(url, size) {
   if (!url) return '';
   const match = String(url).match(/\/d\/([a-zA-Z0-9_-]+)/);
-  return match ? `https://drive.google.com/thumbnail?id=${match[1]}&sz=w200` : '';
+  return match ? `https://drive.google.com/thumbnail?id=${match[1]}&sz=w${size||200}` : '';
+}
+
+// ── SITE PHOTOS (hero background + gear card images, set via admin → Photos) ──
+let sitePhotos = {};
+async function loadSitePhotos() {
+  try {
+    const res = await fetch(BACKEND+'?action=getSitePhotos',{signal:AbortSignal.timeout(8000)});
+    const data = await res.json();
+    if (data && data.ok) sitePhotos = data.photos || {};
+  } catch (err) {
+    // Silent failure — falls back to the default stock hero photo + emoji icons.
+  }
+  const hero = document.querySelector('.hero-card');
+  if (hero && sitePhotos.hero) {
+    const img = driveThumbUrl(sitePhotos.hero, 1600);
+    hero.style.backgroundImage = `linear-gradient(180deg, rgba(7,20,36,.35) 0%, rgba(7,20,36,.65) 55%, rgba(7,20,36,.92) 100%), url('${img}')`;
+  }
+  renderGear();
 }
 
 async function loadTeamPublic() {
@@ -754,9 +774,14 @@ async function loadWeatherBanner() {
 // ── RENDER GEAR ──
 function renderGear() {
   const regularGear = GEAR.filter(g => !g.isPackage);
-  document.getElementById('gearGrid').innerHTML = regularGear.map(g => `
+  document.getElementById('gearGrid').innerHTML = regularGear.map(g => {
+    const photo = sitePhotos['gear_'+g.id];
+    const iconHtml = photo
+      ? `<img class="gear-photo" src="${driveThumbUrl(photo,300)}" alt="${g.name}">`
+      : `<div class="gear-icon">${g.icon}</div>`;
+    return `
     <div class="gear-card" id="gc-${g.id}" onclick="toggleGear('${g.id}')">
-      <div class="gear-icon">${g.icon}</div>
+      ${iconHtml}
       <div class="gear-name">${g.name}</div>
       <div class="gear-price">from XCD ${g.price30}</div>
       <div class="qty-controls" onclick="event.stopPropagation()">
@@ -766,7 +791,8 @@ function renderGear() {
       </div>
       <div class="gear-check">✓</div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function toggleGear(id) {

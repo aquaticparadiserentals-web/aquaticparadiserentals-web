@@ -619,6 +619,13 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
     <a href="rules.html" target="_blank" style="display:block;text-align:center;background:var(--teal);border-radius:8px;color:#fff;padding:10px 16px;font-size:0.85rem;font-weight:700;text-decoration:none">📄 Open Printable Rules &amp; Regulations</a>
   </div>
 
+  <div class="sec-title">Photos</div>
+  <div class="setting-card">
+    <h3>📸 Booking Page Photos</h3>
+    <p style="font-size:0.75rem;color:var(--muted);margin-bottom:12px">Upload real photos for the booking page — pick a file, hit Upload, it goes live right away. Leave a slot empty to keep the default look.</p>
+    <div id="sitePhotoSlots"></div>
+  </div>
+
   <div class="sec-title">Weather</div>
   <div class="setting-card">
     <p style="font-size:0.75rem;color:var(--muted);margin-bottom:10px">Turns on the hourly conditions check on the server (wind alerts by email/WhatsApp, and the safety banner on the booking page). Run this once — or again if the weather alerts ever stop.</p>
@@ -947,6 +954,63 @@ async function changeStaffPin() {
 }
 function var_coral(){return 'var(--coral)'}
 
+// ── SITE PHOTOS (hero + gear card images shown on the public booking page) ──
+const SITE_PHOTO_SLOTS = [
+  { key:'hero',    label:'Hero background (top banner)' },
+  { key:'gear_SUP', label:'Paddle Board' },
+  { key:'gear_KAY', label:'Kayak (Single)' },
+  { key:'gear_KAY2', label:'Kayak (Double)' },
+  { key:'gear_SNK', label:'Snorkel Set' },
+  { key:'gear_FLT', label:'Floater/Board' },
+];
+let sitePhotosCache = {};
+
+function renderSitePhotoSlots() {
+  const el = document.getElementById('sitePhotoSlots');
+  if (!el) return;
+  el.innerHTML = SITE_PHOTO_SLOTS.map(s => {
+    const url = sitePhotosCache[s.key];
+    const thumb = driveThumbUrl(url);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.08)">
+      ${thumb ? `<img src="${thumb}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0">` : `<div style="width:44px;height:44px;border-radius:6px;background:rgba(255,255,255,0.06);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:var(--muted)">none</div>`}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:0.82rem;font-weight:700;margin-bottom:4px">${s.label}</div>
+        <input type="file" accept="image/jpeg,image/png,image/webp" id="sitePhotoFile-${s.key}" style="font-size:0.72rem;max-width:100%">
+      </div>
+      <button onclick="uploadSitePhotoSlot('${s.key}')" style="background:var(--teal);border:none;border-radius:6px;color:#fff;padding:8px 12px;font-size:0.75rem;font-weight:700;cursor:pointer;flex-shrink:0">Upload</button>
+    </div>`;
+  }).join('');
+}
+
+async function loadSitePhotos() {
+  try {
+    const res = await fetch(BACKEND+'?action=getSitePhotos',{signal:AbortSignal.timeout(8000)});
+    const data = await res.json();
+    if (data && data.ok) sitePhotosCache = data.photos || {};
+  } catch (err) { /* leave cache empty, slots just show "none" */ }
+  renderSitePhotoSlots();
+}
+
+async function uploadSitePhotoSlot(key) {
+  const input = document.getElementById('sitePhotoFile-'+key);
+  const photo = await _fileToBase64(input);
+  if (!photo) { showToast('Choose a JPG, PNG, or WEBP file first', 'warn'); return; }
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'uploadSitePhoto', token:APP_TOKEN, key:key,
+      photoBase64: photo.base64, photoMimeType: photo.mimeType
+    }),signal:AbortSignal.timeout(30000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Upload failed');
+    sitePhotosCache[key] = data.url;
+    renderSitePhotoSlots();
+    showToast('Photo uploaded — live on the booking page now ✅','ok');
+  } catch (err) {
+    showToast('Could not upload photo: '+err.message, 'warn');
+  }
+}
+
 // ── ON LOGIN ──
 function onLogin() {
   renderLog();
@@ -959,6 +1023,7 @@ function onLogin() {
   startWeatherWatch();
   updateQueueCount();
   loadBrotherNum();
+  loadSitePhotos();
   setInterval(updateOnline,10000);
 }
 
