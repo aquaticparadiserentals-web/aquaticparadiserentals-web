@@ -109,17 +109,56 @@ function _pinPropKey(role) {
   return role === 'staff' ? 'APR_STAFF_PIN_HASH' : 'APR_ADMIN_PIN_HASH';
 }
 
+// Matches the lockout documented in ACCESS-AND-RECOVERY.md: 5 wrong PINs
+// locks that role out for 5 minutes. This is the actual enforcement point —
+// the client-side attempt counter (admin.html) is UX only and can be
+// bypassed by calling this endpoint directly, so the real gate must live
+// here.
+var PIN_LOCKOUT_MAX_ATTEMPTS = 5;
+var PIN_LOCKOUT_SECONDS = 5 * 60;
+
+function _pinLockoutKey(role) {
+  return 'pin_fail_' + role;
+}
+
+// Returns true if role is currently locked out.
+function _pinLockedOut(role) {
+  var current = Number(CacheService.getScriptCache().get(_pinLockoutKey(role))) || 0;
+  return current >= PIN_LOCKOUT_MAX_ATTEMPTS;
+}
+
+// Records a wrong attempt, refreshing the lockout window each time so a
+// caller who keeps guessing during the lockout doesn't get a shorter wait.
+function _pinRecordFailure(role) {
+  var cache = CacheService.getScriptCache();
+  var key = _pinLockoutKey(role);
+  var current = Number(cache.get(key)) || 0;
+  cache.put(key, String(current + 1), PIN_LOCKOUT_SECONDS);
+}
+
+function _pinClearFailures(role) {
+  CacheService.getScriptCache().remove(_pinLockoutKey(role));
+}
+
 // Public (no token) — this IS the login step. Rate-limited against brute force.
 function verifyPin(p) {
   try {
-    if (!_rateLimitOk('pin')) return { ok: false, error: 'Too many attempts — please wait a minute.' };
     if (!p || (p.role !== 'admin' && p.role !== 'staff')) return { ok: false, error: 'Invalid request' };
+
+    if (_pinLockedOut(p.role)) {
+      return { ok: false, error: 'Too many wrong attempts — locked for 5 minutes.' };
+    }
+    if (!_rateLimitOk('pin')) return { ok: false, error: 'Too many attempts — please wait a minute.' };
     if (typeof p.pin !== 'string' || !/^\d{4}$/.test(p.pin)) return { ok: false, error: 'Incorrect PIN' };
 
     var storedHash = PropertiesService.getScriptProperties().getProperty(_pinPropKey(p.role));
     if (!storedHash) return { ok: false, error: 'PIN not set up yet — run seedDefaultPins() once from the Apps Script editor.' };
-    if (_hashPin(p.pin) !== storedHash) return { ok: false, error: 'Incorrect PIN' };
+    if (_hashPin(p.pin) !== storedHash) {
+      _pinRecordFailure(p.role);
+      return { ok: false, error: 'Incorrect PIN' };
+    }
 
+    _pinClearFailures(p.role);
     return { ok: true, token: p.role === 'staff' ? STAFF_TOKEN : APP_TOKEN };
   } catch (err) {
     return _fail('verifyPin', err);
