@@ -244,6 +244,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
       <p>Bequia · St. Vincent &amp; the Grenadines</p>
     </div>
     <div class="header-badge">⚓ Est. 2024</div>
+    <button id="installAppBtn" onclick="installApp()" style="display:none;margin-left:10px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:0.72rem;font-weight:600;padding:6px 12px;border-radius:20px;white-space:nowrap;cursor:pointer">⬇ Install app</button>
   </div>
   <nav>
     <div class="nav-tabs">
@@ -1480,6 +1481,24 @@ if ('serviceWorker' in navigator) {
       .catch(e => console.log('SW registration failed:', e));
   });
 }
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const btn = document.getElementById('installAppBtn');
+  if (btn) btn.style.display = 'inline-block';
+});
+function installApp() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.then(() => { deferredInstallPrompt = null; });
+  const btn = document.getElementById('installAppBtn');
+  if (btn) btn.style.display = 'none';
+}
+window.addEventListener('appinstalled', () => {
+  const btn = document.getElementById('installAppBtn');
+  if (btn) btn.style.display = 'none';
+});
 </script>
 </body>
 </html>
