@@ -254,6 +254,10 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
     </div>
   </nav>
 </header>
+<div id="iosInstallBanner" style="display:none;background:#0A4A5A;color:#fff;padding:10px 16px;font-size:0.82rem;text-align:center;line-height:1.4">
+  📲 Install this app: tap the <strong>Share</strong> button below, then <strong>"Add to Home Screen"</strong>
+  <button onclick="document.getElementById('iosInstallBanner').style.display='none'" style="margin-left:8px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:12px;padding:2px 9px;font-size:0.75rem;cursor:pointer">Got it</button>
+</div>
 
 <div id="weatherBanner" style="display:none;padding:10px 16px;text-align:center;font-size:0.82rem;font-weight:700"></div>
 
@@ -1498,6 +1502,24 @@ function installApp() {
 window.addEventListener('appinstalled', () => {
   const btn = document.getElementById('installAppBtn');
   if (btn) btn.style.display = 'none';
+});
+
+// iOS Safari has no beforeinstallprompt API at all — there's no button that can trigger
+// an install there. Show manual "Add to Home Screen" instructions instead, but only on
+// iOS Safari itself (not Chrome-on-iOS, which is Safari under the hood but can't install),
+// and only if the site isn't already running as an installed standalone app.
+(function () {
+  const ua = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+  const isSafari = /^((?!chrome|android|crios|fxios|edgios).)*safari/i.test(ua);
+  const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+  if (isIOS && isSafari && !isStandalone && !localStorage.getItem('aprIosBannerDismissed')) {
+    document.getElementById('iosInstallBanner').style.display = 'block';
+  }
+})();
+document.addEventListener('DOMContentLoaded', () => {
+  const gotIt = document.querySelector('#iosInstallBanner button');
+  if (gotIt) gotIt.addEventListener('click', () => localStorage.setItem('aprIosBannerDismissed', '1'));
 });
 </script>
 </body>
