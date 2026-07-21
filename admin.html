@@ -429,7 +429,6 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
           <strong style="color:#fbbf24">Key Numbers:</strong><br/>
           Bequia Hospital: 784-458-3294 · Bequia Police: 784-458-3350<br/>
           Coast Guard (SVG): 784-457-1648 · Hospital (Milton Cato): 784-456-1185<br/>
-          Ops Manager (Brother): <span id="brotherNumDisplay">Not set — add in Settings tab</span><br/>
           Business Email: aquaticparadiserentals@gmail.com
         </div>
       </div>
@@ -569,19 +568,6 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 
 <!-- ═ SETTINGS ═ -->
 <div class="asection" id="asec-settings">
-  <!-- Brother WhatsApp -->
-  <div class="card" style="margin-bottom:16px">
-    <div style="font-weight:700;font-size:0.88rem;margin-bottom:10px;color:var(--navy)">📱 Ops Manager Contact</div>
-    <label style="font-size:0.8rem;color:var(--muted);display:block;margin-bottom:6px">Brother's Personal WhatsApp Number</label>
-    <input type="tel" id="brotherWhatsApp" placeholder="e.g. +1 784 XXX XXXX" 
-      style="width:100%;padding:11px 12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;font-size:0.9rem;font-family:inherit;color:var(--navy);box-sizing:border-box"
-      value="" oninput="updateBrotherNum(this.value)"/>
-    <div style="font-size:0.72rem;color:var(--muted);margin-top:5px">Saved locally on this device</div>
-    <button onclick="saveBrotherNum()" 
-      style="margin-top:10px;width:100%;padding:10px;background:var(--teal);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.88rem;cursor:pointer">
-      💾 Save Number
-    </button>
-  </div>
 
 
   <div class="sec-title">System Info</div>
@@ -1022,7 +1008,6 @@ function onLogin() {
   fetchBookings();
   startWeatherWatch();
   updateQueueCount();
-  loadBrotherNum();
   loadSitePhotos();
   setInterval(updateOnline,10000);
 }
@@ -2324,31 +2309,6 @@ function updateQueueCount() {
   const q = safeParseJSON('apr_queue', []);
   if (el) el.textContent = Array.isArray(q) ? q.length : 0;
 }
-
-
-// ── BROTHER WHATSAPP ──
-function loadBrotherNum() {
-  const num = localStorage.getItem('apr_brother_num') || '';
-  const inp = document.getElementById('brotherWhatsApp');
-  if (inp) inp.value = num;
-  const disp = document.getElementById('brotherNumDisplay');
-  if (disp) disp.textContent = num || 'Not set — add in Settings tab';
-}
-
-function saveBrotherNum() {
-  const num = document.getElementById('brotherWhatsApp')?.value.trim() || '';
-  if (!num) { showToast('Enter a number first', 'warn'); return; }
-  localStorage.setItem('apr_brother_num', num);
-  const disp = document.getElementById('brotherNumDisplay');
-  if (disp) disp.textContent = num;
-  showToast('Brother number saved ✅', 'ok');
-}
-
-function updateBrotherNum(val) {
-  const disp = document.getElementById('brotherNumDisplay');
-  if (disp) disp.textContent = val || 'Not set';
-}
-
 
 // ── CSV EXPORT ──
 function exportCSV() {
