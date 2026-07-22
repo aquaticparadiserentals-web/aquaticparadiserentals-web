@@ -1315,6 +1315,22 @@ function doPost(e) {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json(markDepositReceived(payload));
     }
+    if (payload.action === 'getExpenses') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(getExpenses(payload));
+    }
+    if (payload.action === 'addExpense') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(addExpense(payload));
+    }
+    if (payload.action === 'deleteExpense') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(deleteExpense(payload));
+    }
+    if (payload.action === 'getCashFlowSummary') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(getCashFlowSummary(payload));
+    }
     return _json(saveBooking(payload));
   } catch (err) {
     return _json(_fail('doPost', err));
@@ -1897,6 +1913,209 @@ function markDepositReceived(p) {
     return { ok: false, error: 'Booking not found' };
   } catch (err) {
     return _fail('markDepositReceived', err);
+  }
+}
+
+// ── CASH FLOW / EXPENSES (new — outflows only; income is derived from
+// BOOKINGS.total / depositAmount, never duplicated here, same "derive, don't
+// duplicate" approach as getCommissionReport) ──
+var EXPENSES_SHEET_NAME = 'EXPENSES';
+var EXPENSE_CATEGORIES = ['Fuel', 'Maintenance', 'Wages', 'Supplies', 'Insurance', 'Marketing', 'Other'];
+// How many trailing days feed the forecast's daily average. Naive/manual by
+// design — no seasonality, no ML, just a trailing average projected
+// forward. Good enough for a small operator to sanity-check runway.
+var CASHFLOW_FORECAST_TRAILING_DAYS = 30;
+var CASHFLOW_FORECAST_UPCOMING_DAYS = 14;
+
+function _expensesSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(EXPENSES_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(EXPENSES_SHEET_NAME);
+    sh.appendRow(['id', 'date', 'category', 'amount', 'note', 'createdAt', 'createdBy']);
+    sh.getRange('1:1').setFontWeight('bold');
+    // Force column B to plain text so Sheets never silently auto-converts
+    // the 'YYYY-MM-DD' string into a Date serial value — _dateCellToStr
+    // below has to tolerate both anyway (existing rows may already be
+    // Dates), but this stops new rows from drifting into that state.
+    sh.getRange('B:B').setNumberFormat('@');
+  }
+  return sh;
+}
+
+// Sheets auto-converts a 'YYYY-MM-DD' string typed/appended into a cell into
+// a real Date value, so a row's date column may come back as either a
+// string or a Date depending on when it was written. Normalize to
+// 'YYYY-MM-DD' either way before handing off to _parseLocalDateInput.
+function _dateCellToStr(cell) {
+  if (cell instanceof Date) {
+    return Utilities.formatDate(cell, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  return String(cell || '');
+}
+
+function _validateExpensePayload(p) {
+  if (!p || typeof p !== 'object') return { valid: false, error: 'Missing expense data' };
+  var date = _parseLocalDateInput(p.date);
+  if (!date || isNaN(date.getTime())) return { valid: false, error: 'Invalid or missing date' };
+  var amount = Number(p.amount);
+  if (!isFinite(amount) || amount <= 0) return { valid: false, error: 'Enter an amount greater than zero' };
+  if (typeof p.category !== 'string' || !p.category.trim() || p.category.length > 60) {
+    return { valid: false, error: 'Invalid or missing category' };
+  }
+  if (p.note !== undefined && p.note !== null && String(p.note).length > 500) {
+    return { valid: false, error: 'Note too long' };
+  }
+  return { valid: true };
+}
+
+function addExpense(p) {
+  try {
+    var validation = _validateExpensePayload(p);
+    if (!validation.valid) return { ok: false, error: validation.error };
+
+    var id = 'exp-' + new Date().getTime();
+    var sh = _expensesSheet();
+    sh.appendRow([
+      id, p.date, p.category.trim(), Number(p.amount), _safe(p.note, ''),
+      new Date().toISOString(), _safe(p.createdBy, 'admin')
+    ]);
+    return { ok: true, id: id };
+  } catch (err) {
+    return _fail('addExpense', err);
+  }
+}
+
+function getExpenses(p) {
+  try {
+    var start = p && p.startDate ? _parseLocalDateInput(p.startDate) : null;
+    var end = p && p.endDate ? _parseLocalDateInput(p.endDate) : null;
+    if (end) end = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999);
+
+    var sh = _expensesSheet();
+    var data = sh.getDataRange().getValues();
+    var expenses = [];
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var dateStr = _dateCellToStr(row[1]);
+      var d = dateStr ? _parseLocalDateInput(dateStr) : null;
+      if (start && (!d || d < start)) continue;
+      if (end && (!d || d > end)) continue;
+      expenses.push({
+        id: row[0], date: dateStr, category: row[2], amount: Number(row[3]) || 0,
+        note: row[4], createdAt: row[5], createdBy: row[6]
+      });
+    }
+    expenses.sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+    return { ok: true, expenses: expenses };
+  } catch (err) {
+    return _fail('getExpenses', err);
+  }
+}
+
+function deleteExpense(p) {
+  try {
+    if (!p || typeof p.id !== 'string' || !p.id.trim()) return { ok: false, error: 'Invalid id' };
+    var sh = _expensesSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(p.id)) {
+        sh.deleteRow(i + 1);
+        return { ok: true };
+      }
+    }
+    return { ok: false, error: 'Expense not found' };
+  } catch (err) {
+    return _fail('deleteExpense', err);
+  }
+}
+
+function getCashFlowSummary(p) {
+  try {
+    var start = p && p.startDate ? _parseLocalDateInput(p.startDate) : null;
+    var end = p && p.endDate ? _parseLocalDateInput(p.endDate) : null;
+    if (!start || isNaN(start.getTime()) || !end || isNaN(end.getTime())) {
+      return { ok: false, error: 'Invalid date range' };
+    }
+    if (start > end) return { ok: false, error: 'Start date must be on or before end date' };
+    end = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999);
+
+    // Income for the period, from BOOKINGS.total — same date-range loop
+    // shape as getCommissionReport (period = rental date, not booked date).
+    var sh = _sheet();
+    var data = sh.getDataRange().getValues();
+    var idx = {};
+    FIELDS.forEach(function (f, i) { idx[f] = i; });
+    var income = 0;
+    if (data.length > 1) {
+      for (var i = 1; i < data.length; i++) {
+        var row = data[i];
+        var rentalDate = row[idx.datetime] ? new Date(row[idx.datetime]) : null;
+        if (!rentalDate || isNaN(rentalDate.getTime()) || rentalDate < start || rentalDate > end) continue;
+        income += Number(row[idx.total]) || 0;
+      }
+    }
+
+    // Expenses for the period.
+    var expensesResult = getExpenses({ startDate: p.startDate, endDate: p.endDate });
+    var expenseRows = expensesResult.ok ? expensesResult.expenses : [];
+    var expenses = expenseRows.reduce(function (sum, e) { return sum + e.amount; }, 0);
+
+    // Forecast — trailing-N-day average net cash flow, projected forward.
+    // Naive/manual by design (see constants above): no seasonality, no
+    // model, just "how has cash moved lately, extended forward."
+    var today = new Date();
+    var trailingStart = new Date(today.getTime() - CASHFLOW_FORECAST_TRAILING_DAYS * 86400000);
+    var trailingIncome = 0;
+    if (data.length > 1) {
+      for (var j = 1; j < data.length; j++) {
+        var row2 = data[j];
+        var rentalDate2 = row2[idx.datetime] ? new Date(row2[idx.datetime]) : null;
+        if (!rentalDate2 || isNaN(rentalDate2.getTime()) || rentalDate2 < trailingStart || rentalDate2 > today) continue;
+        trailingIncome += Number(row2[idx.total]) || 0;
+      }
+    }
+    var trailingExpensesResult = getExpenses({
+      startDate: Utilities.formatDate(trailingStart, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+      endDate: Utilities.formatDate(today, Session.getScriptTimeZone(), 'yyyy-MM-dd')
+    });
+    var trailingExpenses = (trailingExpensesResult.ok ? trailingExpensesResult.expenses : [])
+      .reduce(function (sum, e) { return sum + e.amount; }, 0);
+    var trailingDailyAvg = (trailingIncome - trailingExpenses) / CASHFLOW_FORECAST_TRAILING_DAYS;
+
+    // Known upcoming inflow — unpaid balances on bookings renting in the
+    // next N days (reuses existing deposit fields, no new data).
+    var upcomingEnd = new Date(today.getTime() + CASHFLOW_FORECAST_UPCOMING_DAYS * 86400000);
+    var upcomingKnownInflow = 0;
+    if (data.length > 1) {
+      for (var k = 1; k < data.length; k++) {
+        var row3 = data[k];
+        var rentalDate3 = row3[idx.datetime] ? new Date(row3[idx.datetime]) : null;
+        if (!rentalDate3 || isNaN(rentalDate3.getTime()) || rentalDate3 < today || rentalDate3 > upcomingEnd) continue;
+        if (String(row3[idx.depositStatus]) === 'received') continue;
+        var total3 = Number(row3[idx.total]) || 0;
+        var deposit3 = Number(row3[idx.depositAmount]) || 0;
+        upcomingKnownInflow += Math.max(0, total3 - deposit3);
+      }
+    }
+
+    return {
+      ok: true,
+      range: { startDate: p.startDate, endDate: p.endDate },
+      income: income,
+      expenses: expenses,
+      net: income - expenses,
+      expenseRows: expenseRows,
+      forecast: {
+        trailingDailyAvg: trailingDailyAvg,
+        projected7d: trailingDailyAvg * 7,
+        projected30d: trailingDailyAvg * 30,
+        upcomingKnownInflow: upcomingKnownInflow,
+        upcomingDays: CASHFLOW_FORECAST_UPCOMING_DAYS
+      }
+    };
+  } catch (err) {
+    return _fail('getCashFlowSummary', err);
   }
 }
 

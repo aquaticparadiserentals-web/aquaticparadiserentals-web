@@ -246,6 +246,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
     <div class="home-tile" onclick="switchATab('drivers')"><span class="ht-icon">🚚</span><span class="ht-label">Drivers</span><span class="ht-sub">Delivery drivers</span></div>
     <div class="home-tile" onclick="switchATab('feedback')"><span class="ht-icon">⭐</span><span class="ht-label">Feedback</span><span class="ht-sub">Customer reviews</span></div>
     <div class="home-tile" onclick="switchATab('commission')"><span class="ht-icon">💵</span><span class="ht-label">Commission</span><span class="ht-sub">Staff sales &amp; commission</span></div>
+    <div class="home-tile" onclick="switchATab('cashflow')"><span class="ht-icon">📈</span><span class="ht-label">Cash Flow</span><span class="ht-sub">Income, expenses &amp; forecast</span></div>
     <div class="home-tile" onclick="switchATab('messages')"><span class="ht-icon">✉️</span><span class="ht-label">Messages</span><span class="ht-sub">Sent history</span></div>
     <div class="home-tile" onclick="switchATab('settings')"><span class="ht-icon">⚙️</span><span class="ht-label">Settings</span><span class="ht-sub">PIN &amp; session</span></div>
     <div class="home-tile" onclick="switchATab('rates')"><span class="ht-icon">💰</span><span class="ht-label">Rates</span><span class="ht-sub">Price list</span></div>
@@ -530,6 +531,51 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   <div id="commissionContainer">
     <div style="text-align:center;padding:30px;color:var(--muted)">Loading commission report…</div>
   </div>
+</div>
+
+<!-- ═ CASH FLOW ═ -->
+<div class="asection" id="asec-cashflow">
+  <div class="sec-title">Cash Flow</div>
+  <p style="font-size:0.72rem;color:var(--muted);margin-bottom:12px">Income is derived from booking totals for the selected period — nothing to enter. Log expenses below as they happen. The forecast is a simple trailing-30-day average projected forward, not a guarantee.</p>
+
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <button class="bk-btn" style="flex:0 0 auto;padding:8px 14px" onclick="setCashFlowPeriod('week')">This Week</button>
+      <button class="bk-btn" style="flex:0 0 auto;padding:8px 14px" onclick="setCashFlowPeriod('month')">This Month</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input type="date" id="cashflowStart" style="padding:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;font-size:0.8rem"/>
+      <span style="color:var(--muted);font-size:0.8rem">to</span>
+      <input type="date" id="cashflowEnd" style="padding:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;font-size:0.8rem"/>
+      <button class="refresh-btn" onclick="fetchCashFlow()">🔄 Refresh</button>
+    </div>
+  </div>
+
+  <div id="cashflowSummary">
+    <div style="text-align:center;padding:30px;color:var(--muted)">Loading cash flow…</div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <h3 style="margin:0 0 10px;font-size:0.9rem">Log an Expense</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input type="date" id="expenseDate" style="padding:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;font-size:0.8rem"/>
+      <select id="expenseCategory" style="padding:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;font-size:0.8rem">
+        <option value="Fuel">Fuel</option>
+        <option value="Maintenance">Maintenance</option>
+        <option value="Wages">Wages</option>
+        <option value="Supplies">Supplies</option>
+        <option value="Insurance">Insurance</option>
+        <option value="Marketing">Marketing</option>
+        <option value="Other">Other</option>
+      </select>
+      <input type="number" id="expenseAmount" placeholder="Amount (XCD)" min="0.01" step="0.01" style="padding:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;font-size:0.8rem;width:130px"/>
+      <input type="text" id="expenseNote" placeholder="Note (optional)" maxlength="500" style="flex:1;min-width:140px;padding:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;font-size:0.8rem"/>
+      <button class="refresh-btn" onclick="submitExpense()">➕ Add Expense</button>
+    </div>
+    <p id="expenseFormMsg" style="font-size:0.75rem;margin-top:8px;min-height:16px"></p>
+  </div>
+
+  <div id="cashflowExpenseList"></div>
 </div>
 
 <!-- ═ MESSAGES ═ -->
@@ -2317,8 +2363,12 @@ function exportCSV() {
     return;
   }
   const headers = ['Ref','First Name','Last Name','Phone','Email','Date/Time','Group Size','Gear','Duration','Total (XCD)','Referral','Notes','Timestamp'];
-  const rows = allBookings.map(b => headers.map(h => {
-    const val = b[h] || '';
+  // Booking objects are keyed by the backend's lowerCamelCase field names
+  // (ref, fname, lname, ... — see FIELDS in Code.gs), not by these
+  // human-readable headers, so each header needs an explicit key lookup.
+  const fieldKeys = ['ref','fname','lname','phone','email','datetime','groupSize','gear','duration','total','referral','notes','Timestamp'];
+  const rows = allBookings.map(b => fieldKeys.map(k => {
+    const val = b[k] || '';
     return '"' + String(val).replace(/"/g,'""') + '"';
   }).join(','));
   const csv = [headers.join(','), ...rows].join('\n');
@@ -2524,6 +2574,154 @@ function renderCommissionReport(report, unassignedTotal) {
   </div>`;
 }
 
+// ── CASH FLOW (income derived from bookings, expenses logged manually — see
+// getCashFlowSummary in Code.gs. Forecast is a naive trailing average, not a
+// model, labeled as such below.) ──
+function setCashFlowPeriod(period) {
+  const today = new Date();
+  let start, end;
+  if (period === 'week') {
+    start = new Date(today); start.setDate(today.getDate() - today.getDay());
+    end = new Date(start); end.setDate(start.getDate() + 6);
+  } else {
+    start = new Date(today.getFullYear(), today.getMonth(), 1);
+    end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  }
+  document.getElementById('cashflowStart').value = _dateInputStr(start);
+  document.getElementById('cashflowEnd').value = _dateInputStr(end);
+  fetchCashFlow();
+}
+
+async function fetchCashFlow() {
+  const startEl = document.getElementById('cashflowStart');
+  const endEl = document.getElementById('cashflowEnd');
+  if (!document.getElementById('expenseDate').value) {
+    document.getElementById('expenseDate').value = _dateInputStr(new Date());
+  }
+  if (!startEl.value || !endEl.value) {
+    setCashFlowPeriod('week');
+    return;
+  }
+  const el = document.getElementById('cashflowSummary');
+  el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">⏳ Loading cash flow…</div>';
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'getCashFlowSummary', token:APP_TOKEN, startDate:startEl.value, endDate:endEl.value
+    }),signal:AbortSignal.timeout(15000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error((data && data.error) || 'No data');
+    renderCashFlowSummary(data);
+    renderCashFlowExpenseList(data.expenseRows || []);
+  } catch (err) {
+    el.innerHTML = `<div style="text-align:center;padding:30px">
+      <div style="color:#ef4444;font-size:0.9rem;margin-bottom:12px">⚠️ Could not load cash flow</div>
+      <div style="color:var(--muted);font-size:0.78rem">${escapeHtml(err.message)}</div>
+    </div>`;
+  }
+}
+
+function renderCashFlowSummary(data) {
+  const el = document.getElementById('cashflowSummary');
+  const f = data.forecast || {};
+  el.innerHTML = `<div class="card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-around;text-align:center;flex-wrap:wrap;gap:10px">
+      <div>
+        <div style="font-size:1.2rem;font-weight:800;color:#4ade80">XCD ${Number(data.income).toFixed(2)}</div>
+        <div style="font-size:0.68rem;color:var(--muted)">Income (period)</div>
+      </div>
+      <div>
+        <div style="font-size:1.2rem;font-weight:800;color:var(--coral)">XCD ${Number(data.expenses).toFixed(2)}</div>
+        <div style="font-size:0.68rem;color:var(--muted)">Expenses (period)</div>
+      </div>
+      <div>
+        <div style="font-size:1.2rem;font-weight:800;color:${data.net>=0?'#4ade80':'var(--coral)'}">XCD ${Number(data.net).toFixed(2)}</div>
+        <div style="font-size:0.68rem;color:var(--muted)">Net (period)</div>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:16px">
+    <h3 style="margin:0 0 6px;font-size:0.85rem">📈 Forecast</h3>
+    <p style="font-size:0.68rem;color:var(--muted);margin-bottom:10px">Simple projection based on the trailing 30-day average — not a guarantee.</p>
+    <div style="display:flex;justify-content:space-around;text-align:center;flex-wrap:wrap;gap:10px">
+      <div>
+        <div style="font-size:1rem;font-weight:800">XCD ${Number(f.trailingDailyAvg||0).toFixed(2)}</div>
+        <div style="font-size:0.68rem;color:var(--muted)">Avg daily net (30d)</div>
+      </div>
+      <div>
+        <div style="font-size:1rem;font-weight:800">XCD ${Number(f.projected7d||0).toFixed(2)}</div>
+        <div style="font-size:0.68rem;color:var(--muted)">Projected next 7d</div>
+      </div>
+      <div>
+        <div style="font-size:1rem;font-weight:800">XCD ${Number(f.projected30d||0).toFixed(2)}</div>
+        <div style="font-size:0.68rem;color:var(--muted)">Projected next 30d</div>
+      </div>
+      <div>
+        <div style="font-size:1rem;font-weight:800;color:var(--gold)">XCD ${Number(f.upcomingKnownInflow||0).toFixed(2)}</div>
+        <div style="font-size:0.68rem;color:var(--muted)">Known unpaid balances due (${f.upcomingDays||14}d)</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderCashFlowExpenseList(expenses) {
+  const el = document.getElementById('cashflowExpenseList');
+  if (!expenses.length) {
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">No expenses logged for this period.</div>';
+    return;
+  }
+  el.innerHTML = expenses.map(e => {
+    const idAttr = escapeHtml(String(e.id));
+    return `<div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <div style="min-width:0">
+        <div style="font-size:0.85rem;font-weight:700">${escapeHtml(e.category)} — XCD ${Number(e.amount).toFixed(2)}</div>
+        <div style="font-size:0.72rem;color:var(--muted)">${escapeHtml(e.date)}${e.note ? ' · ' + escapeHtml(e.note) : ''}</div>
+      </div>
+      <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer;padding:2px 8px;font-size:0.72rem;flex-shrink:0" data-id="${idAttr}" onclick="removeExpense(this.dataset.id)">🗑️</button>
+    </div>`;
+  }).join('');
+}
+
+async function submitExpense() {
+  const date = document.getElementById('expenseDate').value;
+  const category = document.getElementById('expenseCategory').value;
+  const amount = document.getElementById('expenseAmount').value;
+  const note = document.getElementById('expenseNote').value;
+  const msg = document.getElementById('expenseFormMsg');
+  if (!date) { msg.style.color=var_coral(); msg.textContent='Pick a date'; return; }
+  if (!amount || Number(amount) <= 0) { msg.style.color=var_coral(); msg.textContent='Enter an amount greater than zero'; return; }
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'addExpense', token:APP_TOKEN, date, category, amount:Number(amount), note,
+      createdBy: currentUser ? currentUser.name : 'admin'
+    }),signal:AbortSignal.timeout(10000)});
+    const data = await res.json();
+    if (!data || !data.ok) { msg.style.color=var_coral(); msg.textContent = (data && data.error) || 'Could not add expense'; return; }
+    msg.style.color='#4ade80'; msg.textContent='✅ Expense logged';
+    document.getElementById('expenseAmount').value = '';
+    document.getElementById('expenseNote').value = '';
+    setTimeout(()=>msg.textContent='',3000);
+    fetchCashFlow();
+  } catch (err) {
+    msg.style.color=var_coral(); msg.textContent='Network error — expense not saved';
+  }
+}
+
+async function removeExpense(id) {
+  if (!confirm('Delete this expense?')) return;
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'deleteExpense', token:APP_TOKEN, id
+    }),signal:AbortSignal.timeout(10000)});
+    const data = await res.json();
+    if (!data || !data.ok) { showToast((data && data.error) || 'Could not delete expense', 'warn'); return; }
+    showToast('Expense deleted','ok');
+    fetchCashFlow();
+  } catch (err) {
+    showToast('Network error — could not delete expense', 'warn');
+  }
+}
+
 // ── MESSAGES ──
 async function fetchMessages() {
   try {
@@ -2649,8 +2847,8 @@ function toggleCustomer(key) {
 }
 
 // ── SECTION NAVIGATION (full-screen sections + back button) ──
-const ATABS = ['home','today','bookings','dispatch','customers','inventory','safety','team','drivers','feedback','commission','messages','settings','rates'];
-const ATAB_LABELS = {home:'Operations Dashboard',today:'📊 Today',bookings:'📋 Bookings',dispatch:'📦 Dispatch',customers:'🧾 Customers',inventory:'🏄 Fleet',safety:'🛡️ Safety',team:'👥 Team',drivers:'🚚 Drivers',feedback:'⭐ Feedback',commission:'💵 Commission',messages:'✉️ Messages',settings:'⚙️ Settings',rates:'💰 Rates'};
+const ATABS = ['home','today','bookings','dispatch','customers','inventory','safety','team','drivers','feedback','commission','cashflow','messages','settings','rates'];
+const ATAB_LABELS = {home:'Operations Dashboard',today:'📊 Today',bookings:'📋 Bookings',dispatch:'📦 Dispatch',customers:'🧾 Customers',inventory:'🏄 Fleet',safety:'🛡️ Safety',team:'👥 Team',drivers:'🚚 Drivers',feedback:'⭐ Feedback',commission:'💵 Commission',cashflow:'📈 Cash Flow',messages:'✉️ Messages',settings:'⚙️ Settings',rates:'💰 Rates'};
 function switchATab(tab) {
   // Every section opens as a full page from the top — without this, the scroll
   // position from the previous section carries over and you land at the bottom.
@@ -2668,6 +2866,7 @@ function switchATab(tab) {
   if (tab==='drivers') renderDrivers();
   if (tab==='feedback') fetchFeedback();
   if (tab==='commission') fetchCommissionReport();
+  if (tab==='cashflow') fetchCashFlow();
   if (tab==='messages') fetchMessages();
 }
 function goHome() { switchATab('home'); }
