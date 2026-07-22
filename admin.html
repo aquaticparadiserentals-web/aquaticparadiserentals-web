@@ -251,6 +251,59 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
     <div class="home-tile" onclick="switchATab('settings')"><span class="ht-icon">⚙️</span><span class="ht-label">Settings</span><span class="ht-sub">PIN &amp; session</span></div>
     <div class="home-tile" onclick="switchATab('rates')"><span class="ht-icon">💰</span><span class="ht-label">Rates</span><span class="ht-sub">Price list</span></div>
   </div>
+
+  <!-- APR Founder's Slogan — rotating quote slide (see index.html for the
+       matching public-facing version; add slides in APR_QUOTE_SLIDES). -->
+  <div class="apr-quote-slider" id="aprQuoteSlider">
+    <div class="apr-quote-track"></div>
+    <div class="apr-quote-dots"></div>
+  </div>
+  <style>
+    .apr-quote-slider{background:#0B1E2D;border-radius:10px;padding:1.1rem 1.4rem;text-align:center;position:relative;overflow:hidden;margin-top:16px;max-width:480px;margin-left:auto;margin-right:auto}
+    .apr-quote-slide{display:none}
+    .apr-quote-slide.active{display:block;animation:aprQuoteFade .6s ease}
+    @keyframes aprQuoteFade{from{opacity:0}to{opacity:1}}
+    .apr-quote-text{font-family:Georgia,'Times New Roman',serif;font-style:italic;color:#FBC62C;font-size:14px;line-height:1.4;letter-spacing:.01em;margin:0 0 .45rem}
+    .apr-quote-byline{font-family:Georgia,'Times New Roman',serif;color:#E0351B;font-size:10px;letter-spacing:.12em;margin:0;text-transform:uppercase}
+    .apr-quote-dots{display:flex;gap:5px;justify-content:center;margin-top:.5rem}
+    .apr-quote-dots button{width:6px;height:6px;border-radius:50%;border:none;background:rgba(255,255,255,.25);padding:0;cursor:pointer}
+    .apr-quote-dots button.active{background:#FBC62C}
+  </style>
+  <script>
+  (function() {
+    var APR_QUOTE_SLIDES = [
+      { quote: "Check to check is survival. Year to year is comfort. Generation to generation is wealth — and that’s what we’re building.", author: "Delroy Stapleton" }
+    ];
+    var root = document.getElementById('aprQuoteSlider');
+    if (!root) return;
+    var track = root.querySelector('.apr-quote-track');
+    var dotsEl = root.querySelector('.apr-quote-dots');
+    track.innerHTML = APR_QUOTE_SLIDES.map(function(s, i) {
+      return '<div class="apr-quote-slide' + (i === 0 ? ' active' : '') + '">' +
+        '<p class="apr-quote-text">“' + s.quote + '”</p>' +
+        '<p class="apr-quote-byline">— ' + s.author + '</p></div>';
+    }).join('');
+    if (APR_QUOTE_SLIDES.length <= 1) return;
+    dotsEl.innerHTML = APR_QUOTE_SLIDES.map(function(_, i) {
+      return '<button aria-label="Slide ' + (i + 1) + '"' + (i === 0 ? ' class="active"' : '') + '></button>';
+    }).join('');
+    var slides = track.querySelectorAll('.apr-quote-slide');
+    var dots = dotsEl.querySelectorAll('button');
+    var idx = 0, timer;
+    function show(n) {
+      idx = n;
+      slides.forEach(function(s, i) { s.classList.toggle('active', i === idx); });
+      dots.forEach(function(d, i) { d.classList.toggle('active', i === idx); });
+    }
+    function next() { show((idx + 1) % slides.length); }
+    function start() { timer = setInterval(next, 7000); }
+    function stop() { clearInterval(timer); }
+    dots.forEach(function(d, i) { d.addEventListener('click', function() { stop(); show(i); start(); }); });
+    root.addEventListener('mouseenter', stop);
+    root.addEventListener('mouseleave', start);
+    start();
+  })();
+  </script>
 </div>
 
 <!-- ═ TODAY ═ -->
