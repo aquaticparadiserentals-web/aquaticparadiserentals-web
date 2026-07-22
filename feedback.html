@@ -54,7 +54,8 @@ textarea::placeholder{color:rgba(255,255,255,0.35)}
   </div>
   <div class="card done" id="doneCard">
     <div class="check">✅</div>
-    <p>Feedback received — thank you! It genuinely helps us do better.</p>
+    <p id="doneMsg">Feedback received — thank you! It genuinely helps us do better.</p>
+    <a id="googleReviewBtn" class="btn-submit" style="display:none;text-decoration:none;text-align:center;margin-top:14px" target="_blank" rel="noopener">Leave us a Google review</a>
   </div>
 </main>
 
@@ -66,6 +67,11 @@ const BACKEND = 'https://script.google.com/macros/s/AKfycbzr1KHela518-pgQ3dJyvv7
 
 const params = new URLSearchParams(window.location.search);
 const ref = params.get('ref') || '';
+
+// Paste your Google review link here once you have it (Google Maps → your
+// listing → Share → Write a review, or Business Profile → Get more reviews).
+// Left blank until then — the review-ask button simply won't show.
+const GOOGLE_REVIEW_URL = 'https://maps.app.goo.gl/6D6GsDmnhGfuNrLP8';
 
 let rating = 0;
 const starsEl = document.getElementById('stars');
@@ -99,7 +105,11 @@ submitBtn.addEventListener('click', async () => {
     document.getElementById('formCard').style.display = 'none';
     document.getElementById('doneCard').style.display = 'block';
     if (data.queued) {
-      document.querySelector('#doneCard p').textContent = "Saved — will send once you're back online. Thanks for renting with us in Bequia 🌊";
+      document.getElementById('doneMsg').textContent = "Saved — will send once you're back online. Thanks for renting with us in Bequia 🌊";
+    } else if (rating >= 4 && GOOGLE_REVIEW_URL) {
+      const btn = document.getElementById('googleReviewBtn');
+      btn.href = GOOGLE_REVIEW_URL;
+      btn.style.display = 'block';
     }
   } catch (err) {
     showToast('Could not submit: ' + err.message);
