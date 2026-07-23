@@ -244,12 +244,15 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
       <p>Bequia · St. Vincent &amp; the Grenadines</p>
     </div>
     <div class="header-badge">⚓ Est. 2024</div>
-    <select id="langSwitcher" onchange="setLanguage(this.value)" style="margin-left:8px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:0.72rem;font-weight:600;padding:6px 8px;border-radius:20px;cursor:pointer">
-      <option value="en">🇬🇧 EN</option>
-      <option value="fr">🇫🇷 FR</option>
-      <option value="sv">🇸🇪 SV</option>
-      <option value="es">🇪🇸 ES</option>
-    </select>
+    <div style="position:relative;margin-left:8px">
+      <button id="langToggleBtn" onclick="toggleLangPanel()" title="Language" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:0.85rem;font-weight:600;padding:6px 10px;border-radius:20px;cursor:pointer">🌐</button>
+      <div id="langPanel" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:#fff;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.25);overflow:hidden;z-index:50;min-width:120px">
+        <button class="lang-option" data-lang="en" onclick="setLanguage('en')" style="display:block;width:100%;text-align:left;background:none;border:none;padding:9px 14px;font-size:0.82rem;font-weight:600;color:#0A4A5A;cursor:pointer">🇬🇧 English</button>
+        <button class="lang-option" data-lang="fr" onclick="setLanguage('fr')" style="display:block;width:100%;text-align:left;background:none;border:none;padding:9px 14px;font-size:0.82rem;font-weight:600;color:#0A4A5A;cursor:pointer">🇫🇷 Français</button>
+        <button class="lang-option" data-lang="sv" onclick="setLanguage('sv')" style="display:block;width:100%;text-align:left;background:none;border:none;padding:9px 14px;font-size:0.82rem;font-weight:600;color:#0A4A5A;cursor:pointer">🇸🇪 Svenska</button>
+        <button class="lang-option" data-lang="es" onclick="setLanguage('es')" style="display:block;width:100%;text-align:left;background:none;border:none;padding:9px 14px;font-size:0.82rem;font-weight:600;color:#0A4A5A;cursor:pointer">🇪🇸 Español</button>
+      </div>
+    </div>
     <button id="installAppBtn" onclick="installApp()" style="display:none;margin-left:10px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:0.72rem;font-weight:600;padding:6px 12px;border-radius:20px;white-space:nowrap;cursor:pointer">⬇ Install app</button>
   </div>
   <nav>
@@ -881,10 +884,31 @@ function applyLanguage(lang) {
 
 function setLanguage(lang) {
   localStorage.setItem('apr_lang', lang);
-  const sw = document.getElementById('langSwitcher');
-  if (sw) sw.value = lang;
+  highlightActiveLang(lang);
   applyLanguage(lang);
+  const panel = document.getElementById('langPanel');
+  if (panel) panel.style.display = 'none';
 }
+
+function highlightActiveLang(lang) {
+  document.querySelectorAll('.lang-option').forEach(btn => {
+    btn.style.background = btn.getAttribute('data-lang') === lang ? '#E8F4F6' : 'none';
+  });
+}
+
+function toggleLangPanel() {
+  const panel = document.getElementById('langPanel');
+  if (!panel) return;
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('langPanel');
+  const btn = document.getElementById('langToggleBtn');
+  if (panel && panel.style.display !== 'none' && !panel.contains(e.target) && e.target !== btn) {
+    panel.style.display = 'none';
+  }
+});
 
 const GEAR = [
   { id:'SUP',  icon:'🏄', name:'Paddle Board',    codes:'PB',  price30:25, price60:40, price120:70, priceHD:110, priceFD:50,  priceWK:90  },
@@ -934,8 +958,7 @@ window.addEventListener('DOMContentLoaded', () => {
   loadSitePhotos();
 
   const savedLang = localStorage.getItem('apr_lang') || 'en';
-  const langSwitcher = document.getElementById('langSwitcher');
-  if (langSwitcher) langSwitcher.value = savedLang;
+  highlightActiveLang(savedLang);
   applyLanguage(savedLang);
 });
 
