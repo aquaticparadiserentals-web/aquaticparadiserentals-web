@@ -16,14 +16,31 @@
 var SHEET_NAME = 'BOOKINGS';
 var DRIVERS_SHEET_NAME = 'DRIVERS';
 var NOTIFY_EMAIL = 'aquaticparadiserentals@gmail.com';
+
+// Reads a secret token from Script Properties, generating and persisting a
+// fresh random one on first call if it isn't set yet. Keeps real secrets out
+// of source (this repo is public on GitHub) instead of hardcoding them.
+function _getOrCreateToken(propKey) {
+  var props = PropertiesService.getScriptProperties();
+  var token = props.getProperty(propKey);
+  if (!token) {
+    token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+    props.setProperty(propKey, token);
+  }
+  return token;
+}
 // Shared secret required to read booking/customer data (PII). Booking *submission*
 // stays open since customers must be able to book without a login.
-var APP_TOKEN = '2Si_80O9OJ0DGmc8p6G5pDeG';
+// Stored in Script Properties (APR_APP_TOKEN), not in source — the repo is
+// public, so a hardcoded token here would be readable by anyone. Generated
+// lazily on first use if not already set (see _getOrCreateToken below).
+var APP_TOKEN = _getOrCreateToken('APR_APP_TOKEN');
 // Weaker, separate secret for dispatch/delivery staff (e.g. Shamar) — unlocks
 // ONLY name/gear/time/location for progressing a delivery, never pricing,
 // revenue, or full guest PII. Give this token to dispatch staff; keep
-// APP_TOKEN for the owner/admin console only.
-var STAFF_TOKEN = 'Dsp_7Kq2mNw94RfL';
+// APP_TOKEN for the owner/admin console only. Stored in Script Properties
+// (APR_STAFF_TOKEN) for the same reason as APP_TOKEN above.
+var STAFF_TOKEN = _getOrCreateToken('APR_STAFF_TOKEN');
 var GENERIC_ERROR = 'Something went wrong. Please try again.';
 var ID_PHOTO_FOLDER_NAME = 'APR Guest ID Photos';
 var MAX_ID_PHOTO_BASE64_LEN = 8000000; // ~6MB decoded — generous cap against abuse

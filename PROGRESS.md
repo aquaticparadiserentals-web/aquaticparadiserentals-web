@@ -133,7 +133,8 @@ Run while the Claude desktop app is open (queued to next launch otherwise):
 - Server-side PIN verification (hashed, changeable in-app; no PINs in code or docs)
 - `ACCESS-AND-RECOVERY.md` and `.claude/` gitignored; HTTPS enforced site-wide
 - **Bitwarden installed on the PC (2026-07-09)** — ⚠️ account/master password still to be created; credentials still to be moved out of any docx/notes files
-- Known gaps (accepted): `APP_TOKEN`/`STAFF_TOKEN` plaintext in code (Apps Script model), no Netlify MFA, no automated tests
+- `APP_TOKEN`/`STAFF_TOKEN` moved out of source (2026-07-28) — auto-generated into Script Properties on first use instead of hardcoded, since the GitHub repo is public
+- Known gaps (accepted): no Netlify MFA, no automated tests
 
 ## Docs
 
