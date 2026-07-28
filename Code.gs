@@ -87,10 +87,13 @@ var SITE_PHOTO_KEYS = ['hero', 'gear_SUP', 'gear_KAY', 'gear_KAY2', 'gear_SNK', 
 function _authOk(p) {
   try {
     var token = p && p.token;
-    if (typeof token !== 'string' || !token) return false;
-    return token === APP_TOKEN;
+    if (typeof token !== 'string' || !token) { _recordAuthFailure('app'); return false; }
+    var ok = token === APP_TOKEN;
+    if (!ok) _recordAuthFailure('app');
+    return ok;
   } catch (err) {
     _logError('auth', err);
+    _recordAuthFailure('app');
     return false;
   }
 }
@@ -102,11 +105,101 @@ function _authOk(p) {
 function _dispatchAuthOk(p) {
   try {
     var token = p && p.token;
-    if (typeof token !== 'string' || !token) return false;
-    return token === APP_TOKEN || token === STAFF_TOKEN;
+    if (typeof token !== 'string' || !token) { _recordAuthFailure('dispatch'); return false; }
+    var ok = token === APP_TOKEN || token === STAFF_TOKEN;
+    if (!ok) _recordAuthFailure('dispatch');
+    return ok;
   } catch (err) {
     _logError('dispatchAuth', err);
+    _recordAuthFailure('dispatch');
     return false;
+  }
+}
+
+// ── AUTH FAILURE ALERTING ──
+// A spike in wrong/missing tokens on the token-gated endpoints suggests
+// someone is probing the public API (e.g. with the old leaked token, or by
+// guessing) — separate from wrong-PIN attempts, which already lock out via
+// _pinLockedOut above. Emails the owner at most once per hour per kind so a
+// sustained probe doesn't flood the inbox.
+var AUTH_FAIL_ALERT_THRESHOLD = 5;      // failures...
+var AUTH_FAIL_ALERT_WINDOW_SEC = 300;   // ...within this window (5 min)...
+var AUTH_FAIL_ALERT_COOLDOWN_SEC = 3600; // ...triggers at most one email per hour.
+
+function _recordAuthFailure(kind) {
+  try {
+    var cache = CacheService.getScriptCache();
+    var key = 'authfail_' + kind;
+    var current = (Number(cache.get(key)) || 0) + 1;
+    cache.put(key, String(current), AUTH_FAIL_ALERT_WINDOW_SEC);
+    if (current >= AUTH_FAIL_ALERT_THRESHOLD) _maybeSendAuthAlert(kind, current);
+  } catch (err) {
+    _logError('_recordAuthFailure', err);
+  }
+}
+
+function _maybeSendAuthAlert(kind, count) {
+  try {
+    var cache = CacheService.getScriptCache();
+    var cooldownKey = 'authfail_alert_sent_' + kind;
+    if (cache.get(cooldownKey)) return;
+    cache.put(cooldownKey, '1', AUTH_FAIL_ALERT_COOLDOWN_SEC);
+    GmailApp.sendEmail(NOTIFY_EMAIL,
+      'APR security alert: repeated failed ' + kind + ' auth attempts',
+      'The APR backend logged ' + count + ' failed "' + kind + '" token attempts within the last few minutes ' +
+      '(' + new Date().toString() + ').\n\n' +
+      'This usually means someone is hitting the public booking API with a wrong, old, or guessed token — ' +
+      'the request was rejected server-side and nothing was exposed. No action is needed for a one-off, but if ' +
+      'this keeps recurring you can flip the Emergency Lockdown switch in Settings to pause the backend, and/or ' +
+      'ask Claude to rotate APP_TOKEN/STAFF_TOKEN again.\n\n' +
+      '(You will not get another one of these emails for this attempt type for at least an hour, even if it keeps happening.)');
+  } catch (err) {
+    _logError('_maybeSendAuthAlert', err);
+  }
+}
+
+// ── EMERGENCY LOCKDOWN ──
+// A single owner-controlled kill switch. When enabled, every action is
+// refused — including public booking submissions — except logging in
+// (verifyPin) and toggling the lockdown itself. Meant for "someone is
+// actively poking at this right now and I want it to stop", not routine
+// maintenance. Stored in Script Properties so it survives restarts/redeploys
+// and can only be flipped by someone holding the real APP_TOKEN (never
+// STAFF_TOKEN).
+var LOCKDOWN_PROP_KEY = 'APR_LOCKDOWN';
+var LOCKDOWN_MESSAGE = 'Bookings and admin access are temporarily paused for security. Please contact us directly or try again shortly.';
+
+function _isLockedDown() {
+  try {
+    return PropertiesService.getScriptProperties().getProperty(LOCKDOWN_PROP_KEY) === 'true';
+  } catch (err) {
+    _logError('_isLockedDown', err);
+    return false; // a Properties read failure must never itself brick the app
+  }
+}
+
+function setLockdown(p) {
+  try {
+    if (!_authOk(p)) return { ok: false, error: 'Unauthorized' };
+    var enable = !!p.enable;
+    PropertiesService.getScriptProperties().setProperty(LOCKDOWN_PROP_KEY, enable ? 'true' : 'false');
+    try {
+      GmailApp.sendEmail(NOTIFY_EMAIL, 'APR: Emergency lockdown ' + (enable ? 'ENABLED' : 'lifted'),
+        'The booking site backend was ' + (enable ? 'locked down' : 'unlocked') + ' from the admin console at ' +
+        new Date().toString() + '.' + (enable ? ' All booking/dispatch/admin actions are refused until it is switched off again from Settings.' : ''));
+    } catch (mailErr) { _logError('setLockdown-email', mailErr); }
+    return { ok: true, lockedDown: enable };
+  } catch (err) {
+    return _fail('setLockdown', err);
+  }
+}
+
+function getLockdownStatus(p) {
+  try {
+    if (!_authOk(p)) return { ok: false, error: 'Unauthorized' };
+    return { ok: true, lockedDown: _isLockedDown() };
+  } catch (err) {
+    return _fail('getLockdownStatus', err);
   }
 }
 
@@ -1111,6 +1204,12 @@ function _safe(val, fallback) {
 function doGet(e) {
   try {
     var p = (e && e.parameter) || {};
+
+    if (_isLockedDown()) return _json({ ok: false, error: LOCKDOWN_MESSAGE });
+    if (!_rateLimitOk('api', API_RATE_LIMIT_MAX_PER_MINUTE)) {
+      return _json({ ok: false, error: 'Too many requests — please wait a minute.' });
+    }
+
     if (p.data) {
       var parsed;
       try {
@@ -1191,6 +1290,22 @@ function doPost(e) {
       return _json({ ok: false, error: 'No data received' });
     }
 
+    // Lockdown blocks everything except logging in and flipping the switch
+    // itself — otherwise a locked-down owner could never unlock it again.
+    var LOCKDOWN_EXEMPT_ACTIONS = ['verifyPin', 'setLockdown', 'getLockdownStatus'];
+    if (_isLockedDown() && LOCKDOWN_EXEMPT_ACTIONS.indexOf(payload.action) === -1) {
+      return _json({ ok: false, error: LOCKDOWN_MESSAGE });
+    }
+    if (!_rateLimitOk('api', API_RATE_LIMIT_MAX_PER_MINUTE)) {
+      return _json({ ok: false, error: 'Too many requests — please wait a minute.' });
+    }
+
+    if (payload.action === 'setLockdown') {
+      return _json(setLockdown(payload));
+    }
+    if (payload.action === 'getLockdownStatus') {
+      return _json(getLockdownStatus(payload));
+    }
     if (payload.action === 'verifyPin') {
       // Public, no token — this is the login step itself. Rate-limited
       // inside verifyPin() against brute force.
@@ -1364,13 +1479,20 @@ function doPost(e) {
 // any single minute, so this threshold has generous headroom for genuine
 // traffic spikes while still capping abuse.
 var RATE_LIMIT_MAX_PER_MINUTE = 20;
+// Applied to EVERY doGet/doPost call (public and token-gated alike) as a
+// blanket cap on request volume, independent of whether the token/PIN was
+// valid. Sized well above real usage (dashboard tab loads, 60s driver-
+// location pings, 15min weather refresh) so it only bites a scripted flood,
+// not a busy owner/dispatch session.
+var API_RATE_LIMIT_MAX_PER_MINUTE = 100;
 
-function _rateLimitOk(bucket) {
+function _rateLimitOk(bucket, maxPerMinute) {
   try {
     var cache = CacheService.getScriptCache();
+    var limit = maxPerMinute || RATE_LIMIT_MAX_PER_MINUTE;
     var key = (bucket || 'booking') + '_rl_' + Math.floor(Date.now() / 60000);
     var current = Number(cache.get(key)) || 0;
-    if (current >= RATE_LIMIT_MAX_PER_MINUTE) return false;
+    if (current >= limit) return false;
     cache.put(key, String(current + 1), 120); // expires well after the minute window closes
     return true;
   } catch (err) {

@@ -734,6 +734,12 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 
   <div class="sec-title">Danger Zone</div>
   <div class="setting-card">
+    <h3 style="color:var(--coral)">🚨 Emergency Lockdown</h3>
+    <p style="font-size:0.75rem;color:var(--muted);margin-bottom:10px">If you think someone is actively poking at bookings/customer data, hit this. It immediately stops <strong>everything</strong> — new bookings, admin, dispatch — for everyone except you logging back in here to switch it off. Only your admin PIN can turn it on or off.</p>
+    <p id="lockdownStatusMsg" style="font-size:0.78rem;font-weight:700;margin-bottom:10px">Checking status…</p>
+    <button onclick="toggleLockdown()" id="btnLockdown" style="width:100%;padding:12px;background:rgba(224,53,27,0.15);border:1px solid var(--coral);border-radius:8px;color:var(--coral);font-weight:700;cursor:pointer;font-size:0.88rem">🚨 Turn On Lockdown</button>
+  </div>
+  <div class="setting-card">
     <button onclick="lockApp()" style="width:100%;padding:12px;background:rgba(224,53,27,0.15);border:1px solid var(--coral);border-radius:8px;color:var(--coral);font-weight:700;cursor:pointer;font-size:0.88rem">🔒 Lock &amp; Exit Console</button>
   </div>
 </div>
@@ -1813,6 +1819,75 @@ async function reinstallWeatherTrigger() {
     if (d && d.ok) {
       msg.style.color = '#4ade80';
       msg.textContent = '✅ Weather checks are on (' + (d.installed || 1) + ' trigger active). First reading arrives within the hour.';
+    } else {
+      msg.style.color = '#f87171';
+      msg.textContent = '❌ ' + ((d && d.error) || 'Something went wrong — try again.');
+    }
+  } catch (err) {
+    msg.style.color = '#f87171';
+    msg.textContent = '❌ Could not reach the backend — check your connection and try again.';
+  }
+  btn.disabled = false;
+}
+
+// ── EMERGENCY LOCKDOWN (Settings tab / Danger Zone) ──
+async function fetchLockdownStatus() {
+  const msg = document.getElementById('lockdownStatusMsg');
+  const btn = document.getElementById('btnLockdown');
+  try {
+    const res = await fetch(BACKEND, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify({ action: 'getLockdownStatus', token: APP_TOKEN }),
+      signal: AbortSignal.timeout(10000)
+    });
+    const d = await res.json();
+    if (d && d.ok) {
+      renderLockdownState(d.lockedDown);
+    } else {
+      msg.style.color = 'var(--muted)';
+      msg.textContent = 'Could not check status.';
+    }
+  } catch (err) {
+    msg.style.color = 'var(--muted)';
+    msg.textContent = 'Could not reach the backend to check status.';
+  }
+}
+
+function renderLockdownState(lockedDown) {
+  const msg = document.getElementById('lockdownStatusMsg');
+  const btn = document.getElementById('btnLockdown');
+  btn.dataset.lockedDown = lockedDown ? '1' : '0';
+  if (lockedDown) {
+    msg.style.color = '#f87171';
+    msg.textContent = '🚨 LOCKDOWN IS ON — the site is refusing bookings and admin access right now.';
+    btn.textContent = '✅ Turn Off Lockdown';
+  } else {
+    msg.style.color = '#4ade80';
+    msg.textContent = '✅ Normal operation — lockdown is off.';
+    btn.textContent = '🚨 Turn On Lockdown';
+  }
+}
+
+async function toggleLockdown() {
+  const btn = document.getElementById('btnLockdown');
+  const msg = document.getElementById('lockdownStatusMsg');
+  const enabling = btn.dataset.lockedDown !== '1';
+  if (enabling && !confirm('This immediately stops ALL bookings, admin, and dispatch access for everyone until you switch it back off here. Continue?')) return;
+  btn.disabled = true;
+  msg.style.color = 'var(--muted)';
+  msg.textContent = enabling ? 'Locking down…' : 'Lifting lockdown…';
+  try {
+    const res = await fetch(BACKEND, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify({ action: 'setLockdown', token: APP_TOKEN, enable: enabling }),
+      signal: AbortSignal.timeout(10000)
+    });
+    const d = await res.json();
+    if (d && d.ok) {
+      renderLockdownState(d.lockedDown);
+      showToast(d.lockedDown ? '🚨 Lockdown is ON' : '✅ Lockdown lifted');
     } else {
       msg.style.color = '#f87171';
       msg.textContent = '❌ ' + ((d && d.error) || 'Something went wrong — try again.');
@@ -2921,6 +2996,7 @@ function switchATab(tab) {
   if (tab==='commission') fetchCommissionReport();
   if (tab==='cashflow') fetchCashFlow();
   if (tab==='messages') fetchMessages();
+  if (tab==='settings') fetchLockdownStatus();
 }
 function goHome() { switchATab('home'); }
 

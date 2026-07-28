@@ -134,6 +134,8 @@ Run while the Claude desktop app is open (queued to next launch otherwise):
 - `ACCESS-AND-RECOVERY.md` and `.claude/` gitignored; HTTPS enforced site-wide
 - **Bitwarden installed on the PC (2026-07-09)** — ⚠️ account/master password still to be created; credentials still to be moved out of any docx/notes files
 - `APP_TOKEN`/`STAFF_TOKEN` moved out of source (2026-07-28) — auto-generated into Script Properties on first use instead of hardcoded, since the GitHub repo is public
+- Auth-failure email alerts (2026-07-28) — a spike of wrong/missing tokens on the API triggers an email to the owner (max 1/hr per attempt type), plus a blanket 100/min request cap on the whole backend (`doGet`/`doPost`), separate from the existing 20/min booking-submission limit
+- Emergency Lockdown (2026-07-28) — a kill switch in Settings → Danger Zone, admin-PIN-gated: instantly refuses every action (bookings, admin, dispatch) except logging back in to switch it off. For "someone is actively interfering, stop everything now"
 - Known gaps (accepted): no Netlify MFA, no automated tests
 
 ## Docs
