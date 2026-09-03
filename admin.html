@@ -379,6 +379,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 <div class="asection" id="asec-inventory">
   <div class="sec-title">Fleet Summary</div>
   <div class="dash-grid" id="invSummary"></div>
+  <button onclick="exportInventoryCSV()" style="margin-top:8px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--navy);padding:9px 16px;font-size:0.8rem;font-weight:700;cursor:pointer">📥 Export Inventory CSV</button>
 
   <div class="sec-title" style="margin-top:18px">Restock</div>
   <div class="card" style="margin-bottom:16px">
@@ -2536,6 +2537,28 @@ function exportCSV() {
   URL.revokeObjectURL(url);
   showToast('CSV exported ✅', 'ok');
   addLog('📥 Bookings exported to CSV');
+}
+
+function exportInventoryCSV() {
+  if (!inventoryCache || !inventoryCache.length) {
+    showToast('No inventory to export', 'warn');
+    return;
+  }
+  const headers = ['Category','Label','Status','Notes','ID'];
+  const rows = inventoryCache.map(i => [
+    (FLEET_CATEGORIES.find(c=>c.key===i.category)||{}).label || i.category || '',
+    i.label || '', i.status || '', i.notes || '', i.id || ''
+  ].map(v => '"' + String(v).replace(/"/g,'""') + '"').join(','));
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'APR_Inventory_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('CSV exported ✅', 'ok');
+  addLog('📥 Inventory exported to CSV');
 }
 
 // ── FEEDBACK ──
