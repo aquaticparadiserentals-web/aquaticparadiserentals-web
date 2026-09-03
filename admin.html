@@ -1929,11 +1929,29 @@ async function reinstallBackupTrigger() {
 
 // ── CONDITIONS BANNER (public endpoint, no token needed — safety info) ──
 // Same location + wind thresholds as the backend (Code.gs): Bequia,
-// caution ≥ 28 km/h (~15 kn), unsafe ≥ 37 km/h (~20 kn).
+// caution ≥ 28 km/h (~15 kn), unsafe ≥ 37 km/h (~20 kn), thunderstorm = always unsafe.
+const WEATHER_CODE_MAP = {
+  0:['☀️','Clear'],1:['🌤️','Mostly clear'],2:['⛅','Partly cloudy'],3:['☁️','Overcast'],
+  45:['🌫️','Fog'],48:['🌫️','Fog'],
+  51:['🌦️','Light drizzle'],53:['🌦️','Drizzle'],55:['🌧️','Heavy drizzle'],
+  56:['🌧️','Freezing drizzle'],57:['🌧️','Freezing drizzle'],
+  61:['🌦️','Light rain'],63:['🌧️','Rain'],65:['🌧️','Heavy rain'],
+  66:['🌧️','Freezing rain'],67:['🌧️','Freezing rain'],
+  71:['🌨️','Light snow'],73:['🌨️','Snow'],75:['❄️','Heavy snow'],77:['🌨️','Snow grains'],
+  80:['🌦️','Rain showers'],81:['🌧️','Rain showers'],82:['⛈️','Violent showers'],
+  85:['🌨️','Snow showers'],86:['🌨️','Snow showers'],
+  95:['⛈️','Thunderstorm'],96:['⛈️','Thunderstorm (hail)'],99:['⛈️','Thunderstorm (hail)']
+};
+const THUNDERSTORM_CODES = [95, 96, 99];
+function weatherConditionInfo(code) {
+  const e = WEATHER_CODE_MAP[code];
+  return e ? {icon:e[0], label:e[1]} : {icon:'🌡️', label:'Conditions unknown'};
+}
 async function fetchWeatherDirect() {
   try {
     const url = 'https://api.open-meteo.com/v1/forecast?latitude=13.0056&longitude=-61.2392' +
-      '&current=wind_speed_10m,wind_gusts_10m&daily=wind_speed_10m_max&timezone=auto&wind_speed_unit=kmh';
+      '&current=wind_speed_10m,wind_gusts_10m,weather_code,precipitation' +
+      '&daily=wind_speed_10m_max,precipitation_probability_max,weather_code&timezone=auto&wind_speed_unit=kmh';
     const res = await fetch(url, {signal:AbortSignal.timeout(8000)});
     if (!res.ok) return null;
     const d = await res.json();
@@ -1941,10 +1959,17 @@ async function fetchWeatherDirect() {
     if (windNow === null) return null;
     const windMax = (d.daily && Array.isArray(d.daily.wind_speed_10m_max) && d.daily.wind_speed_10m_max.length) ? d.daily.wind_speed_10m_max[0] : null;
     const gustNow = (d.current && typeof d.current.wind_gusts_10m === 'number') ? d.current.wind_gusts_10m : null;
+    const weatherCode = (d.current && typeof d.current.weather_code === 'number') ? d.current.weather_code : null;
+    const condition = weatherConditionInfo(weatherCode);
+    const precipNow = (d.current && typeof d.current.precipitation === 'number') ? d.current.precipitation : null;
+    const precipProbMax = (d.daily && Array.isArray(d.daily.precipitation_probability_max) && d.daily.precipitation_probability_max.length) ? d.daily.precipitation_probability_max[0] : null;
     const worst = Math.max(windNow, windMax || 0);
+    const status = THUNDERSTORM_CODES.includes(weatherCode) ? 'unsafe' : (worst >= 37 ? 'unsafe' : worst >= 28 ? 'caution' : 'safe');
     return {
-      status: worst >= 37 ? 'unsafe' : worst >= 28 ? 'caution' : 'safe',
+      status,
       windNowKmh: windNow, gustNowKmh: gustNow, windMaxTodayKmh: windMax,
+      weatherCode, conditionIcon: condition.icon, conditionLabel: condition.label,
+      precipNowMm: precipNow, precipProbMaxToday: precipProbMax,
       checkedAt: new Date().toISOString()
     };
   } catch { return null; }
@@ -2009,9 +2034,11 @@ function renderWeatherBanner(el, w) {
   el.style.background = s.bg;
   el.style.color = s.color;
   el.textContent = s.label +
+    (w.conditionLabel ? ` · ${w.conditionIcon || ''} ${w.conditionLabel}` : '') +
     (w.windNowKmh ? ` · Wind ${Math.round(w.windNowKmh)} km/h` : '') +
     (w.gustNowKmh ? ` (gusts ${Math.round(w.gustNowKmh)})` : '') +
     (w.windMaxTodayKmh ? ` · Max today ${Math.round(w.windMaxTodayKmh)} km/h` : '') +
+    (w.precipProbMaxToday != null ? ` · ${Math.round(w.precipProbMaxToday)}% rain chance` : '') +
     (w.checkedAt ? ` · checked ${new Date(w.checkedAt).toLocaleTimeString()}` : '');
 }
 
@@ -3027,10 +3054,10 @@ function showToast(msg, type='') {
         </tr>
       </thead>
       <tbody>
-        <tr style="border-bottom:1px solid var(--line)"><td style="padding:7px 10px">🏄 Paddle Board</td><td style="text-align:center">$25</td><td style="text-align:center">$40</td><td style="text-align:center">$70</td><td style="text-align:center">$110</td><td style="text-align:center;font-weight:700;color:var(--teal)">$200</td><td style="text-align:center;color:var(--gold);font-weight:700">$120</td></tr>
+        <tr style="border-bottom:1px solid var(--line)"><td style="padding:7px 10px">🏄 Paddle Board</td><td style="text-align:center">$25</td><td style="text-align:center">$40</td><td style="text-align:center">$70</td><td style="text-align:center">$110</td><td style="text-align:center;font-weight:700;color:var(--teal)">$200</td><td style="text-align:center;color:var(--gold);font-weight:700">$1000</td></tr>
         <tr style="border-bottom:1px solid var(--line);background:var(--bg)"><td style="padding:7px 10px">🚣 Kayak (Single)</td><td style="text-align:center">$20</td><td style="text-align:center">$35</td><td style="text-align:center">$60</td><td style="text-align:center">$90</td><td style="text-align:center;font-weight:700;color:var(--teal)">$160</td><td style="text-align:center">–</td></tr>
-        <tr style="border-bottom:1px solid var(--line)"><td style="padding:7px 10px">🚣 Kayak (Double)</td><td style="text-align:center">$30</td><td style="text-align:center">$50</td><td style="text-align:center">$85</td><td style="text-align:center">$130</td><td style="text-align:center;font-weight:700;color:var(--teal)">$160</td><td style="text-align:center;color:var(--gold);font-weight:700">$100</td></tr>
-        <tr style="border-bottom:1px solid var(--line);background:var(--bg)"><td style="padding:7px 10px">🤿 Snorkel Set</td><td style="text-align:center">$15</td><td style="text-align:center">$25</td><td style="text-align:center">$40</td><td style="text-align:center">$60</td><td style="text-align:center">–</td><td style="text-align:center;color:var(--gold);font-weight:700">$20</td></tr>
+        <tr style="border-bottom:1px solid var(--line)"><td style="padding:7px 10px">🚣 Kayak (Double)</td><td style="text-align:center">$30</td><td style="text-align:center">$50</td><td style="text-align:center">$85</td><td style="text-align:center">$130</td><td style="text-align:center;font-weight:700;color:var(--teal)">$230</td><td style="text-align:center;color:var(--gold);font-weight:700">$1150</td></tr>
+        <tr style="border-bottom:1px solid var(--line);background:var(--bg)"><td style="padding:7px 10px">🤿 Snorkel Set</td><td style="text-align:center">$15</td><td style="text-align:center">$25</td><td style="text-align:center">$40</td><td style="text-align:center">$60</td><td style="text-align:center">–</td><td style="text-align:center;color:var(--gold);font-weight:700">$120</td></tr>
         <tr><td style="padding:7px 10px">🏊 Floater/Board</td><td style="text-align:center">$15</td><td style="text-align:center">$25</td><td style="text-align:center">$40</td><td style="text-align:center">$55</td><td style="text-align:center">–</td><td style="text-align:center">–</td></tr>
       </tbody>
     </table>

@@ -1320,6 +1320,12 @@ function doPost(e) {
       if (!_dispatchAuthOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json(updateStatus(payload));
     }
+    if (payload.action === 'deleteBooking') {
+      // Admin-only — this is an irreversible row delete (guest PII, deposit
+      // data, everything), a different trust level than update_status.
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(deleteBooking(payload));
+    }
     if (payload.action === 'update_driver_location') {
       // Dispatch-scoped: a driver sharing their own position is the same
       // trust level as progressing a delivery status.
@@ -1874,6 +1880,29 @@ function updateStatus(p) {
     return { ok: false, error: 'Booking not found' };
   } catch (err) {
     return _fail('updateStatus', err);
+  }
+}
+
+// Dispatch/admin — permanently removes a booking row by ref (e.g. a
+// duplicate or test submission). Idempotent, same pattern as
+// deleteDriver/deleteFeedback: returns ok even if already gone.
+function deleteBooking(p) {
+  try {
+    if (!p || typeof p.ref !== 'string' || !p.ref.trim()) return { ok: false, error: 'Invalid ref' };
+    var sh = _sheet();
+    var data = sh.getDataRange().getValues();
+    var refIdx = data[0] ? data[0].indexOf('ref') : -1;
+    if (refIdx === -1) return { ok: false, error: 'Sheet not initialized' };
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][refIdx]) === String(p.ref)) {
+        sh.deleteRow(i + 1);
+        return { ok: true };
+      }
+    }
+    return { ok: true }; // already gone — idempotent
+  } catch (err) {
+    return _fail('deleteBooking', err);
   }
 }
 
@@ -2759,7 +2788,33 @@ var WIND_CAUTION_KMH = 28;  // ~15 knots
 var WIND_UNSAFE_KMH = 37;   // ~20 knots
 var WEATHER_PROP_KEY = 'apr_weather_latest';
 
-function _weatherStatus(windKmh) {
+// WMO weather codes (Open-Meteo's `weather_code`) collapsed to a short
+// icon + label. Same table is duplicated in index.html/admin.html since
+// this is a static-HTML repo with no shared include (matches the existing
+// TRANSLATIONS-duplication pattern used for i18n).
+var WEATHER_CODE_MAP = {
+  0:['☀️','Clear'],1:['🌤️','Mostly clear'],2:['⛅','Partly cloudy'],3:['☁️','Overcast'],
+  45:['🌫️','Fog'],48:['🌫️','Fog'],
+  51:['🌦️','Light drizzle'],53:['🌦️','Drizzle'],55:['🌧️','Heavy drizzle'],
+  56:['🌧️','Freezing drizzle'],57:['🌧️','Freezing drizzle'],
+  61:['🌦️','Light rain'],63:['🌧️','Rain'],65:['🌧️','Heavy rain'],
+  66:['🌧️','Freezing rain'],67:['🌧️','Freezing rain'],
+  71:['🌨️','Light snow'],73:['🌨️','Snow'],75:['❄️','Heavy snow'],77:['🌨️','Snow grains'],
+  80:['🌦️','Rain showers'],81:['🌧️','Rain showers'],82:['⛈️','Violent showers'],
+  85:['🌨️','Snow showers'],86:['🌨️','Snow showers'],
+  95:['⛈️','Thunderstorm'],96:['⛈️','Thunderstorm (hail)'],99:['⛈️','Thunderstorm (hail)']
+};
+// Codes 95/96/99 (thunderstorm) force 'unsafe' regardless of wind — lightning
+// is a hard stop for water rentals even on a calm day.
+var THUNDERSTORM_CODES = [95, 96, 99];
+
+function _weatherConditionInfo(code) {
+  var entry = WEATHER_CODE_MAP[code];
+  return entry ? { icon: entry[0], label: entry[1] } : { icon: '🌡️', label: 'Unknown' };
+}
+
+function _weatherStatus(windKmh, weatherCode) {
+  if (THUNDERSTORM_CODES.indexOf(weatherCode) !== -1) return 'unsafe';
   if (windKmh >= WIND_UNSAFE_KMH) return 'unsafe';
   if (windKmh >= WIND_CAUTION_KMH) return 'caution';
   return 'safe';
@@ -2770,8 +2825,8 @@ function _weatherStatus(windKmh) {
 function _fetchWeather() {
   try {
     var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + WEATHER_LAT +
-      '&longitude=' + WEATHER_LON + '&current=wind_speed_10m,wind_gusts_10m' +
-      '&daily=wind_speed_10m_max&timezone=auto&wind_speed_unit=kmh';
+      '&longitude=' + WEATHER_LON + '&current=wind_speed_10m,wind_gusts_10m,weather_code,precipitation' +
+      '&daily=wind_speed_10m_max,precipitation_probability_max,weather_code&timezone=auto&wind_speed_unit=kmh';
     var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
     if (resp.getResponseCode() !== 200) {
       return { status: 'unknown', error: 'HTTP ' + resp.getResponseCode() };
@@ -2782,11 +2837,21 @@ function _fetchWeather() {
     var windMaxToday = (data.daily && Array.isArray(data.daily.wind_speed_10m_max) && data.daily.wind_speed_10m_max.length) ? data.daily.wind_speed_10m_max[0] : null;
     if (windNow === null) return { status: 'unknown', error: 'No wind data in response' };
 
+    var weatherCode = data.current && typeof data.current.weather_code === 'number' ? data.current.weather_code : null;
+    var condition = _weatherConditionInfo(weatherCode);
+    var precipNow = data.current && typeof data.current.precipitation === 'number' ? data.current.precipitation : null;
+    var precipProbMaxToday = (data.daily && Array.isArray(data.daily.precipitation_probability_max) && data.daily.precipitation_probability_max.length) ? data.daily.precipitation_probability_max[0] : null;
+
     return {
-      status: _weatherStatus(Math.max(windNow, windMaxToday || 0)),
+      status: _weatherStatus(Math.max(windNow, windMaxToday || 0), weatherCode),
       windNowKmh: windNow,
       gustNowKmh: gustNow,
       windMaxTodayKmh: windMaxToday,
+      weatherCode: weatherCode,
+      conditionIcon: condition.icon,
+      conditionLabel: condition.label,
+      precipNowMm: precipNow,
+      precipProbMaxToday: precipProbMaxToday,
       checkedAt: new Date().toISOString()
     };
   } catch (err) {
@@ -2837,15 +2902,18 @@ function dailyWeatherCheck() {
       : '🌊 APR Conditions CHANGED: ' + (prev && prev.status ? prev.status.toUpperCase() : '?') + ' → ' + weather.status.toUpperCase();
     var body = weather.status === 'unknown'
       ? 'Could not reach the weather service today (' + (weather.error || 'unknown error') + '). Do a manual anemometer check before dispatching.'
-      : ('Wind now: ' + weather.windNowKmh + ' km/h (gusts ' + (weather.gustNowKmh || 'N/A') + ' km/h)\n' +
+      : ('Sky: ' + (weather.conditionIcon || '') + ' ' + (weather.conditionLabel || 'N/A') + '\n' +
+         'Wind now: ' + weather.windNowKmh + ' km/h (gusts ' + (weather.gustNowKmh || 'N/A') + ' km/h)\n' +
          'Max wind expected today: ' + (weather.windMaxTodayKmh || 'N/A') + ' km/h\n' +
+         'Rain now: ' + (weather.precipNowMm != null ? weather.precipNowMm + ' mm' : 'N/A') +
+         ' · Rain chance today: ' + (weather.precipProbMaxToday != null ? weather.precipProbMaxToday + '%' : 'N/A') + '\n' +
          'Status: ' + weather.status.toUpperCase() + '\n\n' +
-         'Thresholds: caution at ' + WIND_CAUTION_KMH + '+ km/h, unsafe at ' + WIND_UNSAFE_KMH + '+ km/h.\n' +
+         'Thresholds: caution at ' + WIND_CAUTION_KMH + '+ km/h, unsafe at ' + WIND_UNSAFE_KMH + '+ km/h (thunderstorms are always unsafe).\n' +
          'This does not replace the on-the-spot anemometer check before each rental.');
 
     if (weather.status === 'caution' || weather.status === 'unsafe') {
       var teamWaText = 'APR conditions today: ' + weather.status.toUpperCase() +
-        ' (wind ~' + (weather.windNowKmh != null ? weather.windNowKmh : 'N/A') + ' km/h, gusts to ' +
+        ' (' + (weather.conditionLabel || 'conditions unknown') + ', wind ~' + (weather.windNowKmh != null ? weather.windNowKmh : 'N/A') + ' km/h, gusts to ' +
         (weather.gustNowKmh != null ? weather.gustNowKmh : 'N/A') + ' km/h).';
       var teamWaLinks = _teamWhatsAppLinks(teamWaText);
       if (teamWaLinks.length) {
@@ -2911,8 +2979,9 @@ function _notifyTodaysGuestsOfConditions(weather) {
         ? '⚠️ Aquatic Paradise Rentals — conditions update for today'
         : 'Aquatic Paradise Rentals — conditions heads-up for today';
       var body = 'Hi ' + (fname || 'there') + ',\n\n' +
-        'Wind conditions today are running ' + weather.status.toUpperCase() +
-        ' (around ' + weather.windNowKmh + ' km/h, gusts to ' + (weather.gustNowKmh || 'N/A') + ' km/h).\n\n' +
+        'Conditions today are running ' + weather.status.toUpperCase() +
+        ' (' + (weather.conditionLabel || 'sky unknown') + ', wind ~' + weather.windNowKmh + ' km/h, gusts to ' + (weather.gustNowKmh || 'N/A') + ' km/h' +
+        (weather.precipProbMaxToday != null ? ', ' + weather.precipProbMaxToday + '% chance of rain' : '') + ').\n\n' +
         (weather.status === 'unsafe'
           ? 'For your safety we may need to adjust timing or gear for your rental today — our team will follow up, or feel free to reach out directly.'
           : 'Your rental is still on — just flagging so you know what to expect on the water today.') +
@@ -2922,7 +2991,8 @@ function _notifyTodaysGuestsOfConditions(weather) {
       var phone = phoneIdx !== -1 ? String(row[phoneIdx] || '').trim() : '';
       if (phone) {
         var waText = 'Hi ' + (fname || 'there') + ', conditions update for your Aquatic Paradise Rentals booking today: ' +
-          weather.status.toUpperCase() + ' (wind ~' + weather.windNowKmh + ' km/h, gusts to ' + (weather.gustNowKmh || 'N/A') + ' km/h). ' +
+          weather.status.toUpperCase() + ' (' + (weather.conditionLabel || 'sky unknown') + ', wind ~' + weather.windNowKmh + ' km/h, gusts to ' + (weather.gustNowKmh || 'N/A') + ' km/h' +
+          (weather.precipProbMaxToday != null ? ', ' + weather.precipProbMaxToday + '% rain chance' : '') + '). ' +
           (weather.status === 'unsafe' ? 'We may need to adjust timing or gear — let us know a good time to talk.' : 'Your rental is still on, just a heads-up.');
         var link = _waLink(phone, waText);
         if (link) guestWaLinks.push(ref + ' (' + (fname || 'guest') + '): ' + link);
