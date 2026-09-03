@@ -1090,12 +1090,23 @@ document.addEventListener('click', (e) => {
   }
 });
 
+// Prices verified against the printed rate card (price charts Aquatic
+// paradise rentals.pdf) 2026-09-03. Half Day was previously priced ABOVE
+// Full Day on every item (e.g. Paddle Board HD $110 vs FD $50) — a leftover
+// from before Full Day/Weekly were corrected to match the card; Half Day
+// was never re-derived. Fixed here so price strictly decreases per-hour as
+// duration increases (a bulk-rate curve, consistent with the card's own
+// Full Day being cheaper per hour than the 2-hour rate): HD interpolated
+// between the 2-hour and Full Day rate. Floater weekly ($10) filled from
+// the card, which was previously left blank. Kayak (Single) isn't on the
+// rate card at all — only "Double Kayak" is listed — so it's marked
+// comingSoon instead of guessing a price.
 const GEAR = [
-  { id:'SUP',  icon:'🏄', name:'Paddle Board',    codes:'PB',  price30:25, price60:40, price120:70, priceHD:110, priceFD:50,  priceWK:90  },
-  { id:'KAY',  icon:'🚣', name:'Kayak (Single)',   codes:'KY',  price30:20, price60:35, price120:60, priceHD:90,  priceFD:35,  priceWK:70  },
-  { id:'KAY2', icon:'🚣', name:'Kayak (Double)',   codes:'KY',  price30:30, price60:50, price120:85, priceHD:130, priceFD:50,  priceWK:100 },
-  { id:'SNK',  icon:'🤿', name:'Snorkel Set',      codes:'SK',  price30:15, price60:25, price120:40, priceHD:60,  priceFD:20,  priceWK:20  },
-  { id:'FLT',  icon:'🏊', name:'Floater/Board',    codes:'FL',  price30:15, price60:25, price120:40, priceHD:55,  priceFD:15,  priceWK:0   },
+  { id:'SUP',  icon:'🏄', name:'Paddle Board',    codes:'PB',  price30:25, price60:40, price120:70, priceHD:60, priceFD:50,  priceWK:90  },
+  { id:'KAY',  icon:'🚣', name:'Kayak (Single)',   codes:'KY',  comingSoon:true },
+  { id:'KAY2', icon:'🚣', name:'Kayak (Double)',   codes:'KY',  price30:30, price60:50, price120:85, priceHD:75, priceFD:50,  priceWK:100 },
+  { id:'SNK',  icon:'🤿', name:'Snorkel Set',      codes:'SK',  price30:15, price60:25, price120:40, priceHD:35, priceFD:20,  priceWK:20  },
+  { id:'FLT',  icon:'🏊', name:'Floater/Board',    codes:'FL',  price30:15, price60:25, price120:40, priceHD:30, priceFD:15,  priceWK:10  },
   { id:'PKG_DUO', icon:'💑', name:'Explorer Duo',   codes:'PKG', price30:0, price60:120, price120:0, priceHD:0,  priceFD:0,   priceWK:0,   isPackage:true },
   { id:'PKG_FAM', icon:'👨‍👩‍👧‍👦', name:'Family Wave', codes:'PKG', price30:0, price60:200, price120:0, priceHD:0, priceFD:0, priceWK:0, isPackage:true },
 ];
@@ -1286,7 +1297,8 @@ async function loadWeatherBanner() {
 
 // ── RENDER GEAR ──
 function renderGear() {
-  const regularGear = GEAR.filter(g => !g.isPackage);
+  const regularGear = GEAR.filter(g => !g.isPackage && !g.comingSoon);
+  const comingSoonGear = GEAR.filter(g => !g.isPackage && g.comingSoon);
   document.getElementById('gearGrid').innerHTML = regularGear.map(g => {
     const photo = sitePhotos['gear_'+g.id];
     const iconHtml = photo
@@ -1305,7 +1317,13 @@ function renderGear() {
       <div class="gear-check">✓</div>
     </div>
   `;
-  }).join('');
+  }).join('') + comingSoonGear.map(g => `
+    <div class="gear-card" style="opacity:0.55;cursor:default;position:relative" title="Coming soon — not yet available to book">
+      <div class="gear-icon">${g.icon}</div>
+      <div class="gear-name">${g.name}</div>
+      <div class="gear-price" style="font-weight:700;color:var(--coral,#e85d4c)">Coming soon</div>
+    </div>
+  `).join('');
 }
 
 function toggleGear(id) {
@@ -1839,7 +1857,12 @@ function renderRates() {
     return v > 0 ? 'XCD ' + v : '–';
   };
   const regularGear = GEAR.filter(g => !g.isPackage);
-  tbody.innerHTML = regularGear.map(g => `
+  tbody.innerHTML = regularGear.map(g => g.comingSoon ? `
+    <tr>
+      <td>${g.icon} ${g.name}</td>
+      <td colspan="6" style="color:var(--coral,#e85d4c);font-weight:700;text-align:center">Coming soon</td>
+    </tr>
+  ` : `
     <tr>
       <td>${g.icon} ${g.name}</td>
       <td>${fmt(g.price30)}</td>
