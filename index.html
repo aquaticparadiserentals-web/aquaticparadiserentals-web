@@ -1107,8 +1107,6 @@ const GEAR = [
   { id:'KAY2', icon:'🚣', name:'Kayak (Double)',   codes:'KY',  price30:30, price60:50, price120:85, priceHD:75, priceFD:50,  priceWK:100 },
   { id:'SNK',  icon:'🤿', name:'Snorkel Set',      codes:'SK',  price30:15, price60:25, price120:40, priceHD:35, priceFD:20,  priceWK:20  },
   { id:'FLT',  icon:'🏊', name:'Floater/Board',    codes:'FL',  price30:15, price60:25, price120:40, priceHD:30, priceFD:15,  priceWK:10  },
-  { id:'PKG_DUO', icon:'💑', name:'Explorer Duo',   codes:'PKG', price30:0, price60:120, price120:0, priceHD:0,  priceFD:0,   priceWK:0,   isPackage:true },
-  { id:'PKG_FAM', icon:'👨‍👩‍👧‍👦', name:'Family Wave', codes:'PKG', price30:0, price60:200, price120:0, priceHD:0, priceFD:0, priceWK:0, isPackage:true },
 ];
 
 const DURATIONS = [
@@ -1118,12 +1116,18 @@ const DURATIONS = [
   { label:'Half Day', mins:240, key:'priceHD', i18nKey:'dur_halfday' },
 ];
 
+// Matches the printed combo package prices exactly (price charts Aquatic
+// paradise rentals.pdf, page 3) — previously this array had 5 different,
+// unpriced-from-the-card combos (several including kayaks, which aren't
+// even on the rate card). None of the old combos map cleanly onto the
+// real 5, so replaced outright rather than patched. None involve kayaks,
+// which conveniently sidesteps the Kayak (Single) comingSoon gap too.
 const PACKAGES = [
-  { id:'PKG_DUO',  name:'Explorer Duo 🌊',          desc:'2× Paddle Boards + 2× Snorkel Sets',              price:120, duration:'1 Hour'  },
-  { id:'PKG_FAM',  name:'Family Wave 👨‍👩‍👧‍👦',      desc:'2× Kayaks + 4× Snorkel Sets + 2× Floaters',       price:200, duration:'2 Hours' },
-  { id:'PKG_ADV',  name:'Adventure Set 🏄',          desc:'1× Paddle Board + 1× Kayak + 2× Snorkel Sets',   price:160, duration:'2 Hours' },
-  { id:'PKG_C2',   name:'Couple Explorer 💑',         desc:'1× Kayak (Double) + 2× Snorkel Sets',            price:130, duration:'2 Hours' },
-  { id:'PKG_PREM', name:'Premium Beach Day 🌴',       desc:'2× Paddle Boards + 1× Kayak (Double) + 4× Snorkel + 2× Floaters', price:350, duration:'Full Day' },
+  { id:'PKG_FAM',  name:'Family Package 👨‍👩‍👧‍👦',    desc:'2× Paddle Boards + 1× Floater + Snorkel Gear',        price:150, duration:'Full Day' },
+  { id:'PKG_DUO',  name:'Paddle Board + Snorkel Duo 🌊', desc:'1× Paddle Board + 2× Snorkel Gear Sets',              price:190, duration:'Full Day' },
+  { id:'PKG_C2',   name:'Combo for 2 💑',              desc:'1× Paddle Board + 2× Snorkel Gear Sets + Life Jackets', price:220, duration:'Full Day' },
+  { id:'PKG_DAY',  name:'Day Rental Combo ☀️',          desc:'1× Paddle Board + Full Snorkel Gear Set + Life Jacket', price:160, duration:'Full Day' },
+  { id:'PKG_PREM', name:'Premium Paddle + 2 Snorkel Sets 🌴', desc:'Best snorkeling experience for two — full equipment', price:270, duration:'Full Day' },
 ];
 
 let selectedGear = {};
