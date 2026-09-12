@@ -14,6 +14,7 @@
  */
 
 var SHEET_NAME = 'BOOKINGS';
+var DELETED_BOOKINGS_SHEET_NAME = 'DELETED_BOOKINGS';
 var DRIVERS_SHEET_NAME = 'DRIVERS';
 var NOTIFY_EMAIL = 'aquaticparadiserentals@gmail.com';
 
@@ -510,6 +511,22 @@ function _sheet() {
       sh.getRange(1, lastCol + 1, 1, missing.length).setValues([missing]);
       sh.getRange('1:1').setFontWeight('bold');
     }
+  }
+  return sh;
+}
+
+// Where deleteBooking() copies a row before removing it from BOOKINGS, so a
+// misclick on the admin Delete button can be recovered by staff manually
+// copying the row back — mirrors the header of BOOKINGS at time of delete
+// plus a deletedAt timestamp, rather than a fixed schema, since BOOKINGS
+// gains columns over time (see _sheet()'s self-healing migration above).
+function _deletedBookingsSheet(header) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(DELETED_BOOKINGS_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(DELETED_BOOKINGS_SHEET_NAME);
+    sh.appendRow(header.concat(['deletedAt']));
+    sh.getRange('1:1').setFontWeight('bold');
   }
   return sh;
 }
@@ -1883,19 +1900,28 @@ function updateStatus(p) {
   }
 }
 
-// Dispatch/admin — permanently removes a booking row by ref (e.g. a
-// duplicate or test submission). Idempotent, same pattern as
-// deleteDriver/deleteFeedback: returns ok even if already gone.
+// Dispatch/admin — removes a booking row by ref (e.g. a duplicate or test
+// submission). Archives the row to DELETED_BOOKINGS first so an admin
+// misclick can be recovered by copying it back — see _deletedBookingsSheet().
+// Idempotent, same pattern as deleteDriver/deleteFeedback: returns ok even
+// if already gone.
 function deleteBooking(p) {
   try {
     if (!p || typeof p.ref !== 'string' || !p.ref.trim()) return { ok: false, error: 'Invalid ref' };
     var sh = _sheet();
     var data = sh.getDataRange().getValues();
-    var refIdx = data[0] ? data[0].indexOf('ref') : -1;
+    var header = data[0] || [];
+    var refIdx = header.indexOf('ref');
     if (refIdx === -1) return { ok: false, error: 'Sheet not initialized' };
 
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][refIdx]) === String(p.ref)) {
+        try {
+          var archive = _deletedBookingsSheet(header);
+          archive.appendRow(data[i].concat([new Date()]));
+        } catch (archiveErr) {
+          _logError('deleteBooking:archive', archiveErr); // don't block the delete on an archive failure
+        }
         sh.deleteRow(i + 1);
         return { ok: true };
       }
