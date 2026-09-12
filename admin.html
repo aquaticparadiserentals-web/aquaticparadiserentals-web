@@ -1411,9 +1411,29 @@ function renderDispatchAdmin() {
         ${status!=='done'?`<button class="bk-btn" style="background:#3a4a5c;color:#fff" data-ref="${refAttr}" onclick="dspShareLocation(this.dataset.ref)">📍 Share Location</button>`:''}
         ${phone?`<a class="bk-btn wa" href="https://wa.me/${encodeURIComponent(phone)}" target="_blank">💬 Guest</a>`:''}
         ${status==='done'&&phone?`<a class="bk-btn" style="background:var(--gold);color:var(--navy)" href="https://wa.me/${encodeURIComponent(phone)}?text=${feedbackMsg}" target="_blank">⭐ Ask Feedback</a>`:''}
+        <button class="bk-btn" style="background:var(--coral);color:#fff" data-ref="${refAttr}" onclick="dspDeleteBooking(this.dataset.ref)">🗑 Delete</button>
       </div>
     </div>`;
   }).join('');
+}
+
+async function dspDeleteBooking(ref) {
+  if (!confirm(`Permanently delete booking ${ref}? This cannot be undone.`)) return;
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'deleteBooking', token:APP_TOKEN, ref
+    }),signal:AbortSignal.timeout(15000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Failed');
+    dispatchBookings = dispatchBookings.filter(b => b && b.ref !== ref);
+    stopAutoTrackingAdmin(ref);
+    renderDispatchAdmin();
+    addLog(`🗑 Deleted booking ${ref}`);
+    showToast('Booking deleted','ok');
+  } catch (err) {
+    showToast('Could not delete: '+err.message,'warn');
+  }
 }
 
 // ── AUTO GPS TRACKING (admin Dispatch view — same pattern as dispatch.html;
