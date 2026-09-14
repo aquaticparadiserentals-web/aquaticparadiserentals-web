@@ -62,7 +62,11 @@ var FIELDS = ['ref','fname','lname','phone','email','datetime','groupSize',
   'staffId','staffName','depositAmount','depositReceivedAt','depositStatus',
   // Added 2026-07-15: drawn e-signature (waiver). Also appended at the end
   // for the same self-healing-migration reason as the row above.
-  'signatureUrl'];
+  'signatureUrl',
+  // Added 2026-09-14: which driver is actually running this delivery, set
+  // via assignDriver() when admin picks one in the Notify Driver modal —
+  // distinct from staffId/staffName above, which is commission attribution.
+  'assignedDriverId','assignedDriverName'];
 // 'delivering' sits between confirmed and done — a driver sets it when they
 // actually leave with the gear, which is also what starts auto-GPS sharing
 // in dispatch.html (see updateDriverLocation).
@@ -1343,6 +1347,12 @@ function doPost(e) {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json(deleteBooking(payload));
     }
+    if (payload.action === 'assignDriver') {
+      // Admin-only — driven from the admin Notify Driver modal, not the
+      // driver-facing dispatch.html page.
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(assignDriver(payload));
+    }
     if (payload.action === 'update_driver_location') {
       // Dispatch-scoped: a driver sharing their own position is the same
       // trust level as progressing a delivery status.
@@ -1780,7 +1790,7 @@ function getCustomers(limit) {
 // Deliberately excludes: total, referral, waiverAccepted, waiverTimestamp,
 // idPhotoUrl, signatureUrl, email. No pricing or revenue figure appears
 // anywhere in this return value — that's the entire point of this endpoint existing.
-var DISPATCH_FIELDS = ['ref', 'fname', 'lname', 'phone', 'datetime', 'groupSize', 'kidsCount', 'gear', 'duration', 'notes', 'status', 'driverLat', 'driverLng', 'driverLocAt'];
+var DISPATCH_FIELDS = ['ref', 'fname', 'lname', 'phone', 'datetime', 'groupSize', 'kidsCount', 'gear', 'duration', 'notes', 'status', 'driverLat', 'driverLng', 'driverLocAt', 'assignedDriverName'];
 
 function getDispatchBookings(limit) {
   try {
@@ -1897,6 +1907,33 @@ function updateStatus(p) {
     return { ok: false, error: 'Booking not found' };
   } catch (err) {
     return _fail('updateStatus', err);
+  }
+}
+
+// Admin — records which driver is running a delivery, set when admin picks
+// one in the Notify Driver modal. Purely informational (so it shows on the
+// Dispatch card); doesn't gate anything the way status does.
+function assignDriver(p) {
+  try {
+    if (!p || typeof p.ref !== 'string' || !p.ref.trim()) return { ok: false, error: 'Invalid ref' };
+    var sh = _sheet();
+    var data = sh.getDataRange().getValues();
+    var header = data[0] || [];
+    var refIdx = header.indexOf('ref');
+    var idIdx = header.indexOf('assignedDriverId');
+    var nameIdx = header.indexOf('assignedDriverName');
+    if (refIdx === -1 || idIdx === -1 || nameIdx === -1) return { ok: false, error: 'Sheet not initialized' };
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][refIdx]) === String(p.ref)) {
+        sh.getRange(i + 1, idIdx + 1).setValue(p.driverId || '');
+        sh.getRange(i + 1, nameIdx + 1).setValue(p.driverName || '');
+        return { ok: true };
+      }
+    }
+    return { ok: false, error: 'Booking not found' };
+  } catch (err) {
+    return _fail('assignDriver', err);
   }
 }
 

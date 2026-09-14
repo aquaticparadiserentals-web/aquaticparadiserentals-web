@@ -1418,6 +1418,7 @@ function renderDispatchAdmin() {
       <div class="bk-detail">📅 ${escapeHtml(b.datetime||'N/A')}</div>
       <div class="bk-detail">👥 Group: ${escapeHtml(b.groupSize||'1')}${b.kidsCount && b.kidsCount!=='N/A' && Number(b.kidsCount)>0 ? ' ('+escapeHtml(b.kidsCount)+' kid(s) — kid-size life jacket)':''}</div>
       ${b.notes && b.notes!=='N/A' ? '<div class="bk-detail">📝 '+escapeHtml(b.notes)+'</div>':''}
+      ${b.assignedDriverName && b.assignedDriverName!=='N/A' ? `<div class="bk-detail">🚚 Driver: ${escapeHtml(b.assignedDriverName)}</div>` : ''}
       ${hasLoc ? `<div class="bk-detail">📍 Last location: <a href="${mapUrl}" target="_blank" style="color:var(--teal)">view on map</a> (${escapeHtml(b.driverLocAt)})</div>`:''}
       ${status==='delivering' ? `<div class="bk-detail" style="color:#ff8a70">🛰️ Auto-sharing location every minute while this tab stays open</div>` : ''}
       <div class="bk-actions">
@@ -1427,6 +1428,7 @@ function renderDispatchAdmin() {
         ${status!=='done'?`<button class="bk-btn" style="background:#3a4a5c;color:#fff" data-ref="${refAttr}" onclick="dspShareLocation(this.dataset.ref)">📍 Share Location</button>`:''}
         ${phone?`<a class="bk-btn wa" href="https://wa.me/${encodeURIComponent(phone)}" target="_blank">💬 Guest</a>`:''}
         ${status==='done'&&phone?`<a class="bk-btn" style="background:var(--gold);color:var(--navy)" href="https://wa.me/${encodeURIComponent(phone)}?text=${feedbackMsg}" target="_blank">⭐ Ask Feedback</a>`:''}
+        ${status!=='done'?`<button class="bk-btn" style="background:#3a4a5c;color:#fff" data-ref="${refAttr}" onclick="notifyDelivery(this.dataset.ref)">🚚 ${b.assignedDriverName && b.assignedDriverName!=='N/A' ? 'Reassign' : 'Assign'} Driver</button>`:''}
         <button class="bk-btn" style="background:var(--coral);color:#fff" data-ref="${refAttr}" onclick="dspDeleteBooking(this.dataset.ref)">🗑 Delete</button>
       </div>
     </div>`;
@@ -2422,10 +2424,17 @@ async function _viewPhotoOverlay(ref, action, overlayId, label) {
   }
 }
 
-function notifyDelivery(ref) {
+async function notifyDelivery(ref) {
   if (!ref) { showToast('Missing booking reference', 'warn'); return; }
-  const b = (allBookings||[]).find(x=>x && x.ref===ref);
+  // Bookings tab and Dispatch tab keep separate caches — look in both so
+  // the "Assign Driver" button works from a Dispatch card even if the
+  // Bookings tab was never opened this session.
+  const b = (allBookings||[]).find(x=>x && x.ref===ref) || (dispatchBookings||[]).find(x=>x && x.ref===ref);
   if (!b) { showToast('Booking not found', 'warn'); return; }
+  // driversCache is only populated once the Drivers/Team tab has loaded —
+  // fetch it on demand so "Assign Driver" works as the very first thing
+  // tapped in a session, straight from the Dispatch tab.
+  if (!driversCache.length) await fetchDrivers();
   const drivers = driversCache.filter(d => d && d.phone);
   if (!drivers.length) { showToast('Add a driver with a phone number first (Drivers tab)', 'warn'); return; }
 
@@ -2462,14 +2471,14 @@ function nz(val, fallback) {
   return s.length ? s : (fallback !== undefined ? fallback : 'N/A');
 }
 
-function confirmDelivery() {
+async function confirmDelivery() {
   try {
     const modal = document.getElementById('deliveryModal');
     const ref = modal ? modal.dataset.ref : null;
     const driverId = document.getElementById('deliveryDriverSelect').value;
     const location = document.getElementById('deliveryLocation').value;
     const driver = driversCache.find(d=>d && d.id===driverId);
-    const b = (allBookings||[]).find(x=>x && x.ref===ref);
+    const b = (allBookings||[]).find(x=>x && x.ref===ref) || (dispatchBookings||[]).find(x=>x && x.ref===ref);
 
     if (!driver || !driver.phone) { showToast('Select a valid driver', 'warn'); return; }
     if (!b) { showToast('Booking not found', 'warn'); return; }
@@ -2494,6 +2503,23 @@ function confirmDelivery() {
     addLog('🚚 Delivery notification sent to '+nz(driver.name)+' for '+nz(ref));
     showToast('Driver notified ✅','ok');
     closeDeliveryModal();
+
+    // Persist who's assigned so it shows on the Dispatch card. Best-effort —
+    // the driver's already been notified above, so a failure here shouldn't
+    // read as the whole action having failed.
+    try {
+      const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+        action:'assignDriver', token:APP_TOKEN, ref, driverId: driver.id, driverName: driver.name
+      }),signal:AbortSignal.timeout(10000)});
+      const data = await res.json();
+      if (data && data.ok) {
+        [allBookings, dispatchBookings].forEach(list => {
+          const bk = (list||[]).find(x=>x && x.ref===ref);
+          if (bk) bk.assignedDriverName = driver.name;
+        });
+        renderDispatchAdmin();
+      }
+    } catch (assignErr) { /* silent — driver already notified, this is just the card label */ }
   } catch (err) {
     console.error('confirmDelivery failed:', err);
     showToast('Could not send notification — please try again', 'warn');
