@@ -131,6 +131,7 @@ async function checkPin() {
     document.getElementById('pinScreen').style.display='none';
     document.getElementById('app').style.display='block';
     fetchDispatch();
+    startDispatchPolling();
   } else {
     showToast('Wrong PIN');
     setTimeout(()=>{ pinBuffer=''; renderPinDots(); }, 400);
@@ -150,6 +151,21 @@ function escapeHtml(val) {
 function notifyLink(wa, msg) {
   const digits = String(wa||'').replace(/\D/g,'');
   return `https://wa.me/${encodeURIComponent(digits)}?text=${encodeURIComponent(msg||'')}`;
+}
+
+// Auto-refresh once logged in, so a delivery confirmed/updated from the
+// admin console shows up here without the driver tapping Refresh. Paused
+// while this tab is backgrounded — same guard as the GPS auto-tracking below.
+let dispatchPollInterval = null;
+const DISPATCH_POLL_MS = 45000;
+function startDispatchPolling() {
+  stopDispatchPolling();
+  dispatchPollInterval = setInterval(() => {
+    if (!document.hidden) fetchDispatch();
+  }, DISPATCH_POLL_MS);
+}
+function stopDispatchPolling() {
+  if (dispatchPollInterval) { clearInterval(dispatchPollInterval); dispatchPollInterval = null; }
 }
 
 async function fetchDispatch() {

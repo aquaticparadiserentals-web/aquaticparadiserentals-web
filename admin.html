@@ -1352,6 +1352,22 @@ async function setBkState(ref, state) {
 // ── DISPATCH (delivery view — same backend list the driver page uses) ──
 let dispatchBookings = [];
 
+// Auto-refresh while the Dispatch tab is open, so a status change made by a
+// driver on dispatch.html shows up here without staff remembering to tap
+// Refresh. Paused while the browser tab itself is hidden (same guard as the
+// GPS tracking below) so it doesn't burn calls in a background tab.
+let dispatchPollInterval = null;
+const DISPATCH_POLL_MS = 45000;
+function startDispatchPolling() {
+  stopDispatchPolling();
+  dispatchPollInterval = setInterval(() => {
+    if (!document.hidden) fetchDispatchAdmin();
+  }, DISPATCH_POLL_MS);
+}
+function stopDispatchPolling() {
+  if (dispatchPollInterval) { clearInterval(dispatchPollInterval); dispatchPollInterval = null; }
+}
+
 async function fetchDispatchAdmin() {
   const el = document.getElementById('dispatchContainer');
   el.innerHTML='<div style="text-align:center;padding:30px;color:var(--muted)">⏳ Loading deliveries…</div>';
@@ -3057,7 +3073,7 @@ function switchATab(tab) {
   document.getElementById('backBtn').style.display = tab==='home' ? 'none' : 'block';
   document.getElementById('appSubtitle').textContent = ATAB_LABELS[tab] || 'Operations Dashboard';
   if (tab==='bookings') fetchBookings();
-  if (tab==='dispatch') fetchDispatchAdmin();
+  if (tab==='dispatch') { fetchDispatchAdmin(); startDispatchPolling(); } else { stopDispatchPolling(); }
   if (tab==='customers') fetchCustomers();
   if (tab==='inventory') fetchInventory();
   if (tab==='safety') renderSafety();
