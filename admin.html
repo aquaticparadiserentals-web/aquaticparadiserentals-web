@@ -364,9 +364,12 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 
 <!-- ═ DISPATCH ═ -->
 <div class="asection" id="asec-dispatch">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px">
     <div class="sec-title" style="margin:0">Dispatch — Deliveries</div>
-    <button class="refresh-btn" onclick="fetchDispatchAdmin()">🔄 Refresh</button>
+    <div style="display:flex;gap:8px">
+      <button class="refresh-btn" style="background:transparent;border:1px solid var(--line);color:var(--muted)" onclick="openDeletedBookings()">🗑 Recently Deleted</button>
+      <button class="refresh-btn" onclick="fetchDispatchAdmin()">🔄 Refresh</button>
+    </div>
   </div>
   <p style="font-size:0.72rem;color:var(--muted);margin-bottom:12px">Delivery view — name, gear, time and location. No pricing shown. Same list the drivers see.</p>
   <a href="dispatch.html" target="_blank" style="display:block;background:var(--surface);border:1px solid var(--line);color:#fff;padding:12px 16px;border-radius:var(--radius);font-weight:700;font-size:0.85rem;text-decoration:none;text-align:center;margin-bottom:14px">🚚 Open Driver Dispatch Page (for driver devices)</a>
@@ -762,6 +765,18 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
       <button onclick="closeDeliveryModal()" style="flex:1;padding:10px;background:var(--line);border:none;border-radius:8px;color:#fff;font-weight:700;cursor:pointer">Cancel</button>
       <button onclick="confirmDelivery()" style="flex:1;padding:10px;background:var(--teal);border:none;border-radius:8px;color:#fff;font-weight:700;cursor:pointer">Send 🔔</button>
     </div>
+  </div>
+</div>
+
+<!-- ═ RECENTLY DELETED BOOKINGS MODAL ═ -->
+<div id="deletedModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:900;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--surface);border-radius:16px;padding:22px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto;color:#fff">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-weight:800;font-size:1rem">🗑 Recently Deleted</div>
+      <button onclick="closeDeletedBookings()" style="background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer;line-height:1">✕</button>
+    </div>
+    <p style="font-size:0.72rem;color:var(--muted);margin-bottom:12px">Deleted bookings are kept here so a misclick can be undone.</p>
+    <div id="deletedList"></div>
   </div>
 </div>
 
@@ -1429,14 +1444,14 @@ function renderDispatchAdmin() {
         ${phone?`<a class="bk-btn wa" href="https://wa.me/${encodeURIComponent(phone)}" target="_blank">💬 Guest</a>`:''}
         ${status==='done'&&phone?`<a class="bk-btn" style="background:var(--gold);color:var(--navy)" href="https://wa.me/${encodeURIComponent(phone)}?text=${feedbackMsg}" target="_blank">⭐ Ask Feedback</a>`:''}
         ${status!=='done'?`<button class="bk-btn" style="background:#3a4a5c;color:#fff" data-ref="${refAttr}" onclick="notifyDelivery(this.dataset.ref)">🚚 ${b.assignedDriverName && b.assignedDriverName!=='N/A' ? 'Reassign' : 'Assign'} Driver</button>`:''}
-        <button class="bk-btn" style="background:var(--coral);color:#fff" data-ref="${refAttr}" onclick="dspDeleteBooking(this.dataset.ref)">🗑 Delete</button>
+        <button class="bk-btn" style="background:transparent;color:var(--coral);border:1px solid var(--coral)" data-ref="${refAttr}" onclick="dspDeleteBooking(this.dataset.ref)">🗑 Delete</button>
       </div>
     </div>`;
   }).join('');
 }
 
 async function dspDeleteBooking(ref) {
-  if (!confirm(`Permanently delete booking ${ref}? This cannot be undone.`)) return;
+  if (!confirm(`Delete booking ${ref}? It moves to Recently Deleted and can be restored from there.`)) return;
   try {
     const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
       action:'deleteBooking', token:APP_TOKEN, ref
@@ -1451,6 +1466,74 @@ async function dspDeleteBooking(ref) {
     showToast('Booking deleted','ok');
   } catch (err) {
     showToast('Could not delete: '+err.message,'warn');
+  }
+}
+
+// ── RECENTLY DELETED — view/restore bookings archived by deleteBooking() ──
+let deletedBookingsCache = [];
+
+function openDeletedBookings() {
+  document.getElementById('deletedModal').style.display = 'flex';
+  fetchDeletedBookings();
+}
+function closeDeletedBookings() {
+  document.getElementById('deletedModal').style.display = 'none';
+}
+async function fetchDeletedBookings() {
+  const el = document.getElementById('deletedList');
+  el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">⏳ Loading…</div>';
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'getDeletedBookings', token:APP_TOKEN, limit:50
+    }),signal:AbortSignal.timeout(15000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (!data || !data.ok || !Array.isArray(data.deleted)) throw new Error((data && data.error) || 'No data');
+    deletedBookingsCache = data.deleted;
+    renderDeletedBookings();
+  } catch (err) {
+    el.innerHTML = `<div style="text-align:center;padding:20px">
+      <div style="color:#ef4444;font-size:0.85rem;margin-bottom:10px">⚠️ ${escapeHtml(err.message)}</div>
+      <button onclick="fetchDeletedBookings()" style="background:var(--teal);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:700;cursor:pointer">Retry</button>
+    </div>`;
+  }
+}
+function renderDeletedBookings() {
+  const el = document.getElementById('deletedList');
+  if (!deletedBookingsCache.length) {
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:0.82rem">Nothing deleted recently.</div>';
+    return;
+  }
+  el.innerHTML = deletedBookingsCache.map((b,idx) => {
+    const ref = escapeHtml(b.ref);
+    const when = b.deletedAt ? new Date(b.deletedAt).toLocaleString() : 'N/A';
+    return `<div style="background:var(--navy);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:8px">
+      <div style="font-weight:700;font-size:0.85rem;color:var(--teal)">${ref}</div>
+      <div style="font-size:0.82rem;margin:2px 0">${escapeHtml(b.fname||'')} ${escapeHtml(b.lname||'')}</div>
+      <div style="font-size:0.72rem;color:var(--muted)">🏄 ${escapeHtml(b.gear||'N/A')} · 📅 ${escapeHtml(b.datetime||'N/A')}</div>
+      <div style="font-size:0.7rem;color:var(--muted);margin-bottom:8px">Deleted ${when}</div>
+      <button data-idx="${idx}" onclick="restoreDeletedBooking(${idx})" style="width:100%;padding:8px;background:var(--teal);border:none;border-radius:8px;color:#fff;font-weight:700;font-size:0.78rem;cursor:pointer">↩ Restore</button>
+    </div>`;
+  }).join('');
+}
+async function restoreDeletedBooking(idx) {
+  const b = deletedBookingsCache[idx];
+  if (!b) return;
+  if (!confirm(`Restore booking ${b.ref} back into Bookings?`)) return;
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'restoreBooking', token:APP_TOKEN, ref:b.ref, deletedAt:b.deletedAt
+    }),signal:AbortSignal.timeout(15000)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Failed');
+    deletedBookingsCache.splice(idx,1);
+    renderDeletedBookings();
+    addLog(`↩ Restored booking ${b.ref}`);
+    showToast('Booking restored ✅','ok');
+    fetchDispatchAdmin();
+  } catch (err) {
+    showToast('Could not restore: '+err.message,'warn');
   }
 }
 

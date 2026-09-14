@@ -1353,6 +1353,14 @@ function doPost(e) {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json(assignDriver(payload));
     }
+    if (payload.action === 'getDeletedBookings') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(getDeletedBookings(payload));
+    }
+    if (payload.action === 'restoreBooking') {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(restoreBooking(payload));
+    }
     if (payload.action === 'update_driver_location') {
       // Dispatch-scoped: a driver sharing their own position is the same
       // trust level as progressing a delivery status.
@@ -1934,6 +1942,80 @@ function assignDriver(p) {
     return { ok: false, error: 'Booking not found' };
   } catch (err) {
     return _fail('assignDriver', err);
+  }
+}
+
+// Admin — lists recently deleted bookings so a misclick on Delete can be
+// undone from the console instead of the admin having to open the raw
+// Sheet. deletedAt comes back as epoch millis (not an ISO string) so
+// restoreBooking() can match the exact row by value equality, no timezone
+// parsing involved on either side.
+function getDeletedBookings(p) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sh = ss.getSheetByName(DELETED_BOOKINGS_SHEET_NAME);
+    if (!sh) return { ok: true, deleted: [] };
+    var data = sh.getDataRange().getValues();
+    if (data.length < 2) return { ok: true, deleted: [] };
+    var header = data[0];
+    var limit = (p && p.limit) || 50;
+    var rows = data.slice(1).slice(-limit);
+    var deleted = rows.map(function (row) {
+      var obj = {};
+      header.forEach(function (h, i) {
+        if (h === 'deletedAt') {
+          obj.deletedAt = row[i] instanceof Date ? row[i].getTime() : row[i];
+        } else {
+          obj[h] = (row[i] === undefined || row[i] === '') ? 'N/A' : row[i];
+        }
+      });
+      return obj;
+    }).reverse(); // most recently deleted first
+    return { ok: true, deleted: deleted };
+  } catch (err) {
+    return _fail('getDeletedBookings', err);
+  }
+}
+
+// Admin — moves a row back from DELETED_BOOKINGS into BOOKINGS. Maps by
+// field NAME rather than column position: BOOKINGS' header can gain columns
+// over time (see _sheet()'s self-healing migration), so an archive row from
+// before that change would otherwise land shifted. Any field the archive
+// row doesn't have (added to BOOKINGS after this row was deleted) is left
+// blank rather than guessed.
+function restoreBooking(p) {
+  try {
+    if (!p || typeof p.ref !== 'string' || !p.ref.trim() || p.deletedAt === undefined || p.deletedAt === null) {
+      return { ok: false, error: 'Invalid ref/deletedAt' };
+    }
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var archive = ss.getSheetByName(DELETED_BOOKINGS_SHEET_NAME);
+    if (!archive) return { ok: false, error: 'Nothing to restore' };
+    var data = archive.getDataRange().getValues();
+    var archiveHeader = data[0] || [];
+    var refIdx = archiveHeader.indexOf('ref');
+    var deletedAtIdx = archiveHeader.indexOf('deletedAt');
+    if (refIdx === -1 || deletedAtIdx === -1) return { ok: false, error: 'Archive not initialized' };
+
+    for (var i = 1; i < data.length; i++) {
+      var cellTime = data[i][deletedAtIdx] instanceof Date ? data[i][deletedAtIdx].getTime() : data[i][deletedAtIdx];
+      if (String(data[i][refIdx]) === String(p.ref) && Number(cellTime) === Number(p.deletedAt)) {
+        var archived = {};
+        archiveHeader.forEach(function (h, idx) { archived[h] = data[i][idx]; });
+
+        var bookingSheet = _sheet(); // runs self-healing migration first
+        var liveHeader = bookingSheet.getRange(1, 1, 1, bookingSheet.getLastColumn()).getValues()[0];
+        var newRow = liveHeader.map(function (h) {
+          return archived.hasOwnProperty(h) ? archived[h] : '';
+        });
+        bookingSheet.appendRow(newRow);
+        archive.deleteRow(i + 1);
+        return { ok: true };
+      }
+    }
+    return { ok: false, error: 'Not found — it may already have been restored' };
+  } catch (err) {
+    return _fail('restoreBooking', err);
   }
 }
 
