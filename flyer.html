@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#0B1E33"/>
+<title>Flyer — Aquatic Paradise Rentals</title>
+<link rel="icon" type="image/png" sizes="48x48" href="/icons/icon-48.png"/>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+:root {
+  --navy: #0B1E33; --navy-2: #13294B; --teal: #0E7C90;
+  --emerald: #0EA972; --gold: #C9820A; --ink: #101828;
+  --muted: #667085; --line: #E4E7EC; --light: #F7F8FA;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Inter',-apple-system,'Segoe UI',Helvetica,sans-serif;
+  background:#ccc;
+  display:flex; flex-direction:column; align-items:center; gap:20px;
+  padding:24px;
+}
+.toolbar{display:flex;gap:10px}
+.btn{padding:10px 18px;border-radius:6px;font-weight:700;font-size:.85rem;border:1px solid var(--navy);background:var(--navy);color:#fff;cursor:pointer;font-family:inherit}
+.btn:hover{background:var(--navy-2)}
+
+/* US Letter at 96dpi = 816x1056px; scales fine for printing either size */
+.page{
+  width:816px; min-height:1056px; background:#fff;
+  box-shadow:0 4px 24px rgba(0,0,0,.25);
+  display:flex; flex-direction:column;
+  position:relative; overflow:hidden;
+}
+.hero{
+  height:340px; position:relative;
+  background:url('hero-beach.jpg') center/cover no-repeat;
+}
+.hero::after{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(180deg, rgba(11,30,51,.15) 0%, rgba(11,30,51,.75) 100%);
+}
+.hero-content{
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  justify-content:flex-end; padding:28px 40px; color:#fff; z-index:1;
+}
+.brand{display:flex; align-items:center; gap:12px; margin-bottom:auto}
+.brand img{width:52px;height:52px;border-radius:10px;border:2px solid rgba(255,255,255,.85)}
+.brand-name{font-weight:800; font-size:1.15rem; letter-spacing:.3px}
+.brand-sub{font-size:.72rem; opacity:.9}
+.headline{font-size:2.6rem; font-weight:800; line-height:1.05; margin-bottom:6px; text-shadow:0 2px 12px rgba(0,0,0,.4)}
+.subheadline{font-size:1.05rem; font-weight:500; opacity:.95}
+
+.body{flex:1; padding:36px 40px; display:flex; flex-direction:column; gap:28px}
+
+.pitch{font-size:1.02rem; color:var(--ink); line-height:1.55; max-width:560px}
+
+.price-row{display:flex; gap:14px; flex-wrap:wrap}
+.price-card{
+  flex:1; min-width:150px; background:var(--light); border:1px solid var(--line);
+  border-radius:10px; padding:16px; text-align:center;
+}
+.price-card .icon{font-size:1.6rem; margin-bottom:4px}
+.price-card .name{font-weight:700; font-size:.88rem; color:var(--ink); margin-bottom:2px}
+.price-card .price{font-weight:800; font-size:1.15rem; color:var(--teal)}
+.price-card .price span{font-size:.72rem; font-weight:600; color:var(--muted)}
+.free-note{font-size:.82rem; color:var(--emerald); font-weight:700; text-align:center}
+
+.cta-row{
+  display:flex; align-items:center; gap:32px; margin-top:auto;
+  background:var(--navy); border-radius:14px; padding:26px 32px; color:#fff;
+}
+.qr-box{background:#fff; border-radius:10px; padding:10px; flex:0 0 auto}
+.qr-box img{width:160px; height:160px; display:block}
+.cta-text{flex:1}
+.cta-text .cta-h{font-size:1.3rem; font-weight:800; margin-bottom:6px}
+.cta-text .cta-p{font-size:.9rem; opacity:.9; margin-bottom:10px}
+.cta-text .cta-url{font-size:.88rem; font-weight:700; color:var(--gold)}
+.cta-text .cta-loc{font-size:.8rem; opacity:.85; margin-top:8px}
+
+@media print {
+  body{background:#fff; padding:0; gap:0}
+  .toolbar{display:none}
+  .page{box-shadow:none; width:100%; min-height:100vh}
+  @page{margin:0}
+}
+@media (max-width:860px) {
+  .page{width:100%}
+  .headline{font-size:2rem}
+  .cta-row{flex-direction:column; text-align:center}
+}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button class="btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+</div>
+
+<div class="page">
+  <div class="hero">
+    <div class="hero-content">
+      <div class="brand">
+        <img src="logo.jpg" alt="Aquatic Paradise Rentals logo"/>
+        <div>
+          <div class="brand-name">AQUATIC PARADISE RENTALS</div>
+          <div class="brand-sub">Princess Margaret Beach · Bequia</div>
+        </div>
+      </div>
+      <div class="headline">Paddle. Kayak.<br/>Snorkel. Repeat.</div>
+      <div class="subheadline">Beach gear rentals, right where the water starts.</div>
+    </div>
+  </div>
+
+  <div class="body">
+    <p class="pitch">
+      No shop to find, no gear to haul from home — just show up to Princess Margaret Beach
+      and rent paddle boards, kayaks, and snorkel sets by the hour, half day, or full day.
+      Life jackets included free with every rental.
+    </p>
+
+    <div class="price-row">
+      <div class="price-card">
+        <div class="icon">🏄</div>
+        <div class="name">Paddle Board</div>
+        <div class="price">$40 <span>/ hr</span></div>
+      </div>
+      <div class="price-card">
+        <div class="icon">🚣</div>
+        <div class="name">Kayak (Double)</div>
+        <div class="price">$50 <span>/ hr</span></div>
+      </div>
+      <div class="price-card">
+        <div class="icon">🤿</div>
+        <div class="name">Snorkel Set</div>
+        <div class="price">$25 <span>/ hr</span></div>
+      </div>
+      <div class="price-card">
+        <div class="icon">🏊</div>
+        <div class="name">Floater</div>
+        <div class="price">$25 <span>/ hr</span></div>
+      </div>
+    </div>
+    <div class="free-note">🆓 Life jackets / PFDs included FREE with every rental · Prices in XCD</div>
+
+    <div class="cta-row">
+      <div class="qr-box">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https%3A%2F%2Faquaticparadiserental.vacations%2F" alt="QR code linking to the booking page"/>
+      </div>
+      <div class="cta-text">
+        <div class="cta-h">Scan to book — no app needed</div>
+        <div class="cta-p">Reserve your gear in under a minute, right from your phone.</div>
+        <div class="cta-url">aquaticparadiserental.vacations</div>
+        <div class="cta-loc">📍 Princess Margaret Beach, Bequia, SVG &nbsp;·&nbsp; 💬 WhatsApp +1 (784) 496-3447</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
