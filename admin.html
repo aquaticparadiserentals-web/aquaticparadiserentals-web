@@ -373,6 +373,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   </div>
   <p style="font-size:0.72rem;color:var(--muted);margin-bottom:12px">Delivery view — name, gear, time and location. No pricing shown. Same list the drivers see.</p>
   <a href="dispatch.html" target="_blank" style="display:block;background:var(--surface);border:1px solid var(--line);color:#fff;padding:12px 16px;border-radius:var(--radius);font-weight:700;font-size:0.85rem;text-decoration:none;text-align:center;margin-bottom:14px">🚚 Open Driver Dispatch Page (for driver devices)</a>
+
+  <input type="text" id="dispatchSearchInput" placeholder="🔎 Search by name, ref or phone…" oninput="setDispatchSearch(this.value)" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--navy);color:#fff;font-size:0.85rem;margin-bottom:8px;box-sizing:border-box"/>
+  <div id="dispatchFilterBar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
+
   <div id="dispatchContainer">
     <div style="text-align:center;padding:30px;color:var(--muted)">Loading deliveries…</div>
   </div>
@@ -1366,6 +1370,43 @@ async function setBkState(ref, state) {
 
 // ── DISPATCH (delivery view — same backend list the driver page uses) ──
 let dispatchBookings = [];
+let dispatchSearchQuery = '';
+let dispatchStatusFilter = 'all';
+const DISPATCH_STATUS_FILTERS = [
+  {key:'all', label:'All'},
+  {key:'pending', label:'Pending'},
+  {key:'confirmed', label:'Confirmed'},
+  {key:'delivering', label:'Delivering'},
+  {key:'done', label:'Done'}
+];
+
+function setDispatchSearch(val) {
+  dispatchSearchQuery = (val||'').trim().toLowerCase();
+  renderDispatchAdmin();
+}
+function setDispatchStatusFilter(key) {
+  dispatchStatusFilter = key;
+  renderDispatchFilterBar();
+  renderDispatchAdmin();
+}
+function renderDispatchFilterBar() {
+  const el = document.getElementById('dispatchFilterBar');
+  if (!el) return;
+  el.innerHTML = DISPATCH_STATUS_FILTERS.map(f => {
+    const active = f.key === dispatchStatusFilter;
+    return `<button onclick="setDispatchStatusFilter('${f.key}')" style="padding:6px 12px;border-radius:20px;font-size:0.72rem;font-weight:700;cursor:pointer;border:1px solid ${active?'var(--teal)':'var(--line)'};background:${active?'var(--teal)':'transparent'};color:${active?'#fff':'var(--muted)'}">${f.label}</button>`;
+  }).join('');
+}
+function dispatchFilteredBookings() {
+  return dispatchBookings.filter(b => {
+    if (!b) return false;
+    const status = b.status && b.status !== 'N/A' ? b.status : 'pending';
+    if (dispatchStatusFilter !== 'all' && status !== dispatchStatusFilter) return false;
+    if (!dispatchSearchQuery) return true;
+    const haystack = [b.ref, b.fname, b.lname, b.phone].map(v => String(v||'').toLowerCase()).join(' ');
+    return haystack.includes(dispatchSearchQuery);
+  });
+}
 
 // Auto-refresh while the Dispatch tab is open, so a status change made by a
 // driver on dispatch.html shows up here without staff remembering to tap
@@ -1386,6 +1427,7 @@ function stopDispatchPolling() {
 async function fetchDispatchAdmin() {
   const el = document.getElementById('dispatchContainer');
   el.innerHTML='<div style="text-align:center;padding:30px;color:var(--muted)">⏳ Loading deliveries…</div>';
+  renderDispatchFilterBar();
   try {
     const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'getDispatchBookings',token:APP_TOKEN,limit:50}),signal:AbortSignal.timeout(10000)});
     if(!res.ok) throw new Error('HTTP '+res.status);
@@ -1411,7 +1453,12 @@ function renderDispatchAdmin() {
     el.innerHTML='<div style="text-align:center;padding:40px;color:var(--muted)">No deliveries right now.</div>';
     return;
   }
-  el.innerHTML = dispatchBookings.map(b => {
+  const filtered = dispatchFilteredBookings();
+  if (!filtered.length) {
+    el.innerHTML='<div style="text-align:center;padding:40px;color:var(--muted)">No deliveries match your search/filter.</div>';
+    return;
+  }
+  el.innerHTML = filtered.map(b => {
     b = b || {};
     const ref = String(b.ref === undefined || b.ref === null || b.ref === '' ? 'N/A' : b.ref);
     const refAttr = escapeHtml(ref);
