@@ -3001,7 +3001,12 @@ function _fetchWeather() {
     };
   } catch (err) {
     _logError('_fetchWeather', err);
-    return { status: 'unknown', error: (err && err.message) ? err.message : String(err) };
+    // checkedAt matters here too, not just on the success path above — without
+    // it, dailyWeatherCheck()'s firstRunToday check (!prev.checkedAt) reads
+    // every failed reading as "no previous reading today" and re-emails on
+    // every hourly trigger run instead of once, e.g. during a sustained
+    // HTTP 429 from the weather API.
+    return { status: 'unknown', error: (err && err.message) ? err.message : String(err), checkedAt: new Date().toISOString() };
   }
 }
 
