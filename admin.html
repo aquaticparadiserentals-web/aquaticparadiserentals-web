@@ -332,9 +332,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   </div>
 
   <div class="sec-title">Next 7 Days</div>
-  <div id="weekStrip" style="display:flex;gap:6px;overflow-x:auto;margin-bottom:18px;padding-bottom:4px">
+  <div id="weekStrip" style="display:flex;gap:6px;overflow-x:auto;margin-bottom:8px;padding-bottom:4px">
     <div style="text-align:center;padding:16px;color:var(--muted);font-size:0.78rem">Loading…</div>
   </div>
+  <div id="weekDayDetail" style="margin-bottom:18px"></div>
 
   <div class="sec-title">Quick Actions</div>
   <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px">
@@ -1190,6 +1191,12 @@ async function fetchBookings() {
 }
 
 // ── NEXT 7 DAYS STRIP ──
+// Tapping a day expands weekDayDetail below the strip with that day's full
+// bookings (name, ref, gear) — previously the cards had no onclick at all,
+// so tapping one did nothing.
+let selectedWeekDay = null;
+let weekStripByDay = {};
+
 function renderWeekStrip() {
   const el = document.getElementById('weekStrip');
   if (!el) return;
@@ -1209,13 +1216,16 @@ function renderWeekStrip() {
     const key = bd.toDateString();
     (byDay[key] = byDay[key] || []).push(b);
   });
+  weekStripByDay = byDay;
   el.innerHTML = days.map(d => {
     const key = d.toDateString();
     const items = (byDay[key]||[]).slice().sort((a,b)=>new Date(a.datetime)-new Date(b.datetime));
     const dayLabel = d.toLocaleDateString(undefined,{weekday:'short'}).toUpperCase();
     const dateLabel = d.getDate();
     const isToday = key === today.toDateString();
-    return `<div style="flex:0 0 auto;min-width:88px;background:var(--surface);border-radius:10px;padding:8px 6px;${isToday?'border:1px solid var(--gold)':''}">
+    const isSelected = key === selectedWeekDay;
+    const border = isSelected ? 'border:1px solid var(--teal)' : (isToday ? 'border:1px solid var(--gold)' : 'border:1px solid transparent');
+    return `<div onclick="selectWeekDay('${key}')" style="flex:0 0 auto;min-width:88px;background:var(--surface);border-radius:10px;padding:8px 6px;cursor:pointer;${border}">
       <div style="text-align:center;font-size:0.65rem;font-weight:700;color:${isToday?'var(--gold)':'var(--muted)'};letter-spacing:1px">${isToday?'TODAY':dayLabel}</div>
       <div style="text-align:center;font-size:0.7rem;color:var(--muted);margin-bottom:6px">${dayLabel} ${dateLabel}</div>
       ${items.length ? items.map(b=>{
@@ -1224,6 +1234,34 @@ function renderWeekStrip() {
       }).join('') : '<div style="text-align:center;font-size:0.66rem;color:var(--muted)">free</div>'}
     </div>`;
   }).join('');
+  renderWeekDayDetail();
+}
+
+function selectWeekDay(key) {
+  selectedWeekDay = (selectedWeekDay === key) ? null : key; // tap again to collapse
+  renderWeekStrip();
+}
+
+function renderWeekDayDetail() {
+  const el = document.getElementById('weekDayDetail');
+  if (!el) return;
+  if (!selectedWeekDay) { el.innerHTML = ''; return; }
+  const items = (weekStripByDay[selectedWeekDay]||[]).slice().sort((a,b)=>new Date(a.datetime)-new Date(b.datetime));
+  const label = new Date(selectedWeekDay).toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'});
+  if (!items.length) {
+    el.innerHTML = `<div style="background:var(--surface);border-radius:var(--radius);padding:14px;font-size:0.8rem;color:var(--muted)">${escapeHtml(label)} — no bookings.</div>`;
+    return;
+  }
+  el.innerHTML = `<div style="background:var(--surface);border-radius:var(--radius);padding:12px">
+    <div style="font-size:0.78rem;font-weight:700;color:var(--teal);margin-bottom:8px">${escapeHtml(label)} — ${items.length} booking${items.length===1?'':'s'}</div>
+    ${items.map(b => {
+      const t = new Date(b.datetime).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+      return `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:0.78rem">
+        <span>${escapeHtml(t)} · ${escapeHtml(b.fname||'N/A')} ${escapeHtml(b.lname||'')}</span>
+        <span style="color:var(--muted)">${escapeHtml(b.gear||'N/A')}</span>
+      </div>`;
+    }).join('')}
+  </div>`;
 }
 
 function renderBookings() {
