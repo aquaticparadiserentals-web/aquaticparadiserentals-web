@@ -120,6 +120,8 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 .perk-sub a{color:var(--teal);font-weight:600}
 .perk.off{opacity:0.7}
 .perk.off .perk-title{color:var(--coral);text-decoration:line-through}
+.deal-badge{display:inline-block;font-size:0.68rem;font-weight:700;color:#fff;background:var(--emerald);border-radius:10px;padding:2px 8px;margin-top:5px;line-height:1.35}
+.left-badge{font-size:0.72rem;font-weight:700;color:var(--amber);margin-top:4px}
 .unavail{font-size:0.72rem;font-weight:700;color:var(--coral);margin-top:3px;line-height:1.3}
 .notice-off{background:rgba(214,58,58,.08);border:1px solid rgba(214,58,58,.3);color:var(--coral);border-radius:var(--radius);padding:10px 12px;font-size:0.8rem;font-weight:600;margin-bottom:12px}
 @media (max-width:420px){.perks{gap:6px}.perk{padding:10px 6px}.perk-title{font-size:0.72rem}.perk-sub{font-size:0.66rem}}
@@ -529,6 +531,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 
     <div class="section-title" data-i18n="booking_total">Booking Total</div>
     <div class="summary-card" id="summaryCard2"></div>
+    <div class="notice-off" id="stockNotice" style="display:none"></div>
 
     <button class="btn-primary" id="btnBook" onclick="submitBooking()" disabled data-i18n="btn_confirm">
       🎯 Confirm Booking
@@ -1165,11 +1168,11 @@ const DURATIONS = [
 // real 5, so replaced outright rather than patched. None involve kayaks,
 // which conveniently sidesteps the Kayak (Single) comingSoon gap too.
 const PACKAGES = [
-  { id:'PKG_FAM',  name:'Family Package 👨‍👩‍👧‍👦',    desc:'2× Paddle Boards + 1× Floater + Snorkel Gear',        price:150, duration:'Full Day', uses:['SUP','FLT','SNK'] },
-  { id:'PKG_DUO',  name:'Paddle Board + Snorkel Duo 🌊', desc:'1× Paddle Board + 2× Snorkel Gear Sets',              price:190, duration:'Full Day', uses:['SUP','SNK'] },
-  { id:'PKG_C2',   name:'Combo for 2 💑',              desc:'1× Paddle Board + 2× Snorkel Gear Sets + Life Jackets', price:220, duration:'Full Day', uses:['SUP','SNK'] },
-  { id:'PKG_DAY',  name:'Day Rental Combo ☀️',          desc:'1× Paddle Board + Full Snorkel Gear Set + Life Jacket', price:160, duration:'Full Day', uses:['SUP','SNK'] },
-  { id:'PKG_PREM', name:'Premium Paddle + 2 Snorkel Sets 🌴', desc:'Best snorkeling experience for two — full equipment', price:270, duration:'Full Day', uses:['SUP','SNK'] },
+  { id:'PKG_FAM',  name:'Family Package 👨‍👩‍👧‍👦',    desc:'2× Paddle Boards + 1× Floater + Snorkel Gear',        price:150, duration:'Full Day', uses:{SUP:2,FLT:1,SNK:1} },
+  { id:'PKG_DUO',  name:'Paddle Board + Snorkel Duo 🌊', desc:'1× Paddle Board + 2× Snorkel Gear Sets',              price:190, duration:'Full Day', uses:{SUP:1,SNK:2} },
+  { id:'PKG_C2',   name:'Combo for 2 💑',              desc:'1× Paddle Board + 2× Snorkel Gear Sets + Life Jackets', price:220, duration:'Full Day', uses:{SUP:1,SNK:2} },
+  { id:'PKG_DAY',  name:'Day Rental Combo ☀️',          desc:'1× Paddle Board + Full Snorkel Gear Set + Life Jacket', price:160, duration:'Full Day', uses:{SUP:1,SNK:1} },
+  { id:'PKG_PREM', name:'Premium Paddle + 2 Snorkel Sets 🌴', desc:'Best snorkeling experience for two — full equipment', price:270, duration:'Full Day', uses:{SUP:1,SNK:2} },
 ];
 
 let selectedGear = {};
@@ -1195,6 +1198,8 @@ window.addEventListener('DOMContentLoaded', () => {
   loadSitePhotos();
   renderPerks();
   loadServiceStatus();
+  loadAvailability();
+  document.getElementById('datetime').addEventListener('change', loadAvailability);
 
   const savedLang = localStorage.getItem('apr_lang') || 'en';
   highlightActiveLang(savedLang);
@@ -1238,7 +1243,91 @@ function offReason(key) {
 function escapeHtmlText(val) {
   return String(val == null ? '' : val).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
-function packageBlocked(p) { return !!(p && (p.uses || []).some(isOff)); }
+// Why a package can't be booked right now (item turned off or not enough
+// left for the chosen time), or '' if it's fine. Keys of p.uses mirror
+// PACKAGE_GEAR in Code.gs.
+function packageBlockReason(p) {
+  if (!p) return '';
+  for (const [id, qty] of Object.entries(p.uses || {})) {
+    if (isOff(id)) return offReason(id);
+    const left = itemLeft(id);
+    if (left !== null && left < qty) return 'Sold out for your time';
+  }
+  return '';
+}
+function packageBlocked(p) { return !!packageBlockReason(p); }
+
+// ── LIVE STOCK + LIMITED DEALS (set by the owner in admin → Stock & Deals) ──
+// Fetched for the guest's chosen date/time + duration. left === null means
+// no stock count is set (unlimited). Fails open on network errors — the
+// server re-checks every booking and alarms the owner on any overbooking.
+let stockInfo = { items: {}, deals: [] };
+let stockReqId = 0;
+function currentWindow() {
+  const pkg = selectedPackage && PACKAGES.find(p => p.id === selectedPackage);
+  return { datetime: document.getElementById('datetime')?.value || '', duration: pkg ? pkg.duration : selectedDuration.label };
+}
+async function loadAvailability() {
+  const { datetime, duration } = currentWindow();
+  if (!datetime) return stockInfo;
+  const reqId = ++stockReqId;
+  try {
+    const url = BACKEND + '?action=getAvailability&datetime=' + encodeURIComponent(datetime) + '&duration=' + encodeURIComponent(duration);
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const data = await res.json();
+    if (reqId !== stockReqId) return stockInfo; // a newer request superseded this one
+    if (data && data.ok) stockInfo = { items: data.items || {}, deals: data.deals || [] };
+  } catch (err) { /* fail open */ }
+  // On the gear step, trim the cart to what's left (the guest sees it happen).
+  // On the details step, leave the cart alone — renderStockNotice() explains
+  // the problem and submitBooking() refuses until they fix it.
+  const onGearStep = document.getElementById('step-gear')?.style.display !== 'none';
+  if (onGearStep) {
+    let trimmed = false;
+    Object.keys(selectedGear).forEach(id => {
+      const left = itemLeft(id);
+      if (left !== null && selectedGear[id] > left) {
+        if (left <= 0) delete selectedGear[id]; else selectedGear[id] = left;
+        trimmed = true;
+      }
+    });
+    if (selectedPackage && packageBlocked(PACKAGES.find(p => p.id === selectedPackage))) { selectedPackage = null; trimmed = true; }
+    if (trimmed) showToast('Some gear just sold out — your selection was updated', 'warn');
+  }
+  renderGear(); renderPackages(); renderPackageUI(); updateSummary(); renderStockNotice();
+  return stockInfo;
+}
+function itemLeft(id) {
+  const it = stockInfo.items[id];
+  return (it && typeof it.left === 'number') ? it.left : null;
+}
+function dealFor(id) { return (stockInfo.deals || []).find(d => d.gear === id) || null; }
+// Discount on one gear line: deal % off, on at most the deal's remaining units.
+function dealDiscount(id, qty, unitPrice) {
+  const d = dealFor(id);
+  if (!d || selectedPackage) return 0;
+  return Math.round(unitPrice * Math.min(qty, d.left) * d.pct / 100);
+}
+// Shown on the details step: tells the guest when their cart no longer fits the time they picked.
+function cartShortfall() {
+  if (selectedPackage) {
+    const why = packageBlockReason(PACKAGES.find(p => p.id === selectedPackage));
+    return why ? 'Your package is not available for that time — ' + why : '';
+  }
+  const short = Object.entries(selectedGear).map(([id, qty]) => {
+    const left = itemLeft(id);
+    const g = GEAR.find(x => x.id === id);
+    return (left !== null && qty > left) ? `only ${left} ${g ? g.name : id} left` : '';
+  }).filter(Boolean);
+  return short.length ? 'Sorry — ' + short.join(', ') + ' for that time. Pick another time or change your gear.' : '';
+}
+function renderStockNotice() {
+  const el = document.getElementById('stockNotice');
+  if (!el) return;
+  const msg = cartShortfall();
+  el.style.display = msg ? 'block' : 'none';
+  el.textContent = msg ? '⛔ ' + msg : '';
+}
 
 function renderPerks() {
   const el = document.getElementById('perks');
@@ -1399,8 +1488,16 @@ async function loadWeatherBanner() {
 
 // ── RENDER GEAR ──
 function renderGear() {
-  const regularGear = GEAR.filter(g => !g.isPackage && !g.comingSoon && !isOff(g.id));
-  const offGear = GEAR.filter(g => !g.isPackage && !g.comingSoon && isOff(g.id));
+  const soldOut = g => itemLeft(g.id) === 0;
+  const regularGear = GEAR.filter(g => !g.isPackage && !g.comingSoon && !isOff(g.id) && !soldOut(g));
+  const offGear = GEAR.filter(g => !g.isPackage && !g.comingSoon && (isOff(g.id) || soldOut(g)));
+  const stockBadge = g => {
+    const left = itemLeft(g.id), deal = dealFor(g.id);
+    let html = '';
+    if (deal) html += `<div class="deal-badge">🏷️ ${deal.pct}% off${deal.label ? ' · ' + escapeHtmlText(deal.label) : ''} — ${deal.left} at this price</div>`;
+    if (left !== null && left <= 3) html += `<div class="left-badge">🔥 Only ${left} left</div>`;
+    return html;
+  };
   const comingSoonGear = GEAR.filter(g => !g.isPackage && g.comingSoon);
   const iconFor = g => {
     const photo = sitePhotos['gear_'+g.id];
@@ -1415,6 +1512,7 @@ function renderGear() {
       ${iconFor(g)}
       <div class="gear-name">${g.name}</div>
       <div class="gear-price">from XCD ${g.price60}</div>
+      ${stockBadge(g)}
       <div class="qty-controls" onclick="event.stopPropagation()">
         <button class="qty-btn" onclick="changeQty('${g.id}',-1)">−</button>
         <span class="qty-display" id="qty-${g.id}">${qty}</span>
@@ -1427,7 +1525,7 @@ function renderGear() {
     <div class="gear-card" style="opacity:0.6;cursor:default" title="Not available at the moment">
       ${iconFor(g)}
       <div class="gear-name">${g.name}</div>
-      <div class="unavail">⛔ ${offReason(g.id)}</div>
+      <div class="unavail">⛔ ${isOff(g.id) ? offReason(g.id) : 'Sold out for your time'}</div>
     </div>
   `).join('') + comingSoonGear.map(g => `
     <div class="gear-card" style="opacity:0.55;cursor:default;position:relative" title="Coming soon — not yet available to book">
@@ -1452,6 +1550,11 @@ function toggleGear(id) {
 function changeQty(id, delta) {
   if (delta > 0 && isOff(id)) return;
   const cur = selectedGear[id] || 0;
+  const left = itemLeft(id);
+  if (delta > 0 && left !== null && cur + delta > left) {
+    showToast(`Only ${left} left for that time`, 'warn');
+    return;
+  }
   const next = Math.max(0, cur + delta);
   if (next === 0) {
     delete selectedGear[id];
@@ -1468,13 +1571,13 @@ function changeQty(id, delta) {
 // ── RENDER PACKAGES ──
 function renderPackages() {
   document.getElementById('pkgList').innerHTML = PACKAGES.map(p => {
-    const blockedBy = (p.uses || []).find(isOff);
+    const blockedWhy = packageBlockReason(p);
     return `
-    <div class="pkg-card" id="pkg-${p.id}" onclick="selectPackage('${p.id}')" ${blockedBy ? 'style="opacity:0.6;cursor:default"' : ''}>
+    <div class="pkg-card" id="pkg-${p.id}" onclick="selectPackage('${p.id}')" ${blockedWhy ? 'style="opacity:0.6;cursor:default"' : ''}>
       <div class="pkg-info">
         <div class="pkg-name">${p.name} <span class="pkg-tag">${p.duration}</span></div>
         <div class="pkg-desc">${p.desc}</div>
-        ${blockedBy ? `<div class="unavail">⛔ ${offReason(blockedBy)}</div>` : ''}
+        ${blockedWhy ? `<div class="unavail">⛔ ${blockedWhy}</div>` : ''}
       </div>
       <div class="pkg-price">XCD ${p.price}</div>
     </div>
@@ -1501,6 +1604,7 @@ function selectPackage(id) {
   selectedPackage = (selectedPackage === id) ? null : id;
   renderPackageUI();
   updateSummary();
+  loadAvailability(); // packages run Full Day, which may change what's left
 }
 
 // ── RENDER DURATIONS ──
@@ -1515,6 +1619,7 @@ function selectDuration(idx) {
   document.getElementById('dur-'+idx)?.classList.add('selected');
   selectedDuration = DURATIONS[idx];
   updateSummary();
+  loadAvailability();
 }
 
 // ── SUMMARY ──
@@ -1526,7 +1631,9 @@ function getTotal() {
   let total = 0;
   Object.entries(selectedGear).forEach(([id, qty]) => {
     const g = GEAR.find(x=>x.id===id);
-    if (g) total += (g[selectedDuration.key] || 0) * qty;
+    if (!g) return;
+    const unit = g[selectedDuration.key] || 0;
+    total += unit * qty - dealDiscount(id, qty, unit);
   });
   return total;
 }
@@ -1554,8 +1661,11 @@ function updateSummary() {
     Object.entries(selectedGear).forEach(([id,qty]) => {
       const g = GEAR.find(x=>x.id===id);
       if (!g) return;
-      const linePrice = (g[selectedDuration.key]||0)*qty;
+      const unit = g[selectedDuration.key]||0;
+      const linePrice = unit*qty;
       lines += `<div class="summary-row"><span>${g.icon} ${g.name} ×${qty}</span><span>XCD ${linePrice}</span></div>`;
+      const off = dealDiscount(id, qty, unit);
+      if (off) lines += `<div class="summary-row" style="color:var(--emerald)"><span>🏷️ Deal ${dealFor(id).pct}% off</span><span>− XCD ${off}</span></div>`;
     });
     lines += `<div class="summary-row"><span style="opacity:0.8">Duration</span><span>${selectedDuration.label}</span></div>`;
   }
@@ -1577,6 +1687,7 @@ function goToDetails() {
   document.getElementById('step-gear').style.display='none';
   document.getElementById('step-details').style.display='block';
   updateSummaryCard2();
+  renderStockNotice();
   window.scrollTo(0,0);
 }
 
@@ -1843,6 +1954,20 @@ async function submitBooking() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Submitting…';
 
+  // Last-second stock check for the exact time picked. The server re-checks
+  // under a lock, but many submits go no-cors (unreadable reply), so this is
+  // where the guest actually gets told "sold out".
+  await loadAvailability();
+  const shortfall = cartShortfall();
+  if (shortfall) {
+    renderStockNotice();
+    showToast(shortfall, 'warn');
+    btn.innerHTML = t('btn_confirm', '🎯 Confirm Booking');
+    btn.disabled = false;
+    return;
+  }
+  const usedDealIds = selectedPackage ? [] : Object.keys(selectedGear).map(dealFor).filter(Boolean).map(d => d.id);
+
   const refNum = 'APR-' + Date.now().toString(36).toUpperCase().slice(-6);
   const gear_summary = selectedPackage
     ? PACKAGES.find(x=>x.id===selectedPackage)?.name
@@ -1879,6 +2004,7 @@ async function submitBooking() {
     gear: gear_summary,
     duration: selectedPackage ? (PACKAGES.find(x=>x.id===selectedPackage)?.duration||'') : selectedDuration.label,
     total: getTotal(),
+    dealIds: usedDealIds,
     currency: 'XCD',
     waiverAccepted: true,
     waiverTimestamp: new Date().toISOString(),

@@ -722,6 +722,365 @@ function setServiceStatus(p) {
   }
 }
 
+// ── STOCK, LIMITED DEALS & TELEGRAM ALARMS ──
+// Stock is a simple per-item count the owner sets in admin (Stock & Deals):
+// how many units we own and how many are out for repair. A booking holds its
+// units for its own date/time window (pending/confirmed/delivering), so the
+// same board can be booked 10am and again 2pm. Items with no count set are
+// treated as unlimited — nothing is blocked until the owner enters numbers.
+// Bookings only store gear as text ("Paddle Board x2, Snorkel Set x1" or a
+// package name), so quantities are parsed back out of that text.
+var STOCK_KEYS = ['SUP', 'KAY2', 'SNK', 'FLT', 'FLC', 'BPG'];
+var GEAR_LABELS = { SUP: 'Paddle Board', KAY2: 'Kayak (Double)', SNK: 'Snorkel Set', FLT: 'Floating Tube', FLC: 'Floating Lounge Chair', BPG: 'Beach Paddle Games' };
+var GEAR_BY_NAME = {
+  'Paddle Board': 'SUP', 'Kayak (Double)': 'KAY2', 'Snorkel Set': 'SNK',
+  'Floating Tube': 'FLT', 'Floater/Board': 'FLT', 'Floating Lounge Chair': 'FLC', 'Beach Paddle Games': 'BPG'
+};
+// Matched by prefix — package names carry emoji. Must mirror PACKAGES in index.html.
+var PACKAGE_GEAR = [
+  ['Family Package', { SUP: 2, FLT: 1, SNK: 1 }],
+  ['Paddle Board + Snorkel Duo', { SUP: 1, SNK: 2 }],
+  ['Combo for 2', { SUP: 1, SNK: 2 }],
+  ['Day Rental Combo', { SUP: 1, SNK: 1 }],
+  ['Premium Paddle', { SUP: 1, SNK: 2 }]
+];
+var ACTIVE_BOOKING_STATUSES = ['pending', 'confirmed', 'delivering'];
+var STOCK_PROP = 'stock_config';
+var DEALS_PROP = 'deals';
+
+function _parseGearQty(gearText) {
+  var text = String(gearText || '').trim();
+  var out = {};
+  if (!text || text === 'N/A') return out;
+  for (var i = 0; i < PACKAGE_GEAR.length; i++) {
+    if (text.indexOf(PACKAGE_GEAR[i][0]) === 0) {
+      var pk = PACKAGE_GEAR[i][1];
+      Object.keys(pk).forEach(function (k) { out[k] = pk[k]; });
+      return out;
+    }
+  }
+  text.split(',').forEach(function (part) {
+    var m = part.trim().match(/^(.*?)\s*x\s*(\d+)$/i);
+    var name = m ? m[1].trim() : part.trim();
+    var key = GEAR_BY_NAME[name];
+    if (key) out[key] = (out[key] || 0) + (m ? parseInt(m[2], 10) : 1);
+  });
+  return out;
+}
+
+function _bookingWindow(datetime, duration) {
+  var start = (datetime instanceof Date) ? datetime.getTime() : new Date(String(datetime || '')).getTime();
+  if (isNaN(start)) return null;
+  return { start: start, end: start + _durationMinutes(duration) * 60000 };
+}
+
+function _readJsonProp(key, fallback) {
+  try {
+    var raw = PropertiesService.getScriptProperties().getProperty(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (err) {
+    _logError('_readJsonProp.' + key, err);
+    return fallback;
+  }
+}
+
+function _stockConfig() { return _readJsonProp(STOCK_PROP, {}); }
+
+// Units held per item by active bookings overlapping [start, end).
+function _heldInWindow(start, end, excludeRef) {
+  var held = {};
+  var data = _sheet().getDataRange().getValues();
+  var iRef = FIELDS.indexOf('ref'), iDt = FIELDS.indexOf('datetime'), iGear = FIELDS.indexOf('gear');
+  var iDur = FIELDS.indexOf('duration'), iStatus = FIELDS.indexOf('status');
+  for (var r = 1; r < data.length; r++) {
+    var row = data[r];
+    if (excludeRef && String(row[iRef]) === String(excludeRef)) continue;
+    var status = String(row[iStatus] || '').trim();
+    if (!status || status === 'N/A') status = 'pending';
+    if (ACTIVE_BOOKING_STATUSES.indexOf(status) === -1) continue;
+    var w = _bookingWindow(row[iDt], row[iDur]);
+    if (!w || !(w.start < end && start < w.end)) continue;
+    var q = _parseGearQty(row[iGear]);
+    Object.keys(q).forEach(function (k) { held[k] = (held[k] || 0) + q[k]; });
+  }
+  return held;
+}
+
+// { SUP: { total, repair, held, left, off } } — left is null when no count is set (unlimited).
+function _availabilityFor(start, end, excludeRef) {
+  var cfg = _stockConfig();
+  var held = _heldInWindow(start, end, excludeRef);
+  var services = getServiceStatus();
+  var out = {};
+  STOCK_KEYS.forEach(function (k) {
+    var c = cfg[k] || {};
+    var total = (typeof c.total === 'number') ? c.total : null;
+    var repair = Number(c.repair) || 0;
+    var off = !!(services[k] && services[k].off);
+    var left = total === null ? null : Math.max(0, total - repair - (held[k] || 0));
+    if (off) left = 0;
+    out[k] = { total: total, repair: repair, held: held[k] || 0, left: left, off: off };
+  });
+  return out;
+}
+
+function _activeDeals() {
+  return _readJsonProp(DEALS_PROP, []).filter(function (d) { return d && d.active && d.used < d.cap; });
+}
+
+// Public: what's left for a given date/time + duration, plus live deals.
+function getAvailability(p) {
+  try {
+    var w = _bookingWindow(p && p.datetime, p && p.duration);
+    if (!w) return { ok: false, error: 'Invalid date/time' };
+    var items = _availabilityFor(w.start, w.end);
+    var publicItems = {};
+    Object.keys(items).forEach(function (k) { publicItems[k] = { left: items[k].left, total: items[k].total }; });
+    var deals = _activeDeals().map(function (d) {
+      return { id: d.id, gear: d.gear, pct: d.pct, left: d.cap - d.used, label: d.label || '' };
+    });
+    return { ok: true, items: publicItems, deals: deals };
+  } catch (err) {
+    return _fail('getAvailability', err);
+  }
+}
+
+// Admin: what's available, what's out/missing, and deal + alarm status.
+function getStockOverview() {
+  try {
+    var now = Date.now();
+    var dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+    var dayEnd = new Date(dayStart.getTime() + 86400000);
+    var nowItems = _availabilityFor(now, now + 60000);
+    var todayHeld = _heldInWindow(dayStart.getTime(), dayEnd.getTime());
+    var items = STOCK_KEYS.map(function (k) {
+      var n = nowItems[k];
+      return { key: k, label: GEAR_LABELS[k], total: n.total, repair: n.repair, outNow: n.held,
+        leftNow: n.left, off: n.off, bookedToday: todayHeld[k] || 0 };
+    });
+    return { ok: true, items: items, deals: _readJsonProp(DEALS_PROP, []), alarm: getAlarmStatus() };
+  } catch (err) {
+    return _fail('getStockOverview', err);
+  }
+}
+
+function setStock(p) {
+  try {
+    var input = (p && p.items) || {};
+    var cfg = _stockConfig();
+    var errors = [];
+    STOCK_KEYS.forEach(function (k) {
+      if (!input[k]) return;
+      var rawTotal = input[k].total;
+      if (rawTotal === '' || rawTotal === null || rawTotal === undefined) { delete cfg[k]; return; }
+      var total = Number(rawTotal), repair = Number(input[k].repair) || 0;
+      if (!isFinite(total) || total < 0 || total > 500 || Math.round(total) !== total) { errors.push(GEAR_LABELS[k] + ': owned must be 0-500'); return; }
+      if (!isFinite(repair) || repair < 0 || repair > total || Math.round(repair) !== repair) { errors.push(GEAR_LABELS[k] + ': in repair must be 0-' + total); return; }
+      cfg[k] = { total: total, repair: repair };
+    });
+    if (errors.length) return { ok: false, error: errors.join('; ') };
+    PropertiesService.getScriptProperties().setProperty(STOCK_PROP, JSON.stringify(cfg));
+    return { ok: true };
+  } catch (err) {
+    return _fail('setStock', err);
+  }
+}
+
+function createDeal(p) {
+  var lock = LockService.getScriptLock();
+  try {
+    var gear = String((p && p.gear) || '');
+    var pct = Number(p && p.pct), cap = Number(p && p.cap);
+    if (STOCK_KEYS.indexOf(gear) === -1) return { ok: false, error: 'Pick an item' };
+    if (!isFinite(pct) || pct < 5 || pct > 90 || Math.round(pct) !== pct) return { ok: false, error: 'Discount must be 5-90%' };
+    if (!isFinite(cap) || cap < 1 || cap > 500 || Math.round(cap) !== cap) return { ok: false, error: 'Quantity must be 1-500' };
+    lock.waitLock(10000);
+    var deals = _readJsonProp(DEALS_PROP, []);
+    deals.forEach(function (d) { if (d.gear === gear) d.active = false; }); // one live deal per item
+    deals.unshift({ id: 'deal-' + Date.now(), gear: gear, pct: pct, cap: cap, used: 0, active: true,
+      label: String(p.label || '').trim().slice(0, 60), createdAt: new Date().toISOString() });
+    PropertiesService.getScriptProperties().setProperty(DEALS_PROP, JSON.stringify(deals.slice(0, 30)));
+    return { ok: true };
+  } catch (err) {
+    return _fail('createDeal', err);
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
+function endDeal(p) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+    var deals = _readJsonProp(DEALS_PROP, []);
+    deals.forEach(function (d) { if (d.id === (p && p.id)) d.active = false; });
+    PropertiesService.getScriptProperties().setProperty(DEALS_PROP, JSON.stringify(deals));
+    return { ok: true };
+  } catch (err) {
+    return _fail('endDeal', err);
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
+// Called from saveBooking while it holds the script lock, BEFORE the row is
+// written. Never throws and never rejects the booking: many bookings arrive
+// via a no-cors POST whose response the guest's page can't read, so a
+// rejection would look like success to the guest. index.html pre-checks
+// stock before submitting; anything that still slips through (a race, an
+// offline-queued booking) is saved, flagged in notes, and alarmed.
+function _reserveStockForBooking(p) {
+  var result = { short: [], after: {}, dealNote: '', dealSoldOut: [], when: '' };
+  try {
+    var w = _bookingWindow(p.datetime, p.duration);
+    if (!w) return result;
+    result.when = Utilities.formatDate(new Date(w.start), Session.getScriptTimeZone(), 'EEE d MMM, h:mm a');
+    var wanted = _parseGearQty(p.gear);
+    var avail = _availabilityFor(w.start, w.end);
+    Object.keys(wanted).forEach(function (k) {
+      var a = avail[k];
+      if (!a || a.left === null) return;
+      if (wanted[k] > a.left) result.short.push(GEAR_LABELS[k] + ': wanted ' + wanted[k] + ', only ' + a.left + ' left' + (a.off ? ' (turned off)' : ''));
+      result.after[k] = { left: a.left - wanted[k], total: a.total };
+    });
+
+    var dealIds = Array.isArray(p.dealIds) ? p.dealIds.slice(0, 10).map(String) : [];
+    if (dealIds.length) {
+      var deals = _readJsonProp(DEALS_PROP, []);
+      var notes = [];
+      result.dealSoldOut = [];
+      dealIds.forEach(function (id) {
+        var deal = null;
+        deals.forEach(function (d) { if (d.id === id) deal = d; });
+        var units = deal ? Math.min(wanted[deal.gear] || 0, deal.cap - deal.used) : 0;
+        if (!deal || !deal.active || units <= 0) {
+          notes.push('⚠️ Deal had ended when this booked — check the price');
+          return;
+        }
+        deal.used += units;
+        if (deal.used >= deal.cap) { deal.active = false; result.dealSoldOut.push(deal); }
+        notes.push('🏷️ Deal ' + deal.pct + '% off ' + GEAR_LABELS[deal.gear] + ' x' + units);
+      });
+      PropertiesService.getScriptProperties().setProperty(DEALS_PROP, JSON.stringify(deals));
+      result.dealNote = notes.join(' · ');
+    }
+  } catch (err) {
+    _logError('_reserveStockForBooking', err);
+  }
+  return result;
+}
+
+function _stockAlarmsAfterBooking(p, r) {
+  try {
+    var guest = (String(p.fname || 'Guest') + ' ' + String(p.lname || '')).trim();
+    var lines = [p.ref + ' — ' + guest + ' · ' + String(p.phone || 'no phone'), 'Gear: ' + p.gear, 'When: ' + (r.when || p.datetime) + ' (' + p.duration + ')', 'Total: XCD ' + p.total];
+    var soldOut = [];
+    Object.keys(r.after).forEach(function (k) {
+      var a = r.after[k];
+      lines.push('Left for that time: ' + GEAR_LABELS[k] + ' ' + Math.max(0, a.left) + '/' + a.total);
+      if (a.left <= 0) soldOut.push(GEAR_LABELS[k]);
+    });
+    if (r.dealNote) lines.push(r.dealNote);
+    _alarm('New booking ' + p.ref, '🏄 ' + lines.join('\n'), false);
+
+    if (r.short.length) {
+      _alarm('OVERBOOKED ' + p.ref, '🚨🚨 OVERBOOKED — ' + p.ref + ' (' + guest + ', ' + String(p.phone || 'no phone') + ')\n' +
+        r.short.join('\n') + '\nWhen: ' + r.when + '\nContact the guest to adjust or move the booking.', true);
+    } else if (soldOut.length) {
+      _alarm('SOLD OUT', '🚨 Sold out for ' + r.when + ': ' + soldOut.join(', '), true);
+    }
+    (r.dealSoldOut || []).forEach(function (d) {
+      _alarm('Deal finished', '🏷️ ' + d.pct + '% off ' + GEAR_LABELS[d.gear] +
+        ' — all ' + d.cap + ' used. Guests now pay full price.', true);
+    });
+  } catch (err) {
+    _logError('_stockAlarmsAfterBooking', err);
+  }
+}
+
+// ── PHONE ALARMS (Telegram) ──
+// The owner creates a bot with @BotFather, pastes its token in admin, sends
+// the bot "hi" from their phone, then taps Connect (bots can't start a chat
+// with a phone number — the person has to message the bot first).
+var TG_TOKEN_PROP = 'TG_BOT_TOKEN';
+var TG_CHAT_PROP = 'TG_CHAT_ID';
+var TG_BOT_NAME_PROP = 'TG_BOT_NAME';
+
+function getAlarmStatus() {
+  var props = PropertiesService.getScriptProperties();
+  return { hasToken: !!props.getProperty(TG_TOKEN_PROP), connected: !!props.getProperty(TG_CHAT_PROP),
+    botName: props.getProperty(TG_BOT_NAME_PROP) || '' };
+}
+
+function _tgApi(method, payload) {
+  var token = PropertiesService.getScriptProperties().getProperty(TG_TOKEN_PROP);
+  if (!token) return null;
+  var res = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/' + method, {
+    method: 'post', contentType: 'application/json', payload: JSON.stringify(payload || {}), muteHttpExceptions: true
+  });
+  try { return JSON.parse(res.getContentText()); } catch (e) { return null; }
+}
+
+function setTelegramToken(p) {
+  try {
+    var token = String((p && p.botToken) || '').trim();
+    if (!/^\d{5,}:[A-Za-z0-9_-]{30,}$/.test(token)) return { ok: false, error: 'That doesn\'t look like a BotFather token — copy the whole line with the colon' };
+    var res = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/getMe', { muteHttpExceptions: true });
+    var me = JSON.parse(res.getContentText());
+    if (!me || !me.ok) return { ok: false, error: 'Telegram rejected that token' };
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty(TG_TOKEN_PROP, token);
+    props.setProperty(TG_BOT_NAME_PROP, me.result.username || '');
+    props.deleteProperty(TG_CHAT_PROP);
+    return { ok: true, botName: me.result.username || '' };
+  } catch (err) {
+    return _fail('setTelegramToken', err);
+  }
+}
+
+// Picks up the chat of whoever last messaged the bot.
+function connectTelegram() {
+  try {
+    var upd = _tgApi('getUpdates', { limit: 50 });
+    if (!upd) return { ok: false, error: 'Save the bot token first' };
+    var msgs = (upd.result || []).map(function (u) { return u.message || u.edited_message; })
+      .filter(function (m) { return m && m.chat && m.chat.type === 'private'; });
+    if (!msgs.length) return { ok: false, error: 'No message found — open your bot in Telegram, send it "hi", then tap Connect again' };
+    var chat = msgs[msgs.length - 1].chat;
+    PropertiesService.getScriptProperties().setProperty(TG_CHAT_PROP, String(chat.id));
+    _tgApi('sendMessage', { chat_id: chat.id, text: '✅ Aquatic Paradise alarms connected. Bookings, sold-out and overbooking alerts will arrive here.' });
+    return { ok: true, name: [chat.first_name, chat.last_name].filter(Boolean).join(' ') };
+  } catch (err) {
+    return _fail('connectTelegram', err);
+  }
+}
+
+function testAlarm() {
+  try {
+    return _tgSend('🔔 Test alarm from Aquatic Paradise — alarms are working.')
+      ? { ok: true } : { ok: false, error: 'Not connected yet — finish the steps above first' };
+  } catch (err) {
+    return _fail('testAlarm', err);
+  }
+}
+
+function _tgSend(text) {
+  var chat = PropertiesService.getScriptProperties().getProperty(TG_CHAT_PROP);
+  if (!chat) return false;
+  var res = _tgApi('sendMessage', { chat_id: chat, text: String(text).slice(0, 4000) });
+  return !!(res && res.ok);
+}
+
+// Telegram for everything; urgent alarms (sold out, overbooked, deal
+// finished) also go by email so they survive Telegram being down or not set
+// up. Routine booking pings skip email — sendNotificationOnce already emails.
+function _alarm(title, text, urgent) {
+  try { _tgSend(text); } catch (err) { _logError('_alarm.telegram', err); }
+  if (!urgent) return;
+  try { GmailApp.sendEmail(NOTIFY_EMAIL, 'APR ALARM: ' + title, text); }
+  catch (err2) { _logError('_alarm.email', err2); }
+}
+
 // ── DRIVERS (shared across staff — same sheet/GAS backend as bookings) ──
 function getDrivers() {
   try {
@@ -1292,6 +1651,10 @@ function doGet(e) {
       // public booking page to display.
       return _json({ ok: true, photos: getSitePhotos() });
     }
+    if (p.action === 'getAvailability') {
+      // Public — guests see how much is left for their chosen time.
+      return _json(getAvailability(p));
+    }
     if (p.action === 'getServiceStatus') {
       // Public — guests need to see what's unavailable before booking.
       return _json({ ok: true, status: getServiceStatus() });
@@ -1442,6 +1805,20 @@ function doPost(e) {
     if (payload.action === 'uploadSitePhoto') {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json(uploadSitePhoto(payload));
+    }
+    if (payload.action === 'getAvailability') {
+      return _json(getAvailability(payload));
+    }
+    if (['getStockOverview', 'setStock', 'createDeal', 'endDeal', 'setTelegramToken', 'connectTelegram', 'testAlarm'].indexOf(payload.action) !== -1) {
+      // Owner-only: stock counts, deals and the alarm phone.
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      if (payload.action === 'getStockOverview') return _json(getStockOverview());
+      if (payload.action === 'setStock') return _json(setStock(payload));
+      if (payload.action === 'createDeal') return _json(createDeal(payload));
+      if (payload.action === 'endDeal') return _json(endDeal(payload));
+      if (payload.action === 'setTelegramToken') return _json(setTelegramToken(payload));
+      if (payload.action === 'connectTelegram') return _json(connectTelegram());
+      return _json(testAlarm());
     }
     if (payload.action === 'getServiceStatus') {
       return _json({ ok: true, status: getServiceStatus() });
@@ -1646,6 +2023,19 @@ function saveBooking(p) {
       _logError('saveBooking.signature', sigErr);
     }
 
+    // Stock check + row write happen under one script lock, so two guests
+    // grabbing the last board at the same moment are handled one at a time.
+    // A lock timeout doesn't block the booking — it just skips the check.
+    var stockLock = LockService.getScriptLock();
+    var haveStockLock = false;
+    try { stockLock.waitLock(20000); haveStockLock = true; }
+    catch (lockErr) { _logError('saveBooking.stockLock', lockErr); }
+    var stock = _reserveStockForBooking(p);
+    var flags = [];
+    if (stock.short.length) flags.push('🚨 OVERBOOKED — ' + stock.short.join('; '));
+    if (stock.dealNote) flags.push(stock.dealNote);
+    if (flags.length) p.notes = flags.join(' · ') + (p.notes && p.notes !== 'N/A' ? ' — ' + p.notes : '');
+
     try {
       sh.appendRow([
         _safe(p.ref, 'N/A'),
@@ -1671,6 +2061,14 @@ function saveBooking(p) {
       ]);
     } catch (writeErr) {
       return _fail('saveBooking.write', writeErr);
+    } finally {
+      if (haveStockLock) { try { stockLock.releaseLock(); } catch (e) {} }
+    }
+
+    try {
+      _stockAlarmsAfterBooking(p, stock);
+    } catch (alarmErr) {
+      _logError('saveBooking.stockAlarm', alarmErr);
     }
 
     // signatureUrl lands after the staff/deposit columns in FIELDS, past

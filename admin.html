@@ -171,6 +171,25 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
    with no background/border at all; adding it here to match the rest of
    the app instead of leaving it invisible. */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin:12px 0}
+.stock-table{width:100%;border-collapse:collapse;font-size:0.78rem}
+.stock-table th{font-size:0.6rem;color:var(--muted);font-weight:600;text-transform:uppercase;padding:6px 2px;line-height:1.2;text-align:center;border-bottom:1px solid var(--line)}
+.stock-table td{padding:8px 2px;text-align:center;border-bottom:1px solid var(--line)}
+.stock-table td:first-child{text-align:left;font-weight:600}
+.stock-table input{width:42px;padding:6px 2px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);text-align:center;font-size:0.85rem}
+.stock-left{font-weight:800}
+.stock-left.zero{color:var(--coral)}
+.stock-left.low{color:var(--gold)}
+.stock-left.ok{color:var(--teal)}
+.stock-btn{width:100%;background:var(--teal);border:none;border-radius:8px;color:var(--navy);padding:10px 16px;font-size:0.85rem;font-weight:700;cursor:pointer;margin-top:4px}
+.stock-btn.ghost{background:var(--bg);color:var(--ink);border:1px solid var(--line)}
+.stock-form{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.stock-form select,.stock-form input{width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:0.85rem;box-sizing:border-box}
+.stock-form #dealLabel{grid-column:1/-1}
+.deal-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:0.82rem}
+.deal-bar{height:5px;background:var(--line);border-radius:3px;margin-top:5px;overflow:hidden}
+.deal-bar span{display:block;height:100%;background:var(--teal)}
+.tg-steps{font-size:0.8rem;line-height:1.6;padding-left:18px;margin:6px 0 12px}
+.tg-steps code{background:var(--bg);padding:1px 5px;border-radius:4px}
 .asec-title{font-size:1.05rem;font-weight:800;color:var(--ink);margin-bottom:6px}
 
 @media(max-width:400px){
@@ -385,6 +404,34 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 
 <!-- ═ INVENTORY / FLEET ═ -->
 <div class="asection" id="asec-inventory">
+  <!-- ═ STOCK & DEALS ═ Counts here drive what guests can book (per date/time). -->
+  <div class="sec-title">📦 Stock — what's available right now</div>
+  <div class="dash-grid" id="stockKpis"></div>
+  <div class="card" style="overflow-x:auto">
+    <table class="stock-table">
+      <thead><tr><th style="text-align:left">Item</th><th>Avail. now</th><th>Out now</th><th>Booked today</th><th>We own</th><th>In repair</th></tr></thead>
+      <tbody id="stockRows"><tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px">Loading…</td></tr></tbody>
+    </table>
+    <p style="font-size:0.72rem;color:var(--muted);margin:10px 0">Change <b>We own</b> or <b>In repair</b>, then Save. Guests can't book more than what's left for their time — booked gear is held for its booking time and freed when marked done or cancelled. Leave <b>We own</b> blank for no limit (∞).</p>
+    <button class="stock-btn" onclick="saveStockCounts()">💾 Save Stock</button>
+  </div>
+
+  <div class="sec-title">🏷️ Limited Deals</div>
+  <div class="card">
+    <div class="stock-form">
+      <select id="dealGear"></select>
+      <input id="dealPct" type="number" min="5" max="90" placeholder="% off">
+      <input id="dealCap" type="number" min="1" max="500" placeholder="How many">
+      <input id="dealLabel" maxlength="60" placeholder="Name (optional), e.g. Weekend Special">
+    </div>
+    <button class="stock-btn" onclick="createDealUI()">➕ Start Deal</button>
+    <p style="font-size:0.72rem;color:var(--muted);margin:10px 0 0">The deal shows on the booking page with how many are left at that price and stops by itself once they're all used. You get an alarm when it runs out.</p>
+    <div id="dealList" style="margin-top:12px"></div>
+  </div>
+
+  <div class="sec-title">🔔 Alarms to Your Phone (Telegram)</div>
+  <div class="card" id="tgCard">Loading…</div>
+
   <div class="sec-title">Fleet Summary</div>
   <div class="dash-grid" id="invSummary"></div>
   <button onclick="exportInventoryCSV()" style="margin-top:8px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--navy);padding:9px 16px;font-size:0.8rem;font-weight:700;cursor:pointer">📥 Export Inventory CSV</button>
@@ -2289,6 +2336,149 @@ async function fetchInventory() {
   renderAvailabilityWarning();
 }
 
+// ── STOCK & DEALS + PHONE ALARMS ── (Code.gs: getStockOverview/setStock/createDeal/endDeal/testAlarm)
+let stockOverview = null;
+async function stockApi(action, extra) {
+  const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify(Object.assign({action, token:APP_TOKEN}, extra||{})),signal:AbortSignal.timeout(20000)});
+  const data = await res.json();
+  if (!data || !data.ok) throw new Error((data && data.error) || 'Failed');
+  return data;
+}
+
+async function fetchStockOverview() {
+  try {
+    stockOverview = await stockApi('getStockOverview');
+  } catch (err) {
+    showToast('Could not load stock: '+err.message, 'warn');
+    return;
+  }
+  renderStock();
+  renderDeals();
+  renderAlarm();
+}
+
+function renderStock() {
+  const items = stockOverview.items || [];
+  const sum = f => items.reduce((s,i) => s + (Number(i[f])||0), 0);
+  const counted = items.filter(i => i.total !== null);
+  const availNow = counted.reduce((s,i) => s + (Number(i.leftNow)||0), 0);
+  const soldOut = items.filter(i => i.leftNow === 0).map(i => i.label);
+  document.getElementById('stockKpis').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">✅ Available now</div><div class="kpi-val">${counted.length ? availNow : '—'}</div><div class="kpi-sub">${counted.length ? 'units ready to rent' : 'set counts below'}</div></div>
+    <div class="kpi-card gold"><div class="kpi-label">🏄 Out on rental</div><div class="kpi-val">${sum('outNow')}</div><div class="kpi-sub">booked for right now</div></div>
+    <div class="kpi-card ${sum('repair')?'coral':''}"><div class="kpi-label">🔧 In repair</div><div class="kpi-val">${sum('repair')}</div><div class="kpi-sub">not rentable</div></div>
+    <div class="kpi-card ${soldOut.length?'coral':''}"><div class="kpi-label">⛔ Sold out now</div><div class="kpi-val">${soldOut.length}</div><div class="kpi-sub">${soldOut.length ? escapeHtml(soldOut.join(', ')) : 'nothing missing'}</div></div>`;
+  document.getElementById('stockRows').innerHTML = items.map(i => {
+    const left = i.leftNow;
+    const cls = left === null ? '' : left === 0 ? 'zero' : left <= 1 ? 'low' : 'ok';
+    return `<tr>
+      <td>${escapeHtml(i.label)}${i.off ? '<div style="font-size:0.68rem;color:var(--coral)">turned off in Dispatch</div>' : ''}</td>
+      <td class="stock-left ${cls}">${left===null ? '∞' : left}</td>
+      <td>${i.outNow}</td>
+      <td>${i.bookedToday}</td>
+      <td><input type="number" min="0" max="500" id="own-${i.key}" value="${i.total===null?'':i.total}" placeholder="∞"></td>
+      <td><input type="number" min="0" max="500" id="rep-${i.key}" value="${i.repair||0}"></td>
+    </tr>`;
+  }).join('');
+  const sel = document.getElementById('dealGear');
+  if (sel && !sel.options.length) sel.innerHTML = items.map(i => `<option value="${i.key}">${escapeHtml(i.label)}</option>`).join('');
+}
+
+async function saveStockCounts() {
+  const items = {};
+  (stockOverview?.items || []).forEach(i => {
+    items[i.key] = { total: document.getElementById('own-'+i.key).value.trim(), repair: document.getElementById('rep-'+i.key).value.trim() || 0 };
+    if (items[i.key].total !== '') items[i.key].total = Number(items[i.key].total);
+    items[i.key].repair = Number(items[i.key].repair);
+  });
+  try {
+    await stockApi('setStock', { items });
+    showToast('Stock saved ✅');
+    fetchStockOverview();
+  } catch (err) { showToast('Could not save: '+err.message, 'warn'); }
+}
+
+function renderDeals() {
+  const deals = stockOverview.deals || [];
+  const label = k => (stockOverview.items.find(i => i.key === k) || {}).label || k;
+  document.getElementById('dealList').innerHTML = deals.length ? deals.slice(0, 10).map(d => {
+    const live = d.active && d.used < d.cap;
+    return `<div class="deal-row">
+      <div style="flex:1">
+        <div style="font-weight:700">${d.pct}% off ${escapeHtml(label(d.gear))}${d.label ? ' · ' + escapeHtml(d.label) : ''}</div>
+        <div style="font-size:0.72rem;color:var(--muted)">${d.used} of ${d.cap} used · ${live ? '🟢 live' : '⚪ ended'}</div>
+        <div class="deal-bar"><span style="width:${Math.min(100, Math.round(d.used / d.cap * 100))}%"></span></div>
+      </div>
+      ${live ? `<button class="stock-btn ghost" style="width:auto;margin:0" onclick="endDealUI('${escapeHtml(d.id)}')">End</button>` : ''}
+    </div>`;
+  }).join('') : '<div style="font-size:0.8rem;color:var(--muted)">No deals yet.</div>';
+}
+
+async function createDealUI() {
+  try {
+    await stockApi('createDeal', {
+      gear: document.getElementById('dealGear').value,
+      pct: Number(document.getElementById('dealPct').value),
+      cap: Number(document.getElementById('dealCap').value),
+      label: document.getElementById('dealLabel').value
+    });
+    ['dealPct','dealCap','dealLabel'].forEach(id => document.getElementById(id).value = '');
+    showToast('Deal is live 🏷️');
+    fetchStockOverview();
+  } catch (err) { showToast('Could not start deal: '+err.message, 'warn'); }
+}
+
+async function endDealUI(id) {
+  if (!confirm('End this deal now? Guests will pay full price.')) return;
+  try { await stockApi('endDeal', { id }); showToast('Deal ended'); fetchStockOverview(); }
+  catch (err) { showToast('Could not end deal: '+err.message, 'warn'); }
+}
+
+// Phone alarms via a Telegram bot the owner creates with @BotFather.
+function renderAlarm() {
+  const tg = stockOverview.alarm || {};
+  const el = document.getElementById('tgCard');
+  if (tg.connected) {
+    el.innerHTML = `<div style="font-weight:700;color:var(--teal);margin-bottom:6px">✅ Connected${tg.botName ? ' to @' + escapeHtml(tg.botName) : ''}</div>
+      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:10px">You get every new booking (with the guest's phone), plus 🚨 sold out, 🚨🚨 overbooked and deal finished. Urgent ones also go to your email.</div>
+      <button class="stock-btn" onclick="alarmAction('testAlarm','Test alarm sent — check Telegram 🔔')">🔔 Send Test Alarm</button>
+      <button class="stock-btn ghost" style="margin-top:8px" onclick="document.getElementById('tgSetup').style.display='block'">Change phone / bot</button>
+      <div id="tgSetup" style="display:none;margin-top:12px">${telegramSetupHtml(tg)}</div>`;
+  } else {
+    el.innerHTML = telegramSetupHtml(tg);
+  }
+}
+
+function telegramSetupHtml(tg) {
+  return `<ol class="tg-steps">
+      <li>In Telegram, open <b>BotFather</b> (blue checkmark) and send <code>/newbot</code>.</li>
+      <li>Name: <code>APR Alarms</code>. Username: something ending in <code>bot</code>, e.g. <code>AquaticParadiseAlarm_bot</code> (add a number if taken).</li>
+      <li>BotFather replies with a token like <code>123456:ABC-…</code> — copy it, paste it below, tap Save.</li>
+      <li>In BotFather's reply, tap the link to your new bot (t.me/…_bot), press <b>Start</b>.</li>
+      <li>Come back here and tap <b>Connect</b>.</li>
+    </ol>
+    <input id="tgToken" type="password" autocomplete="off" placeholder="Paste bot token here" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:0.85rem;box-sizing:border-box;margin-bottom:8px">
+    <button class="stock-btn" onclick="saveTgToken()">💾 Save Bot Token</button>
+    ${tg.hasToken ? `<div style="font-size:0.75rem;color:var(--teal);margin:8px 0">Bot saved${tg.botName ? ': @' + escapeHtml(tg.botName) : ''} — press Start in your bot, then:</div>
+    <button class="stock-btn" onclick="alarmAction('connectTelegram','Connected ✅ — check Telegram')">🔗 Connect</button>` : ''}`;
+}
+
+async function saveTgToken() {
+  const token = document.getElementById('tgToken').value.trim();
+  if (!token) { showToast('Paste the token from BotFather first', 'warn'); return; }
+  try {
+    const r = await stockApi('setTelegramToken', { botToken: token });
+    showToast('Bot saved: @' + (r.botName || 'bot'));
+    fetchStockOverview();
+  } catch (err) { showToast(err.message, 'warn'); }
+}
+
+async function alarmAction(action, okMsg) {
+  try { await stockApi(action); showToast(okMsg); fetchStockOverview(); }
+  catch (err) { showToast(err.message, 'warn'); }
+}
+
 function renderInventorySummary() {
   const summaryEl = document.getElementById('invSummary');
   if (summaryEl) {
@@ -3271,7 +3461,7 @@ function switchATab(tab) {
   if (tab==='bookings') fetchBookings();
   if (tab==='dispatch') { fetchDispatchAdmin(); startDispatchPolling(); } else { stopDispatchPolling(); }
   if (tab==='customers') fetchCustomers();
-  if (tab==='inventory') fetchInventory();
+  if (tab==='inventory') { fetchInventory(); fetchStockOverview(); }
   if (tab==='safety') renderSafety();
   if (tab==='drivers') renderDrivers();
   if (tab==='feedback') fetchFeedback();
