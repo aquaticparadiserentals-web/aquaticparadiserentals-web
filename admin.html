@@ -432,6 +432,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   <div class="sec-title">🔔 Alarms to Your Phone (Telegram)</div>
   <div class="card" id="tgCard">Loading…</div>
 
+  <div class="sec-title">📱 Text-Message Alarms (works with no internet)</div>
+  <div class="card" id="smsCard">Loading…</div>
+
   <div class="sec-title">Fleet Summary</div>
   <div class="dash-grid" id="invSummary"></div>
   <button onclick="exportInventoryCSV()" style="margin-top:8px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--navy);padding:9px 16px;font-size:0.8rem;font-weight:700;cursor:pointer">📥 Export Inventory CSV</button>
@@ -2356,6 +2359,7 @@ async function fetchStockOverview() {
   renderStock();
   renderDeals();
   renderAlarm();
+  renderSms();
 }
 
 function renderStock() {
@@ -2442,7 +2446,7 @@ function renderAlarm() {
   if (tg.connected) {
     el.innerHTML = `<div style="font-weight:700;color:var(--teal);margin-bottom:6px">✅ Connected${tg.botName ? ' to @' + escapeHtml(tg.botName) : ''}</div>
       <div style="font-size:0.78rem;color:var(--muted);margin-bottom:10px">You get every new booking (with the guest's phone), plus 🚨 sold out, 🚨🚨 overbooked and deal finished. Urgent ones also go to your email.</div>
-      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:10px">📋 Booking alerts have <b>✅ Confirm / ❌ Decline</b> buttons (a tap takes up to a minute to apply). ☀️ A briefing arrives every morning around 7am — or send <b>/today</b> to the bot anytime. ⭐ Reviews arrive instantly; 1–3 stars come as 🚨.</div>
+      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:10px">📋 Booking alerts have <b>✅ Confirm / ❌ Decline</b> buttons (a tap takes up to a minute to apply). ☀️ A briefing arrives every morning around 7am — or send <b>/today</b> to the bot anytime. 📱 Log WhatsApp bookings by sending <b>/book</b> to the bot. ⭐ Reviews arrive instantly; 1–3 stars come as 🚨.</div>
       <button class="stock-btn" onclick="alarmAction('testAlarm','Test alarm sent — check Telegram 🔔')">🔔 Send Test Alarm</button>
       <button class="stock-btn" style="margin-top:8px" onclick="alarmAction('sendBriefing','Briefing sent — check Telegram ☀️')">☀️ Send Today's Briefing Now</button>
       <button class="stock-btn ghost" style="margin-top:8px" onclick="document.getElementById('tgSetup').style.display='block'">Change phone / bot</button>
@@ -2464,6 +2468,39 @@ function telegramSetupHtml(tg) {
     <button class="stock-btn" onclick="saveTgToken()">💾 Save Bot Token</button>
     ${tg.hasToken ? `<div style="font-size:0.75rem;color:var(--teal);margin:8px 0">Bot saved${tg.botName ? ': @' + escapeHtml(tg.botName) : ''} — press Start in your bot, then:</div>
     <button class="stock-btn" onclick="alarmAction('connectTelegram','Connected ✅ — check Telegram')">🔗 Connect</button>` : ''}`;
+}
+
+// SMS alarms via Twilio — urgent alarms only (each text costs a few cents).
+function renderSms() {
+  const s = stockOverview.sms || {};
+  const el = document.getElementById('smsCard');
+  const field = (id, ph, type) => `<input id="${id}" type="${type||'text'}" autocomplete="off" placeholder="${ph}" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:0.85rem;box-sizing:border-box;margin-bottom:8px">`;
+  const setup = `<ol class="tg-steps">
+      <li>Sign up at <b>twilio.com</b> (you add a card — about $3–5/month for your use).</li>
+      <li>Buy a phone number in Twilio (Phone Numbers → Buy a number, ~$1.15/month).</li>
+      <li>On the Twilio home page, copy the <b>Account SID</b> and <b>Auth Token</b> into the boxes below.</li>
+    </ol>
+    ${field('twSid','Account SID (starts with AC…)')}
+    ${field('twToken','Auth Token','password')}
+    ${field('twFrom','Your Twilio number, e.g. +15615550100')}
+    ${field('twTo','Your phone for alarms, e.g. +15619389675')}
+    <button class="stock-btn" onclick="saveSms()">💾 Save SMS Settings</button>
+    <div style="font-size:0.75rem;color:var(--muted);margin-top:8px">Only urgent alarms are texted: 🚨🚨 overbooked, 🚨 sold out, 🏷️ deal finished, and 1–3 ⭐ reviews.</div>`;
+  el.innerHTML = s.configured
+    ? `<div style="font-weight:700;color:var(--teal);margin-bottom:8px">✅ Texting urgent alarms to ${escapeHtml(s.toMasked)}</div>
+       <button class="stock-btn" onclick="alarmAction('testSms','Test text sent — check your phone 📱')">📱 Send Test Text</button>
+       <button class="stock-btn ghost" style="margin-top:8px" onclick="document.getElementById('smsSetup').style.display='block'">Change SMS settings</button>
+       <div id="smsSetup" style="display:none;margin-top:12px">${setup}</div>`
+    : setup;
+}
+
+async function saveSms() {
+  const v = id => document.getElementById(id).value.trim();
+  try {
+    await stockApi('setSmsConfig', { sid: v('twSid'), authToken: v('twToken'), from: v('twFrom'), to: v('twTo') });
+    showToast('SMS settings saved — tap Send Test Text');
+    fetchStockOverview();
+  } catch (err) { showToast(err.message, 'warn'); }
 }
 
 async function saveTgToken() {

@@ -860,7 +860,7 @@ function getStockOverview() {
     });
     var alarm = getAlarmStatus();
     if (alarm.connected) _ensureTelegramTriggers(); // cheap no-op once installed
-    return { ok: true, items: items, deals: _readJsonProp(DEALS_PROP, []), alarm: alarm };
+    return { ok: true, items: items, deals: _readJsonProp(DEALS_PROP, []), alarm: alarm, sms: getSmsStatus() };
   } catch (err) {
     return _fail('getStockOverview', err);
   }
@@ -984,8 +984,11 @@ function _stockAlarmsAfterBooking(p, r) {
     });
     if (r.dealNote) lines.push(r.dealNote);
     // New-booking ping carries Confirm/Decline buttons (handled by pollTelegram).
-    try { _tgSendButtons('🏄 ' + lines.join('\n'), _bookingButtons(p.ref, p.phone)); }
-    catch (tgErr) { _logError('_stockAlarmsAfterBooking.tg', tgErr); }
+    // Skipped for bookings the owner just logged via /book — they're already confirmed.
+    if (p.source !== 'WhatsApp') {
+      try { _tgSendButtons('🏄 ' + lines.join('\n'), _bookingButtons(p.ref, p.phone)); }
+      catch (tgErr) { _logError('_stockAlarmsAfterBooking.tg', tgErr); }
+    }
 
     if (r.short.length) {
       _alarm('OVERBOOKED ' + p.ref, '🚨🚨 OVERBOOKED — ' + p.ref + ' (' + guest + ', ' + String(p.phone || 'no phone') + ')\n' +
@@ -1081,6 +1084,64 @@ function _tgSend(text) {
   return !!(res && res.ok);
 }
 
+// ── SMS ALARMS (Twilio) — urgent alarms only, for when the owner has no data ──
+// Owner creates the Twilio account and enters the details in admin; nothing
+// is sent until then. SMS costs money per text, so only urgent alarms
+// (overbooked, sold out, deal finished, 1-3 star reviews) go by SMS.
+var TW_SID_PROP = 'TW_ACCOUNT_SID', TW_TOKEN_PROP = 'TW_AUTH_TOKEN', TW_FROM_PROP = 'TW_FROM', TW_TO_PROP = 'TW_TO';
+
+function getSmsStatus() {
+  var props = PropertiesService.getScriptProperties();
+  var to = props.getProperty(TW_TO_PROP) || '';
+  return { configured: !!(props.getProperty(TW_SID_PROP) && props.getProperty(TW_TOKEN_PROP) && props.getProperty(TW_FROM_PROP) && to),
+    toMasked: to ? to.slice(0, 2) + '•••' + to.slice(-4) : '' };
+}
+
+function setSmsConfig(p) {
+  try {
+    var sid = String((p && p.sid) || '').trim(), token = String((p && p.authToken) || '').trim();
+    var from = String((p && p.from) || '').replace(/[^\d+]/g, ''), to = String((p && p.to) || '').replace(/[^\d+]/g, '');
+    if (!/^AC[a-fA-F0-9]{32}$/.test(sid)) return { ok: false, error: 'Account SID should start with AC and be 34 characters' };
+    if (!/^[a-fA-F0-9]{32}$/.test(token)) return { ok: false, error: 'Auth Token should be 32 letters/numbers' };
+    if (!/^\+\d{8,15}$/.test(from)) return { ok: false, error: 'Twilio number must start with + and country code, e.g. +15615550100' };
+    if (!/^\+\d{8,15}$/.test(to)) return { ok: false, error: 'Your phone must start with + and country code, e.g. +15619389675' };
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty(TW_SID_PROP, sid); props.setProperty(TW_TOKEN_PROP, token);
+    props.setProperty(TW_FROM_PROP, from); props.setProperty(TW_TO_PROP, to);
+    return { ok: true };
+  } catch (err) {
+    return _fail('setSmsConfig', err);
+  }
+}
+
+function _smsSend(text) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var sid = props.getProperty(TW_SID_PROP), token = props.getProperty(TW_TOKEN_PROP);
+    var from = props.getProperty(TW_FROM_PROP), to = props.getProperty(TW_TO_PROP);
+    if (!sid || !token || !from || !to) return { ok: false, error: 'SMS not set up' };
+    var res = UrlFetchApp.fetch('https://api.twilio.com/2010-04-01/Accounts/' + sid + '/Messages.json', {
+      method: 'post', muteHttpExceptions: true,
+      headers: { Authorization: 'Basic ' + Utilities.base64Encode(sid + ':' + token) },
+      payload: { To: to, From: from, Body: 'APR: ' + String(text).slice(0, 300) }
+    });
+    var code = res.getResponseCode();
+    if (code >= 200 && code < 300) return { ok: true };
+    var msg = '';
+    try { msg = JSON.parse(res.getContentText()).message || ''; } catch (e) {}
+    _logError('_smsSend', new Error('Twilio HTTP ' + code + ' ' + msg));
+    return { ok: false, error: msg || ('Twilio error ' + code) };
+  } catch (err) {
+    _logError('_smsSend', err);
+    return { ok: false, error: 'Could not reach Twilio' };
+  }
+}
+
+function testSms() {
+  var r = _smsSend('Test text from Aquatic Paradise — SMS alarms are working.');
+  return r.ok ? { ok: true } : r;
+}
+
 // ── TELEGRAM OPERATIONS: booking buttons, daily briefing, /today ──
 // Telegram can push button taps to a webhook, but Apps Script answers every
 // POST with a 302 redirect, which Telegram treats as a failure and retries —
@@ -1128,7 +1189,9 @@ function _ensureTelegramTriggers() {
 }
 
 function pollTelegram() {
-  var lock = LockService.getScriptLock();
+  // User lock, not script lock: a /book save calls saveBooking(), which takes
+  // the script lock itself for its stock check.
+  var lock = LockService.getUserLock();
   if (!lock.tryLock(0)) return; // previous run still going
   try {
     var props = PropertiesService.getScriptProperties();
@@ -1155,9 +1218,11 @@ function pollTelegram() {
 }
 
 function _handleTgMessage(msg) {
-  var text = String(msg.text || '').trim().toLowerCase();
+  var raw = String(msg.text || '').trim();
+  var text = raw.toLowerCase();
   if (text === '/today' || text === 'today') { _sendBriefing(); return; }
-  _tgSend('Commands: /today — today\'s briefing. Booking alerts have Confirm/Decline buttons.');
+  if (/^\/book\b/.test(text)) { _startBookDraft(raw); return; }
+  _tgSend('Commands:\n/today — today\'s briefing\n/book — log a WhatsApp booking (send /book for how)\n\nBooking alerts have Confirm/Decline buttons.');
 }
 
 function _handleTgTap(cb, ownerChat) {
@@ -1166,11 +1231,30 @@ function _handleTgTap(cb, ownerChat) {
   if (!msg.chat || String(msg.chat.id) !== ownerChat) { answer('Not allowed'); return; }
   var parts = String(cb.data || '').split('|');
   var action = parts[0], ref = parts.slice(1).join('|');
-  var b = _findBooking(ref);
   var edit = function (suffix, keyboard) {
     _tgApi('editMessageText', { chat_id: msg.chat.id, message_id: msg.message_id,
       text: String(msg.text || '').split('\n\n➡️')[0] + (suffix ? '\n\n➡️ ' + suffix : ''), reply_markup: keyboard || { inline_keyboard: [] } });
   };
+
+  // /book drafts: s = save, n = cancel (ref here is the draft id)
+  if (action === 's') {
+    var saved = _saveBookDraft(ref);
+    if (!saved.ok) { answer(saved.error); return; } // e.g. double tap — keep the "SAVED" line as is
+    answer('Saved ✅');
+    var waS = _waLink(saved.booking.phone, 'Hi ' + saved.booking.name.split(' ')[0] + ', your Aquatic Paradise booking ' + saved.ref +
+      ' is confirmed ✅ ' + saved.booking.gear + ', ' + saved.booking.datetime.replace('T', ' ') + '. See you soon!');
+    edit('✅ SAVED as ' + saved.ref + ' (confirmed) — now in admin, Dispatch and stock',
+      waS ? { inline_keyboard: [[{ text: '💬 Send guest confirmation', url: waS }]] } : null);
+    return;
+  }
+  if (action === 'n') {
+    PropertiesService.getScriptProperties().deleteProperty('bookdraft_' + ref);
+    answer('Cancelled');
+    edit('❌ Cancelled — nothing saved');
+    return;
+  }
+
+  var b = _findBooking(ref);
 
   if (!b) {
     answer('Booking not found');
@@ -1202,6 +1286,186 @@ function _handleTgTap(cb, ownerChat) {
   } else {
     answer('');
   }
+}
+
+// ── /book: LOG A WHATSAPP BOOKING FROM TELEGRAM ──
+// "/book 2 paddle boards, sat 10am, 1 hour, John Smith 784-555-1234"
+// Parsed loosely, shown back with price + stock, and only saved when the
+// owner taps Save — a misread line never becomes a booking silently.
+// Prices mirror GEAR/PACKAGES in index.html.
+var PRICES = {
+  SUP:  { '1 Hour': 20, 'Full Day': 50, 'Weekend (2 days)': 90, 'Week (7 days)': 250 },
+  KAY2: { '1 Hour': 50, 'Full Day': 50, 'Week (7 days)': 100 },
+  SNK:  { '1 Hour': 10, 'Full Day': 20, 'Weekend (2 days)': 35, 'Week (7 days)': 90 },
+  FLT:  { '1 Hour': 8,  'Full Day': 15, 'Weekend (2 days)': 25, 'Week (7 days)': 60 },
+  FLC:  { '1 Hour': 10, 'Full Day': 20, 'Weekend (2 days)': 35, 'Week (7 days)': 90 },
+  BPG:  { '1 Hour': 8,  'Full Day': 15, 'Weekend (2 days)': 25, 'Week (7 days)': 60 }
+};
+var PACKAGE_PRICES = { 'Family Package': 150, 'Paddle Board + Snorkel Duo': 190, 'Combo for 2': 220, 'Day Rental Combo': 160, 'Premium Paddle': 270 };
+// Order matters: "paddle games" must win over "paddle board".
+var BOOK_GEAR_WORDS = [
+  [/\b(paddle\s*games?|beach\s*paddles?|rackets?)\b/i, 'BPG'],
+  [/\b(lounge|lounger|chairs?)\b/i, 'FLC'],
+  [/\b(tubes?|floats?|floaters?|floating\s*tubes?)\b/i, 'FLT'],
+  [/\b(snorkel\w*|masks?)\b/i, 'SNK'],
+  [/\bkayaks?\b/i, 'KAY2'],
+  [/\b(paddle\s*boards?|paddleboards?|boards?|sups?|isups?)\b/i, 'SUP']
+];
+var BOOK_PACKAGE_WORDS = [
+  [/family/i, 'Family Package'], [/duo/i, 'Paddle Board + Snorkel Duo'], [/combo\s*for\s*2|couple/i, 'Combo for 2'],
+  [/day\s*(rental\s*)?combo/i, 'Day Rental Combo'], [/premium/i, 'Premium Paddle']
+];
+var BOOK_HELP = 'To log a WhatsApp booking, send one line like:\n' +
+  '/book 2 paddle boards, 1 snorkel, sat 10am, 1 hour, John Smith 784-555-1234\n\n' +
+  'Gear: paddle board, kayak, snorkel, tube, lounge chair, paddle games — or a package (family, duo, combo for 2, day combo, premium).\n' +
+  'When: today / tomorrow / sat / 27/9, plus a time like 10am.\n' +
+  'Length: 1 hour, full day, weekend, week.\n' +
+  'I\'ll show you what I understood — nothing is saved until you tap ✅ Save.';
+
+function _parseBookText(raw) {
+  var tz = Session.getScriptTimeZone();
+  var warn = [];
+  var text = String(raw || '').replace(/^\/book(@\w+)?/i, '').trim();
+
+  // Phone first, then strip it so its digits can't be read as a date/time/qty.
+  var phoneM = text.match(/\+?\d[\d\s\-().]{5,}\d/);
+  var phone = phoneM ? phoneM[0].trim() : '';
+  if (phoneM) text = text.replace(phoneM[0], ' ');
+
+  var segs = text.split(/[,;\n]+/).map(function (s) { return s.trim(); }).filter(Boolean);
+  var gear = {}, pkg = '', nameSeg = '';
+  var isWhen = function (s) {
+    return /\b(today|tonight|tomorrow|tmrw?|mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)[a-z]*\b|\d{1,2}\s*[:.]?\s*\d{0,2}\s*(am|pm)\b|\b\d{1,2}:\d{2}\b|\b\d{1,2}[\/\-]\d{1,2}\b|\b(hour|hr|full\s*day|all\s*day|weekend|week|days?)\b/i.test(s);
+  };
+  segs.forEach(function (s) {
+    for (var i = 0; i < BOOK_PACKAGE_WORDS.length; i++) {
+      if (BOOK_PACKAGE_WORDS[i][0].test(s) && /pack|package|combo|duo|premium|family/i.test(s)) { pkg = BOOK_PACKAGE_WORDS[i][1]; return; }
+    }
+    for (var j = 0; j < BOOK_GEAR_WORDS.length; j++) {
+      if (BOOK_GEAR_WORDS[j][0].test(s)) {
+        var q = s.match(/(?:^|[\sx×])(\d{1,2})(?=[\sx×]|$)/i);
+        var key = BOOK_GEAR_WORDS[j][1];
+        gear[key] = (gear[key] || 0) + (q ? parseInt(q[1], 10) : 1);
+        return;
+      }
+    }
+    if (!isWhen(s) && !nameSeg) nameSeg = s; // first leftover segment = guest name
+  });
+
+  // Length
+  var all = segs.join(' ');
+  var duration = '';
+  if (pkg) duration = 'Full Day';
+  else if (/weekend|2\s*days?/i.test(all)) duration = 'Weekend (2 days)';
+  else if (/\bweek\b|7\s*days?/i.test(all)) duration = 'Week (7 days)';
+  else if (/full\s*day|all\s*day|\bday\b/i.test(all)) duration = 'Full Day';
+  else if (/\b(1\s*)?(hour|hr|h)\b/i.test(all)) duration = '1 Hour';
+  else { duration = '1 Hour'; warn.push('No length given — assumed 1 hour'); }
+
+  // Date (local island time)
+  var now = new Date();
+  var parts = Utilities.formatDate(now, tz, 'yyyy,M,d,u,H,m').split(',').map(Number);
+  var y = parts[0], mo = parts[1], d = parts[2], dow = parts[3];
+  var dayOffset = null, explicit = null;
+  var wd = all.match(/\b(mon|tue|wed|thu|fri|sat|sun)[a-z]*\b/i);
+  var dm = all.match(/\b(\d{1,2})[\/\-](\d{1,2})\b/);
+  if (/\btoday|tonight\b/i.test(all)) dayOffset = 0;
+  else if (/\btomorrow|\btmrw?\b/i.test(all)) dayOffset = 1;
+  else if (wd) {
+    var target = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].indexOf(wd[1].toLowerCase()) + 1;
+    dayOffset = (target - dow + 7) % 7;
+  } else if (dm) {
+    explicit = { d: parseInt(dm[1], 10), m: parseInt(dm[2], 10) }; // day/month, island style
+  }
+
+  // Time
+  var hh = null, mm = 0;
+  var ap = all.match(/\b(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)\b/i);
+  var h24 = all.match(/\b(\d{1,2}):(\d{2})\b/);
+  if (ap) {
+    hh = parseInt(ap[1], 10) % 12 + (ap[3].toLowerCase() === 'pm' ? 12 : 0);
+    mm = ap[2] ? parseInt(ap[2], 10) : 0;
+  } else if (h24) {
+    hh = parseInt(h24[1], 10); mm = parseInt(h24[2], 10);
+  }
+  if (hh === null || hh > 23 || mm > 59) { hh = 10; mm = 0; warn.push('No time given — assumed 10:00 AM'); }
+
+  var dateObj;
+  if (explicit) {
+    dateObj = new Date(y, explicit.m - 1, explicit.d);
+    if (dateObj.getTime() < new Date(y, mo - 1, d).getTime() - 86400000) dateObj = new Date(y + 1, explicit.m - 1, explicit.d);
+  } else {
+    if (dayOffset === null) { dayOffset = 0; warn.push('No day given — assumed today'); }
+    dateObj = new Date(y, mo - 1, d + dayOffset);
+  }
+  var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+  var datetime = dateObj.getFullYear() + '-' + pad(dateObj.getMonth() + 1) + '-' + pad(dateObj.getDate()) + 'T' + pad(hh) + ':' + pad(mm);
+
+  // Name
+  var name = String(nameSeg || '').replace(/[^\p{L}\s'.-]/gu, '').replace(/\s+/g, ' ').trim();
+  if (!name) { name = 'WhatsApp Guest'; warn.push('No guest name found'); }
+  if (!phone) warn.push('No phone number found');
+
+  // Gear text + price, in the same format the website saves
+  var gearText = '', total = 0;
+  if (pkg) {
+    gearText = pkg; total = PACKAGE_PRICES[pkg] || 0;
+  } else {
+    gearText = Object.keys(gear).map(function (k) { return GEAR_LABELS[k] + ' x' + gear[k]; }).join(', ');
+    Object.keys(gear).forEach(function (k) {
+      var price = PRICES[k] && PRICES[k][duration];
+      if (price === undefined) warn.push(GEAR_LABELS[k] + ' has no ' + duration + ' price — counted as 0');
+      total += (price || 0) * gear[k];
+    });
+  }
+  return { gear: gearText, duration: duration, datetime: datetime, name: name, phone: phone, total: total, warn: warn };
+}
+
+function _startBookDraft(msgText) {
+  if (!/\S/.test(String(msgText).replace(/^\/book(@\w+)?/i, ''))) { _tgSend(BOOK_HELP); return; }
+  var b = _parseBookText(msgText);
+  if (!b.gear) { _tgSend('I couldn\'t find any gear in that.\n\n' + BOOK_HELP); return; }
+  var id = Date.now().toString(36);
+  PropertiesService.getScriptProperties().setProperty('bookdraft_' + id, JSON.stringify(b));
+
+  var lines = ['📝 WhatsApp booking — check this:', '',
+    'Gear: ' + b.gear, 'When: ' + b.datetime.replace('T', ' ') + ' (' + b.duration + ')',
+    'Guest: ' + b.name + (b.phone ? ' · ' + b.phone : ''), 'Total: XCD ' + b.total];
+  try {
+    var w = _bookingWindow(b.datetime, b.duration);
+    var avail = _availabilityFor(w.start, w.end);
+    var wanted = _parseGearQty(b.gear);
+    Object.keys(wanted).forEach(function (k) {
+      var a = avail[k];
+      if (!a || a.left === null) return;
+      lines.push(wanted[k] > a.left
+        ? '⚠️ ' + GEAR_LABELS[k] + ': only ' + a.left + ' left — saving will OVERBOOK'
+        : '✅ ' + GEAR_LABELS[k] + ': ' + a.left + ' left');
+    });
+  } catch (err) { _logError('_startBookDraft.stock', err); }
+  if (b.warn.length) lines.push('', 'ℹ️ ' + b.warn.join('\nℹ️ '));
+  lines.push('', 'Wrong? Tap Cancel and send /book again.');
+  _tgSendButtons(lines.join('\n'), { inline_keyboard: [[{ text: '✅ Save booking', callback_data: 's|' + id }, { text: '❌ Cancel', callback_data: 'n|' + id }]] });
+}
+
+function _saveBookDraft(id) {
+  var props = PropertiesService.getScriptProperties();
+  var raw = props.getProperty('bookdraft_' + id);
+  if (!raw) return { ok: false, error: 'Already saved or cancelled' };
+  props.deleteProperty('bookdraft_' + id);
+  var b = JSON.parse(raw);
+  var nameParts = b.name.split(' ');
+  var ref = 'APR-' + Date.now().toString(36).toUpperCase().slice(-6);
+  var res = saveBooking({
+    ref: ref, fname: nameParts[0], lname: nameParts.slice(1).join(' ') || '(WhatsApp)',
+    phone: b.phone || 'N/A', email: '', datetime: b.datetime, groupSize: '', gear: b.gear,
+    duration: b.duration, total: b.total, referral: 'WhatsApp',
+    notes: '📱 Booked via WhatsApp (logged from Telegram) — waiver NOT signed yet, get it at handover',
+    waiverAccepted: false, waiverTimestamp: '', source: 'WhatsApp'
+  });
+  if (!res || !res.ok) return { ok: false, error: (res && res.error) || 'Save failed' };
+  updateStatus({ ref: ref, status: 'confirmed' }); // owner took it directly — already confirmed
+  return { ok: true, ref: ref, booking: b };
 }
 
 // ── 7AM DAILY BRIEFING (also on demand: send "/today" to the bot) ──
@@ -1281,6 +1545,7 @@ function _feedbackAlarm(p) {
     if (low) {
       try { GmailApp.sendEmail(NOTIFY_EMAIL, 'APR ALARM: low rating ' + rating + '/5 on ' + p.ref, text); }
       catch (mailErr) { _logError('_feedbackAlarm.email', mailErr); }
+      _smsSend(text);
     }
   } catch (err) {
     _logError('_feedbackAlarm', err);
@@ -1293,6 +1558,7 @@ function _feedbackAlarm(p) {
 function _alarm(title, text, urgent) {
   try { _tgSend(text); } catch (err) { _logError('_alarm.telegram', err); }
   if (!urgent) return;
+  _smsSend(text); // no-op until Twilio is set up in admin; never throws
   try { GmailApp.sendEmail(NOTIFY_EMAIL, 'APR ALARM: ' + title, text); }
   catch (err2) { _logError('_alarm.email', err2); }
 }
@@ -2025,7 +2291,7 @@ function doPost(e) {
     if (payload.action === 'getAvailability') {
       return _json(getAvailability(payload));
     }
-    if (['getStockOverview', 'setStock', 'createDeal', 'endDeal', 'setTelegramToken', 'connectTelegram', 'testAlarm', 'sendBriefing'].indexOf(payload.action) !== -1) {
+    if (['getStockOverview', 'setStock', 'createDeal', 'endDeal', 'setTelegramToken', 'connectTelegram', 'testAlarm', 'sendBriefing', 'setSmsConfig', 'testSms'].indexOf(payload.action) !== -1) {
       // Owner-only: stock counts, deals and the alarm phone.
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       if (payload.action === 'getStockOverview') return _json(getStockOverview());
@@ -2035,6 +2301,8 @@ function doPost(e) {
       if (payload.action === 'setTelegramToken') return _json(setTelegramToken(payload));
       if (payload.action === 'connectTelegram') return _json(connectTelegram());
       if (payload.action === 'sendBriefing') { _sendBriefing(); return _json({ ok: true }); }
+      if (payload.action === 'setSmsConfig') return _json(setSmsConfig(payload));
+      if (payload.action === 'testSms') return _json(testSms());
       return _json(testAlarm());
     }
     if (payload.action === 'getServiceStatus') {
