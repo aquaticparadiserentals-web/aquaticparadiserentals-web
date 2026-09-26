@@ -1187,11 +1187,12 @@ window.addEventListener('DOMContentLoaded', () => {
   renderRates();
   updateSummary();
 
-  // Default datetime to tomorrow 10am
+  // Default datetime to tomorrow 10am. Built from local date parts — the old
+  // toISOString() version converted to UTC, so island guests saw 2pm.
   const d = new Date();
   d.setDate(d.getDate() + 1);
-  d.setHours(10, 0, 0, 0);
-  document.getElementById('datetime').value = d.toISOString().slice(0,16);
+  const pad = n => String(n).padStart(2, '0');
+  document.getElementById('datetime').value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T10:00`;
 
   loadWeatherBanner();
   loadTeamPublic();
