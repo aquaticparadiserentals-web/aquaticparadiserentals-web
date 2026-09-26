@@ -1689,7 +1689,7 @@ function getBookings(limit) {
 // unrecognized (e.g. a package's "Full Day") falls back to a conservative
 // 2-hour window so the conflict check stays a useful heuristic rather than
 // silently skipping those bookings.
-var DURATION_MINUTES = { '30 min': 30, '1 Hour': 60, '2 Hours': 120, 'Half Day': 240, 'Full Day': 480 };
+var DURATION_MINUTES = { '30 min': 30, '1 Hour': 60, '2 Hours': 120, 'Half Day': 240, 'Full Day': 480, 'Weekend (2 days)': 2880, 'Week (7 days)': 10080 };
 function _durationMinutes(label) {
   return DURATION_MINUTES[String(label || '').trim()] || 120;
 }

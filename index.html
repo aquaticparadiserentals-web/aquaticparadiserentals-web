@@ -546,8 +546,9 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
   <div class="info-card" style="padding:0;overflow:hidden">
     <div class="rates-scroll">
       <table class="rates-table">
-        <thead><tr><th data-i18n="th_gear">Gear</th><th data-i18n="dur_30min">30 min</th><th data-i18n="dur_1hr">1 hr</th><th data-i18n="dur_2hr">2 hr</th><th data-i18n="dur_halfday">Half Day</th>
+        <thead><tr><th data-i18n="th_gear">Gear</th><th data-i18n="dur_1hr">1 hr</th>
               <th style="color:#03939E" data-i18n="th_fullday">Full Day</th>
+              <th data-i18n="th_weekend">Weekend (2 days)</th>
               <th style="color:#FBC62C" data-i18n="th_weekly">Weekly</th></tr></thead>
         <tbody id="ratesBody"></tbody>
       </table>
@@ -749,7 +750,7 @@ const TRANSLATIONS = {
     btn_book_another:'Book Another ↺', btn_whatsapp:'💬 Message Us on WhatsApp',
     price_guide_title:'💰 Price Guide', price_guide_sub:'All prices in Eastern Caribbean Dollars (XCD). USD approx. ÷ 2.7',
     section_individual_gear:'Individual Gear', th_gear:'Gear', dur_30min:'30 min', dur_1hr:'1 hr', dur_2hr:'2 hr', dur_halfday:'Half Day',
-    th_fullday:'Full Day', th_weekly:'Weekly', swipe_hint:'👈 Swipe sideways to see all prices 👉', section_packages:'Packages',
+    th_fullday:'Full Day', th_weekend:'Weekend (2 days)', th_weekly:'Week (7 days)', swipe_hint:'👈 Swipe sideways to see all prices 👉', section_packages:'Packages',
     pricing_notes_title:'📌 Pricing Notes', pricing_note_1:'Life jackets / PFDs included free with all gear',
     pricing_note_2:'Safety whistle provided on each rental', pricing_note_3:'Group discounts available — ask on WhatsApp',
     pricing_note_4:'Hotel partner rates negotiated separately', pricing_note_5:'Payment accepted: Cash (XCD/USD), bank transfer, card arrangements via WhatsApp',
@@ -793,7 +794,7 @@ const TRANSLATIONS = {
     btn_book_another:'Faire une autre réservation ↺', btn_whatsapp:'💬 Contactez-nous sur WhatsApp',
     price_guide_title:'💰 Guide des tarifs', price_guide_sub:"Tous les prix sont en dollars des Caraïbes orientales (XCD). Environ ÷ 2,7 pour l'USD.",
     section_individual_gear:'Matériel individuel', th_gear:'Matériel', dur_30min:'30 min', dur_1hr:'1 h', dur_2hr:'2 h', dur_halfday:'Demi-journée',
-    th_fullday:'Journée complète', th_weekly:'Semaine', swipe_hint:'👈 Faites défiler pour voir tous les prix 👉', section_packages:'Forfaits',
+    th_fullday:'Journée complète', th_weekend:'Week-end (2 jours)', th_weekly:'Semaine', swipe_hint:'👈 Faites défiler pour voir tous les prix 👉', section_packages:'Forfaits',
     pricing_notes_title:'📌 Notes tarifaires', pricing_note_1:'Gilets de sauvetage inclus gratuitement avec tout le matériel',
     pricing_note_2:'Sifflet de sécurité fourni à chaque location', pricing_note_3:'Réductions de groupe disponibles — demandez sur WhatsApp',
     pricing_note_4:'Tarifs partenaires hôteliers négociés séparément', pricing_note_5:'Paiement accepté : espèces (XCD/USD), virement bancaire, carte via WhatsApp',
@@ -837,7 +838,7 @@ const TRANSLATIONS = {
     btn_book_another:'Boka igen ↺', btn_whatsapp:'💬 Meddela oss på WhatsApp',
     price_guide_title:'💰 Prisguide', price_guide_sub:'Alla priser i östkaribiska dollar (XCD). USD ca ÷ 2,7.',
     section_individual_gear:'Individuell utrustning', th_gear:'Utrustning', dur_30min:'30 min', dur_1hr:'1 tim', dur_2hr:'2 tim', dur_halfday:'Halvdag',
-    th_fullday:'Heldag', th_weekly:'Vecka', swipe_hint:'👈 Svep i sidled för att se alla priser 👉', section_packages:'Paket',
+    th_fullday:'Heldag', th_weekend:'Helg (2 dagar)', th_weekly:'Vecka', swipe_hint:'👈 Svep i sidled för att se alla priser 👉', section_packages:'Paket',
     pricing_notes_title:'📌 Prisanmärkningar', pricing_note_1:'Flytvästar ingår gratis med all utrustning',
     pricing_note_2:'Säkerhetsvissla ingår vid varje uthyrning', pricing_note_3:'Grupprabatter tillgängliga — fråga på WhatsApp',
     pricing_note_4:'Hotellpartnerpriser förhandlas separat', pricing_note_5:'Betalning accepteras: kontant (XCD/USD), banköverföring, kortarrangemang via WhatsApp',
@@ -881,7 +882,7 @@ const TRANSLATIONS = {
     btn_book_another:'Hacer otra reserva ↺', btn_whatsapp:'💬 Escríbenos por WhatsApp',
     price_guide_title:'💰 Guía de precios', price_guide_sub:'Todos los precios en dólares del Caribe oriental (XCD). USD aprox. ÷ 2.7',
     section_individual_gear:'Equipo individual', th_gear:'Equipo', dur_30min:'30 min', dur_1hr:'1 h', dur_2hr:'2 h', dur_halfday:'Medio día',
-    th_fullday:'Día completo', th_weekly:'Semanal', swipe_hint:'👈 Desliza hacia los lados para ver todos los precios 👉', section_packages:'Paquetes',
+    th_fullday:'Día completo', th_weekend:'Fin de semana (2 días)', th_weekly:'Semanal', swipe_hint:'👈 Desliza hacia los lados para ver todos los precios 👉', section_packages:'Paquetes',
     pricing_notes_title:'📌 Notas de precios', pricing_note_1:'Chalecos salvavidas incluidos gratis con todo el equipo',
     pricing_note_2:'Silbato de seguridad incluido en cada alquiler', pricing_note_3:'Descuentos de grupo disponibles — pregunta por WhatsApp',
     pricing_note_4:'Tarifas de socios hoteleros negociadas por separado', pricing_note_5:'Pago aceptado: efectivo (XCD/USD), transferencia bancaria, tarjeta mediante WhatsApp',
@@ -925,7 +926,7 @@ const TRANSLATIONS = {
     btn_book_another:'Weitere Buchung ↺', btn_whatsapp:'💬 Schreib uns auf WhatsApp',
     price_guide_title:'💰 Preisübersicht', price_guide_sub:'Alle Preise in Ostkaribischen Dollar (XCD). USD ca. ÷ 2,7',
     section_individual_gear:'Einzelne Ausrüstung', th_gear:'Ausrüstung', dur_30min:'30 Min', dur_1hr:'1 Std', dur_2hr:'2 Std', dur_halfday:'Halber Tag',
-    th_fullday:'Ganzer Tag', th_weekly:'Wöchentlich', swipe_hint:'👈 Seitlich wischen, um alle Preise zu sehen 👉', section_packages:'Pakete',
+    th_fullday:'Ganzer Tag', th_weekend:'Wochenende (2 Tage)', th_weekly:'Wöchentlich', swipe_hint:'👈 Seitlich wischen, um alle Preise zu sehen 👉', section_packages:'Pakete',
     pricing_notes_title:'📌 Preishinweise', pricing_note_1:'Schwimmwesten kostenlos bei jeder Ausrüstung enthalten',
     pricing_note_2:'Sicherheitspfeife bei jeder Ausleihe enthalten', pricing_note_3:'Gruppenrabatte verfügbar — frag auf WhatsApp',
     pricing_note_4:'Hotelpartnertarife separat verhandelt', pricing_note_5:'Zahlung akzeptiert: Bar (XCD/USD), Banküberweisung, Kartenvereinbarung über WhatsApp',
@@ -969,7 +970,7 @@ const TRANSLATIONS = {
     btn_book_another:'Prenota di nuovo ↺', btn_whatsapp:'💬 Scrivici su WhatsApp',
     price_guide_title:'💰 Guida ai prezzi', price_guide_sub:'Tutti i prezzi in dollari dei Caraibi orientali (XCD). USD circa ÷ 2,7',
     section_individual_gear:'Attrezzatura singola', th_gear:'Attrezzatura', dur_30min:'30 min', dur_1hr:'1 ora', dur_2hr:'2 ore', dur_halfday:'Mezza giornata',
-    th_fullday:'Giornata intera', th_weekly:'Settimanale', swipe_hint:'👈 Scorri lateralmente per vedere tutti i prezzi 👉', section_packages:'Pacchetti',
+    th_fullday:'Giornata intera', th_weekend:'Weekend (2 giorni)', th_weekly:'Settimanale', swipe_hint:'👈 Scorri lateralmente per vedere tutti i prezzi 👉', section_packages:'Pacchetti',
     pricing_notes_title:'📌 Note sui prezzi', pricing_note_1:"Giubbotti salvagente inclusi gratuitamente con tutta l'attrezzatura",
     pricing_note_2:'Fischietto di sicurezza fornito con ogni noleggio', pricing_note_3:'Sconti di gruppo disponibili — chiedi su WhatsApp',
     pricing_note_4:'Tariffe partner alberghieri negoziate separatamente', pricing_note_5:'Pagamento accettato: contanti (XCD/USD), bonifico bancario, accordi con carta tramite WhatsApp',
@@ -1013,7 +1014,7 @@ const TRANSLATIONS = {
     btn_book_another:'Fazer outra reserva ↺', btn_whatsapp:'💬 Fale conosco pelo WhatsApp',
     price_guide_title:'💰 Guia de preços', price_guide_sub:'Todos os preços em dólares do Caribe Oriental (XCD). USD aprox. ÷ 2,7',
     section_individual_gear:'Equipamento individual', th_gear:'Equipamento', dur_30min:'30 min', dur_1hr:'1 h', dur_2hr:'2 h', dur_halfday:'Meio dia',
-    th_fullday:'Dia inteiro', th_weekly:'Semanal', swipe_hint:'👈 Deslize para o lado para ver todos os preços 👉', section_packages:'Pacotes',
+    th_fullday:'Dia inteiro', th_weekend:'Fim de semana (2 dias)', th_weekly:'Semanal', swipe_hint:'👈 Deslize para o lado para ver todos os preços 👉', section_packages:'Pacotes',
     pricing_notes_title:'📌 Notas sobre preços', pricing_note_1:'Coletes salva-vidas incluídos gratuitamente com todo o equipamento',
     pricing_note_2:'Apito de segurança fornecido em cada aluguel', pricing_note_3:'Descontos para grupos disponíveis — pergunte pelo WhatsApp',
     pricing_note_4:'Tarifas de parceiros hoteleiros negociadas separadamente', pricing_note_5:'Pagamento aceito: dinheiro (XCD/USD), transferência bancária, cartão combinado pelo WhatsApp',
@@ -1057,7 +1058,7 @@ const TRANSLATIONS = {
     btn_book_another:'Nog een boeking maken ↺', btn_whatsapp:'💬 Stuur ons een bericht op WhatsApp',
     price_guide_title:'💰 Prijsgids', price_guide_sub:'Alle prijzen in Oost-Caribische dollar (XCD). USD ca. ÷ 2,7',
     section_individual_gear:'Individuele uitrusting', th_gear:'Uitrusting', dur_30min:'30 min', dur_1hr:'1 uur', dur_2hr:'2 uur', dur_halfday:'Halve dag',
-    th_fullday:'Hele dag', th_weekly:'Wekelijks', swipe_hint:'👈 Veeg zijwaarts om alle prijzen te zien 👉', section_packages:'Pakketten',
+    th_fullday:'Hele dag', th_weekend:'Weekend (2 dagen)', th_weekly:'Wekelijks', swipe_hint:'👈 Veeg zijwaarts om alle prijzen te zien 👉', section_packages:'Pakketten',
     pricing_notes_title:'📌 Prijsopmerkingen', pricing_note_1:'Reddingsvesten gratis inbegrepen bij alle uitrusting',
     pricing_note_2:'Veiligheidsfluitje bij elke verhuur inbegrepen', pricing_note_3:'Groepskortingen beschikbaar — vraag op WhatsApp',
     pricing_note_4:'Hotelpartnertarieven apart onderhandeld', pricing_note_5:'Betaling geaccepteerd: contant (XCD/USD), bankoverschrijving, kaartregeling via WhatsApp',
@@ -1117,30 +1118,26 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// Prices verified against the printed rate card (price charts Aquatic
-// paradise rentals.pdf) 2026-09-03. Half Day was previously priced ABOVE
-// Full Day on every item (e.g. Paddle Board HD $110 vs FD $50) — a leftover
-// from before Full Day/Weekly were corrected to match the card; Half Day
-// was never re-derived. Fixed here so price strictly decreases per-hour as
-// duration increases (a bulk-rate curve, consistent with the card's own
-// Full Day being cheaper per hour than the 2-hour rate): HD interpolated
-// between the 2-hour and Full Day rate. Floater weekly ($10) filled from
-// the card, which was previously left blank. Kayak (Single) isn't on the
-// rate card at all — only "Double Kayak" is listed — so it's marked
-// comingSoon instead of guessing a price.
+// Prices match the "Rental Price Chart — Bequia" image (2026-09-26):
+// Hour / Day / Weekend (2 days) / Week (7 days). The chart has no 30-min,
+// 2-hour or half-day tier, so those were dropped. Kayaks aren't on the
+// chart — the Double keeps its existing hour/day/week prices (no weekend
+// price), and the Single stays comingSoon.
 const GEAR = [
-  { id:'SUP',  icon:'🏄', name:'Paddle Board',    codes:'PB',  price30:25, price60:40, price120:70, priceHD:60, priceFD:50,  priceWK:90  },
-  { id:'KAY',  icon:'🚣', name:'Kayak (Single)',   codes:'KY',  comingSoon:true },
-  { id:'KAY2', icon:'🚣', name:'Kayak (Double)',   codes:'KY',  price30:30, price60:50, price120:85, priceHD:75, priceFD:50,  priceWK:100 },
-  { id:'SNK',  icon:'🤿', name:'Snorkel Set',      codes:'SK',  price30:15, price60:25, price120:40, priceHD:35, priceFD:20,  priceWK:20  },
-  { id:'FLT',  icon:'🏊', name:'Floater/Board',    codes:'FL',  price30:15, price60:25, price120:40, priceHD:30, priceFD:15,  priceWK:10  },
+  { id:'SUP',  icon:'🏄', name:'Paddle Board',          codes:'PB', price60:20, priceFD:50, priceWE:90, priceWK:250 },
+  { id:'KAY',  icon:'🚣', name:'Kayak (Single)',         codes:'KY', comingSoon:true },
+  { id:'KAY2', icon:'🚣', name:'Kayak (Double)',         codes:'KY', price60:50, priceFD:50,             priceWK:100 },
+  { id:'SNK',  icon:'🤿', name:'Snorkel Set',            codes:'SK', price60:10, priceFD:20, priceWE:35, priceWK:90  },
+  { id:'FLT',  icon:'🛟', name:'Floating Tube',          codes:'FL', price60:8,  priceFD:15, priceWE:25, priceWK:60  },
+  { id:'FLC',  icon:'🏊', name:'Floating Lounge Chair',  codes:'LC', price60:10, priceFD:20, priceWE:35, priceWK:90  },
+  { id:'BPG',  icon:'🏓', name:'Beach Paddle Games',     codes:'BG', price60:8,  priceFD:15, priceWE:25, priceWK:60  },
 ];
 
 const DURATIONS = [
-  { label:'30 min', mins:30, key:'price30', i18nKey:'dur_30min' },
-  { label:'1 Hour', mins:60, key:'price60', i18nKey:'dur_1hr' },
-  { label:'2 Hours', mins:120, key:'price120', i18nKey:'dur_2hr' },
-  { label:'Half Day', mins:240, key:'priceHD', i18nKey:'dur_halfday' },
+  { label:'1 Hour',           mins:60,    key:'price60', i18nKey:'dur_1hr' },
+  { label:'Full Day',         mins:480,   key:'priceFD', i18nKey:'th_fullday' },
+  { label:'Weekend (2 days)', mins:2880,  key:'priceWE', i18nKey:'th_weekend' },
+  { label:'Week (7 days)',    mins:10080, key:'priceWK', i18nKey:'th_weekly' },
 ];
 
 // Matches the printed combo package prices exactly (price charts Aquatic
@@ -1158,7 +1155,7 @@ const PACKAGES = [
 ];
 
 let selectedGear = {};
-let selectedDuration = DURATIONS[1]; // default 1 hour
+let selectedDuration = DURATIONS[0]; // default 1 hour
 let selectedPackage = null;
 
 // ── INIT ──
@@ -1339,7 +1336,7 @@ function renderGear() {
     <div class="gear-card" id="gc-${g.id}" onclick="toggleGear('${g.id}')">
       ${iconHtml}
       <div class="gear-name">${g.name}</div>
-      <div class="gear-price">from XCD ${g.price30}</div>
+      <div class="gear-price">from XCD ${g.price60}</div>
       <div class="qty-controls" onclick="event.stopPropagation()">
         <button class="qty-btn" onclick="changeQty('${g.id}',-1)">−</button>
         <span class="qty-display" id="qty-${g.id}">0</span>
@@ -1419,7 +1416,7 @@ function selectPackage(id) {
 // ── RENDER DURATIONS ──
 function renderDurations() {
   document.getElementById('durGrid').innerHTML = DURATIONS.map((d,i) => `
-    <div class="dur-btn ${i===1?'selected':''}" id="dur-${i}" onclick="selectDuration(${i})">${t(d.i18nKey, d.label)}</div>
+    <div class="dur-btn ${i===0?'selected':''}" id="dur-${i}" onclick="selectDuration(${i})">${t(d.i18nKey, d.label)}</div>
   `).join('');
 }
 
@@ -1891,20 +1888,18 @@ function renderRates() {
   tbody.innerHTML = regularGear.map(g => g.comingSoon ? `
     <tr>
       <td>${g.icon} ${g.name}</td>
-      <td colspan="6" style="color:var(--coral,#e85d4c);font-weight:700;text-align:center">Coming soon</td>
+      <td colspan="4" style="color:var(--coral,#e85d4c);font-weight:700;text-align:center">Coming soon</td>
     </tr>
   ` : `
     <tr>
       <td>${g.icon} ${g.name}</td>
-      <td>${fmt(g.price30)}</td>
       <td>${fmt(g.price60)}</td>
-      <td>${fmt(g.price120)}</td>
-      <td>${fmt(g.priceHD)}</td>
       <td style="font-weight:700;color:#03939E">${fmt(g.priceFD)}</td>
+      <td>${fmt(g.priceWE)}</td>
       <td style="color:#FBC62C;font-weight:700">${fmt(g.priceWK, true)}</td>
     </tr>
   `).join('');
-  tbody.innerHTML += '<tr style="background:#f0f9ff"><td colspan="7" style="font-size:0.72rem;color:#03939E;padding:8px 12px;white-space:normal;position:static;background:transparent">💱 USD ≈ XCD ÷ 2.7 · Life Jackets included FREE with all rentals</td></tr>';
+  tbody.innerHTML += '<tr style="background:#f0f9ff"><td colspan="5" style="font-size:0.72rem;color:#03939E;padding:8px 12px;white-space:normal;position:static;background:transparent">💱 USD ≈ XCD ÷ 2.7 · Life Jackets included FREE with all rentals</td></tr>';
 
   const pkgEl = document.getElementById('pkgRatesList');
   if (pkgEl) {

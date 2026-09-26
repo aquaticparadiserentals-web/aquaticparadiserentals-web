@@ -1073,7 +1073,9 @@ const SITE_PHOTO_SLOTS = [
   { key:'gear_KAY', label:'Kayak (Single)' },
   { key:'gear_KAY2', label:'Kayak (Double)' },
   { key:'gear_SNK', label:'Snorkel Set' },
-  { key:'gear_FLT', label:'Floater/Board' },
+  { key:'gear_FLT', label:'Floating Tube' },
+  { key:'gear_FLC', label:'Floating Lounge Chair' },
+  { key:'gear_BPG', label:'Beach Paddle Games' },
 ];
 let sitePhotosCache = {};
 
@@ -3298,20 +3300,20 @@ function showToast(msg, type='') {
       <thead>
         <tr style="background:var(--teal);color:#fff">
           <th style="padding:8px 10px;text-align:left">Gear</th>
-          <th style="padding:8px 6px;text-align:center">30 min</th>
           <th style="padding:8px 6px;text-align:center">1 hr</th>
-          <th style="padding:8px 6px;text-align:center">2 hr</th>
-          <th style="padding:8px 6px;text-align:center">½ Day</th>
           <th style="padding:8px 6px;text-align:center;color:var(--gold)">Full Day</th>
-          <th style="padding:8px 6px;text-align:center;color:var(--gold)">Weekly</th>
+          <th style="padding:8px 6px;text-align:center">Weekend (2 days)</th>
+          <th style="padding:8px 6px;text-align:center;color:var(--gold)">Week (7 days)</th>
         </tr>
       </thead>
       <tbody>
-        <tr style="border-bottom:1px solid var(--line)"><td style="padding:7px 10px">🏄 Paddle Board</td><td style="text-align:center">$25</td><td style="text-align:center">$40</td><td style="text-align:center">$70</td><td style="text-align:center">$60</td><td style="text-align:center;font-weight:700;color:var(--teal)">$50</td><td style="text-align:center;color:var(--gold);font-weight:700">$90</td></tr>
-        <tr style="border-bottom:1px solid var(--line);background:var(--bg)"><td style="padding:7px 10px">🚣 Kayak (Single)</td><td colspan="6" style="text-align:center;color:var(--coral);font-weight:700">Coming soon — not on rate card yet</td></tr>
-        <tr style="border-bottom:1px solid var(--line)"><td style="padding:7px 10px">🚣 Kayak (Double)</td><td style="text-align:center">$30</td><td style="text-align:center">$50</td><td style="text-align:center">$85</td><td style="text-align:center">$75</td><td style="text-align:center;font-weight:700;color:var(--teal)">$50</td><td style="text-align:center;color:var(--gold);font-weight:700">$100</td></tr>
-        <tr style="border-bottom:1px solid var(--line);background:var(--bg)"><td style="padding:7px 10px">🤿 Snorkel Set</td><td style="text-align:center">$15</td><td style="text-align:center">$25</td><td style="text-align:center">$40</td><td style="text-align:center">$35</td><td style="text-align:center;font-weight:700;color:var(--teal)">$20</td><td style="text-align:center;color:var(--gold);font-weight:700">$20</td></tr>
-        <tr><td style="padding:7px 10px">🏊 Floater/Board</td><td style="text-align:center">$15</td><td style="text-align:center">$25</td><td style="text-align:center">$40</td><td style="text-align:center">$30</td><td style="text-align:center;font-weight:700;color:var(--teal)">$15</td><td style="text-align:center;color:var(--gold);font-weight:700">$10</td></tr>
+        <tr style="border-bottom:1px solid var(--line)"><td style="padding:7px 10px">🏄 Paddle Board</td><td style="text-align:center">$20</td><td style="text-align:center;font-weight:700;color:var(--teal)">$50</td><td style="text-align:center">$90</td><td style="text-align:center;color:var(--gold);font-weight:700">$250</td></tr>
+        <tr style="border-bottom:1px solid var(--line);background:var(--bg)"><td style="padding:7px 10px">🚣 Kayak (Single)</td><td colspan="4" style="text-align:center;color:var(--coral);font-weight:700">Coming soon — not on rate card yet</td></tr>
+        <tr style="border-bottom:1px solid var(--line)"><td style="padding:7px 10px">🚣 Kayak (Double)</td><td style="text-align:center">$50</td><td style="text-align:center;font-weight:700;color:var(--teal)">$50</td><td style="text-align:center">–</td><td style="text-align:center;color:var(--gold);font-weight:700">$100</td></tr>
+        <tr style="border-bottom:1px solid var(--line);background:var(--bg)"><td style="padding:7px 10px">🤿 Snorkel Set</td><td style="text-align:center">$10</td><td style="text-align:center;font-weight:700;color:var(--teal)">$20</td><td style="text-align:center">$35</td><td style="text-align:center;color:var(--gold);font-weight:700">$90</td></tr>
+        <tr style="border-bottom:1px solid var(--line)"><td style="padding:7px 10px">🛟 Floating Tube</td><td style="text-align:center">$8</td><td style="text-align:center;font-weight:700;color:var(--teal)">$15</td><td style="text-align:center">$25</td><td style="text-align:center;color:var(--gold);font-weight:700">$60</td></tr>
+        <tr style="border-bottom:1px solid var(--line);background:var(--bg)"><td style="padding:7px 10px">🏊 Floating Lounge Chair</td><td style="text-align:center">$10</td><td style="text-align:center;font-weight:700;color:var(--teal)">$20</td><td style="text-align:center">$35</td><td style="text-align:center;color:var(--gold);font-weight:700">$90</td></tr>
+        <tr><td style="padding:7px 10px">🏓 Beach Paddle Games</td><td style="text-align:center">$8</td><td style="text-align:center;font-weight:700;color:var(--teal)">$15</td><td style="text-align:center">$25</td><td style="text-align:center;color:var(--gold);font-weight:700">$60</td></tr>
       </tbody>
     </table>
     <p style="font-size:0.72rem;color:var(--teal);padding:8px 10px;margin:0">🆓 Life Jackets / PFDs included FREE with all rentals</p>
