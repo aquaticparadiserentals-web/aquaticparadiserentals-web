@@ -2444,7 +2444,15 @@ function renderAlarm() {
   const tg = stockOverview.alarm || {};
   const el = document.getElementById('tgCard');
   if (tg.connected) {
+    const mins = tg.lastPoll ? Math.round((Date.now() - new Date(tg.lastPoll).getTime()) / 60000) : null;
+    const pollOk = tg.pollOn && mins !== null && mins <= 5;
+    const health = [
+      pollOk ? `🟢 Bot checked messages ${mins < 1 ? 'just now' : mins + ' min ago'}` : `🔴 Bot isn't reading messages${mins !== null ? ' (last ' + mins + ' min ago)' : ''} — reopen this page; if it stays red, tell Claude`,
+      tg.briefingOn ? '🟢 7am briefing on' : '🔴 7am briefing off',
+      tg.weatherOn ? '🟢 Weather checks on' : '🔴 Weather checks off'
+    ].join('<br>');
     el.innerHTML = `<div style="font-weight:700;color:var(--teal);margin-bottom:6px">✅ Connected${tg.botName ? ' to @' + escapeHtml(tg.botName) : ''}</div>
+      <div style="font-size:0.78rem;line-height:1.7;margin-bottom:10px">${health}</div>
       <div style="font-size:0.78rem;color:var(--muted);margin-bottom:10px">You get every new booking (with the guest's phone), plus 🚨 sold out, 🚨🚨 overbooked and deal finished. Urgent ones also go to your email.</div>
       <div style="font-size:0.78rem;color:var(--muted);margin-bottom:10px">📋 Booking alerts have <b>✅ Confirm / ❌ Decline</b> buttons (a tap takes up to a minute to apply). ☀️ A briefing arrives every morning around 7am — or send <b>/today</b> to the bot anytime. 📱 Log WhatsApp bookings by sending <b>/book</b> to the bot. ⭐ Reviews arrive instantly; 1–3 stars come as 🚨.</div>
       <button class="stock-btn" onclick="alarmAction('testAlarm','Test alarm sent — check Telegram 🔔')">🔔 Send Test Alarm</button>

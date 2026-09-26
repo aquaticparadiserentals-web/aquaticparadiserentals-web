@@ -946,6 +946,7 @@ function _reserveStockForBooking(p) {
       result.after[k] = { left: a.left - wanted[k], total: a.total };
     });
 
+    var dealOff = 0; // discount the server agrees with, for the price check below
     var dealIds = Array.isArray(p.dealIds) ? p.dealIds.slice(0, 10).map(String) : [];
     if (dealIds.length) {
       var deals = _readJsonProp(DEALS_PROP, []);
@@ -960,11 +961,25 @@ function _reserveStockForBooking(p) {
           return;
         }
         deal.used += units;
+        dealOff += Math.round(((PRICES[deal.gear] || {})[p.duration] || 0) * units * deal.pct / 100);
         if (deal.used >= deal.cap) { deal.active = false; result.dealSoldOut.push(deal); }
         notes.push('🏷️ Deal ' + deal.pct + '% off ' + GEAR_LABELS[deal.gear] + ' x' + units);
       });
       PropertiesService.getScriptProperties().setProperty(DEALS_PROP, JSON.stringify(deals));
       result.dealNote = notes.join(' · ');
+    }
+
+    // Price check: the booking page works out the total on the guest's
+    // device, so recompute it here. Flag (don't silently change) a mismatch —
+    // the guest was shown their number, so the owner decides what to charge.
+    var expected = _expectedTotal(p.gear, p.duration);
+    if (expected !== null) {
+      expected = Math.max(0, expected - dealOff);
+      var charged = Number(p.total) || 0;
+      if (Math.abs(charged - expected) > 0.5) {
+        var pn = '⚠️ PRICE CHECK: page charged XCD ' + charged + ', price list says XCD ' + expected;
+        result.dealNote = result.dealNote ? result.dealNote + ' · ' + pn : pn;
+      }
     }
   } catch (err) {
     _logError('_reserveStockForBooking', err);
@@ -1015,8 +1030,12 @@ var TG_BOT_NAME_PROP = 'TG_BOT_NAME';
 
 function getAlarmStatus() {
   var props = PropertiesService.getScriptProperties();
+  var triggers = {};
+  try { ScriptApp.getProjectTriggers().forEach(function (t) { triggers[t.getHandlerFunction()] = true; }); }
+  catch (err) { _logError('getAlarmStatus.triggers', err); }
   return { hasToken: !!props.getProperty(TG_TOKEN_PROP), connected: !!props.getProperty(TG_CHAT_PROP),
-    botName: props.getProperty(TG_BOT_NAME_PROP) || '' };
+    botName: props.getProperty(TG_BOT_NAME_PROP) || '', lastPoll: props.getProperty(TG_LAST_POLL_PROP) || '',
+    pollOn: !!triggers.pollTelegram, briefingOn: !!triggers.dailyBriefing, weatherOn: !!triggers.dailyWeatherCheck };
 }
 
 function _tgApi(method, payload) {
@@ -1148,6 +1167,7 @@ function testSms() {
 // so instead a 1-minute trigger polls getUpdates. Taps land within ~1 minute.
 // Only taps/messages from the connected owner chat are ever acted on.
 var TG_OFFSET_PROP = 'TG_UPDATE_OFFSET';
+var TG_LAST_POLL_PROP = 'TG_LAST_POLL';
 
 // WhatsApp links use the existing _waLink(phone, text) helper further down.
 function _bookingButtons(ref, phone) {
@@ -1197,6 +1217,7 @@ function pollTelegram() {
     var props = PropertiesService.getScriptProperties();
     var chat = props.getProperty(TG_CHAT_PROP);
     if (!chat) return;
+    props.setProperty(TG_LAST_POLL_PROP, new Date().toISOString()); // health check shown in admin
     var offset = Number(props.getProperty(TG_OFFSET_PROP)) || 0;
     var upd = _tgApi('getUpdates', { offset: offset, timeout: 0, allowed_updates: ['callback_query', 'message'] });
     if (!upd || !upd.ok || !upd.result.length) return;
@@ -1321,6 +1342,24 @@ var BOOK_HELP = 'To log a WhatsApp booking, send one line like:\n' +
   'When: today / tomorrow / sat / 27/9, plus a time like 10am.\n' +
   'Length: 1 hour, full day, weekend, week.\n' +
   'I\'ll show you what I understood — nothing is saved until you tap ✅ Save.';
+
+// Price-list total for a booking's gear text, or null if anything in it
+// isn't recognised (then no price check is made rather than a false alarm).
+function _expectedTotal(gearText, duration) {
+  var text = String(gearText || '').trim();
+  if (!text) return null;
+  for (var name in PACKAGE_PRICES) {
+    if (text.indexOf(name) === 0) return PACKAGE_PRICES[name];
+  }
+  var total = 0, recognised = true;
+  text.split(',').forEach(function (part) {
+    var m = part.trim().match(/^(.*?)\s*x\s*(\d+)$/i);
+    var key = GEAR_BY_NAME[m ? m[1].trim() : part.trim()];
+    if (!key || !PRICES[key]) { recognised = false; return; }
+    total += (PRICES[key][duration] || 0) * (m ? parseInt(m[2], 10) : 1);
+  });
+  return recognised ? total : null;
+}
 
 function _parseBookText(raw) {
   var tz = Session.getScriptTimeZone();
