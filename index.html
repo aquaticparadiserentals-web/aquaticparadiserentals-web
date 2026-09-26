@@ -112,6 +112,17 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 .section-title{font-size:.95rem;font-weight:600;color:var(--ink);margin:22px 0 12px;letter-spacing:-.005em}
 .gear-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:22px}
 .gear-card{background:var(--card);border-radius:var(--radius);padding:16px 14px;box-shadow:var(--shadow);border:1px solid var(--line);cursor:pointer;transition:border-color .15s,box-shadow .15s;position:relative}
+.perks{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.perk{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 10px;text-align:center;box-shadow:var(--shadow)}
+.perk-icon{font-size:1.4rem}
+.perk-title{font-size:0.78rem;font-weight:700;color:var(--teal-ink);margin-top:4px}
+.perk-sub{font-size:0.7rem;color:var(--muted);margin-top:2px;line-height:1.3}
+.perk-sub a{color:var(--teal);font-weight:600}
+.perk.off{opacity:0.7}
+.perk.off .perk-title{color:var(--coral);text-decoration:line-through}
+.unavail{font-size:0.72rem;font-weight:700;color:var(--coral);margin-top:3px;line-height:1.3}
+.notice-off{background:rgba(214,58,58,.08);border:1px solid rgba(214,58,58,.3);color:var(--coral);border-radius:var(--radius);padding:10px 12px;font-size:0.8rem;font-weight:600;margin-bottom:12px}
+@media (max-width:420px){.perks{gap:6px}.perk{padding:10px 6px}.perk-title{font-size:0.72rem}.perk-sub{font-size:0.66rem}}
 .gear-card.selected{border-color:var(--teal);box-shadow:0 0 0 3px rgba(14,124,144,.12)}
 .gear-card .gear-icon{font-size:1.6rem;margin-bottom:8px}
 .gear-card .gear-photo{width:100%;height:84px;object-fit:cover;border-radius:6px;margin-bottom:8px;display:block}
@@ -312,6 +323,10 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
     <div class="tagline" data-i18n="hero_tagline">🌊 The Caribbean at your pace</div>
   </div>
 
+  <!-- Perks from the printed price chart. Delivery/Tours can be switched off
+       by staff in dispatch.html (Equipment & Services) — see renderPerks(). -->
+  <div class="perks" id="perks"></div>
+
   <!-- APR Founder's Slogan — rotating quote slide. Add more slides by pushing
        another {quote, author} object into APR_QUOTE_SLIDES below; the JS
        below handles rotation/dots automatically once there's more than one. -->
@@ -369,6 +384,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
   <!-- STEP 1: GEAR -->
   <div id="step-gear">
     <div class="section-title" data-i18n="step1_title">1 · Choose Your Gear</div>
+    <div class="notice-off" id="deliveryNotice" style="display:none"></div>
     <div class="gear-grid" id="gearGrid">
       <!-- Rendered by JS -->
     </div>
@@ -563,6 +579,8 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
     <h3 data-i18n="pricing_notes_title">📌 Pricing Notes</h3>
     <ul>
       <li data-i18n="pricing_note_1">Life jackets / PFDs included free with all gear</li>
+      <li>Free delivery to any beach in Bequia</li>
+      <li>Guided tours available from our safety boat — ask on WhatsApp</li>
       <li data-i18n="pricing_note_2">Safety whistle provided on each rental</li>
       <li data-i18n="pricing_note_3">Group discounts available — ask on WhatsApp</li>
       <li data-i18n="pricing_note_4">Hotel partner rates negotiated separately</li>
@@ -1147,11 +1165,11 @@ const DURATIONS = [
 // real 5, so replaced outright rather than patched. None involve kayaks,
 // which conveniently sidesteps the Kayak (Single) comingSoon gap too.
 const PACKAGES = [
-  { id:'PKG_FAM',  name:'Family Package 👨‍👩‍👧‍👦',    desc:'2× Paddle Boards + 1× Floater + Snorkel Gear',        price:150, duration:'Full Day' },
-  { id:'PKG_DUO',  name:'Paddle Board + Snorkel Duo 🌊', desc:'1× Paddle Board + 2× Snorkel Gear Sets',              price:190, duration:'Full Day' },
-  { id:'PKG_C2',   name:'Combo for 2 💑',              desc:'1× Paddle Board + 2× Snorkel Gear Sets + Life Jackets', price:220, duration:'Full Day' },
-  { id:'PKG_DAY',  name:'Day Rental Combo ☀️',          desc:'1× Paddle Board + Full Snorkel Gear Set + Life Jacket', price:160, duration:'Full Day' },
-  { id:'PKG_PREM', name:'Premium Paddle + 2 Snorkel Sets 🌴', desc:'Best snorkeling experience for two — full equipment', price:270, duration:'Full Day' },
+  { id:'PKG_FAM',  name:'Family Package 👨‍👩‍👧‍👦',    desc:'2× Paddle Boards + 1× Floater + Snorkel Gear',        price:150, duration:'Full Day', uses:['SUP','FLT','SNK'] },
+  { id:'PKG_DUO',  name:'Paddle Board + Snorkel Duo 🌊', desc:'1× Paddle Board + 2× Snorkel Gear Sets',              price:190, duration:'Full Day', uses:['SUP','SNK'] },
+  { id:'PKG_C2',   name:'Combo for 2 💑',              desc:'1× Paddle Board + 2× Snorkel Gear Sets + Life Jackets', price:220, duration:'Full Day', uses:['SUP','SNK'] },
+  { id:'PKG_DAY',  name:'Day Rental Combo ☀️',          desc:'1× Paddle Board + Full Snorkel Gear Set + Life Jacket', price:160, duration:'Full Day', uses:['SUP','SNK'] },
+  { id:'PKG_PREM', name:'Premium Paddle + 2 Snorkel Sets 🌴', desc:'Best snorkeling experience for two — full equipment', price:270, duration:'Full Day', uses:['SUP','SNK'] },
 ];
 
 let selectedGear = {};
@@ -1175,6 +1193,8 @@ window.addEventListener('DOMContentLoaded', () => {
   loadWeatherBanner();
   loadTeamPublic();
   loadSitePhotos();
+  renderPerks();
+  loadServiceStatus();
 
   const savedLang = localStorage.getItem('apr_lang') || 'en';
   highlightActiveLang(savedLang);
@@ -1190,6 +1210,60 @@ function driveThumbUrl(url, size) {
 
 // ── SITE PHOTOS (hero background + gear card images, set via admin → Photos) ──
 let sitePhotos = {};
+// ── SERVICE STATUS (staff switch items off in dispatch.html → Equipment & Services) ──
+// { SUP: {off:true, reason:'Boat under maintenance'}, DELIVERY: {...}, ... }
+// Anything missing is available. Fails open: if the backend is unreachable,
+// everything shows as available rather than blocking bookings.
+let serviceStatus = {};
+async function loadServiceStatus() {
+  try {
+    const res = await fetch(BACKEND+'?action=getServiceStatus',{signal:AbortSignal.timeout(8000)});
+    const data = await res.json();
+    if (data && data.ok) serviceStatus = data.status || {};
+  } catch (err) { /* fail open */ }
+  // Drop anything already in the cart that staff just turned off.
+  Object.keys(selectedGear).forEach(id => { if (isOff(id)) delete selectedGear[id]; });
+  if (selectedPackage && packageBlocked(PACKAGES.find(p => p.id === selectedPackage))) selectedPackage = null;
+  renderPerks();
+  renderGear();
+  renderPackages();
+  renderPackageUI();
+  renderRates();
+}
+function isOff(key) { return !!(serviceStatus[key] && serviceStatus[key].off); }
+function offReason(key) {
+  const r = serviceStatus[key] && serviceStatus[key].reason;
+  return 'Not available at the moment' + (r ? ' — ' + escapeHtmlText(r) : '');
+}
+function escapeHtmlText(val) {
+  return String(val == null ? '' : val).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+function packageBlocked(p) { return !!(p && (p.uses || []).some(isOff)); }
+
+function renderPerks() {
+  const el = document.getElementById('perks');
+  if (!el) return;
+  const tourLink = 'https://wa.me/17844963447?text=' + encodeURIComponent("Hi APR, I'd like to ask about a guided tour.");
+  const perks = [
+    { icon:'🦺', title:'Life Jackets Included', sub:'All rentals' },
+    { icon:'📍', title:'Free Delivery', sub:'To any beach in Bequia', key:'DELIVERY' },
+    { icon:'🚤', title:'Guided Tours', sub:`From our safety boat · <a href="${tourLink}" target="_blank" rel="noopener">Ask us</a>`, key:'TOURS' },
+  ];
+  el.innerHTML = perks.map(p => {
+    const off = p.key && isOff(p.key);
+    return `<div class="perk ${off?'off':''}">
+      <div class="perk-icon">${p.icon}</div>
+      <div class="perk-title">${p.title}</div>
+      ${off ? `<div class="unavail">${offReason(p.key)}</div>` : `<div class="perk-sub">${p.sub}</div>`}
+    </div>`;
+  }).join('');
+  const notice = document.getElementById('deliveryNotice');
+  if (notice) {
+    notice.style.display = isOff('DELIVERY') ? 'block' : 'none';
+    notice.innerHTML = isOff('DELIVERY') ? `📍 Beach delivery: ${offReason('DELIVERY')}. You can still book — we'll confirm pickup details on WhatsApp.` : '';
+  }
+}
+
 async function loadSitePhotos() {
   try {
     const res = await fetch(BACKEND+'?action=getSitePhotos',{signal:AbortSignal.timeout(8000)});
@@ -1325,27 +1399,37 @@ async function loadWeatherBanner() {
 
 // ── RENDER GEAR ──
 function renderGear() {
-  const regularGear = GEAR.filter(g => !g.isPackage && !g.comingSoon);
+  const regularGear = GEAR.filter(g => !g.isPackage && !g.comingSoon && !isOff(g.id));
+  const offGear = GEAR.filter(g => !g.isPackage && !g.comingSoon && isOff(g.id));
   const comingSoonGear = GEAR.filter(g => !g.isPackage && g.comingSoon);
-  document.getElementById('gearGrid').innerHTML = regularGear.map(g => {
+  const iconFor = g => {
     const photo = sitePhotos['gear_'+g.id];
-    const iconHtml = photo
+    return photo
       ? `<img class="gear-photo" src="${driveThumbUrl(photo,300)}" alt="${g.name}">`
       : `<div class="gear-icon">${g.icon}</div>`;
+  };
+  document.getElementById('gearGrid').innerHTML = regularGear.map(g => {
+    const qty = selectedGear[g.id] || 0;
     return `
-    <div class="gear-card" id="gc-${g.id}" onclick="toggleGear('${g.id}')">
-      ${iconHtml}
+    <div class="gear-card ${qty?'selected':''}" id="gc-${g.id}" onclick="toggleGear('${g.id}')">
+      ${iconFor(g)}
       <div class="gear-name">${g.name}</div>
       <div class="gear-price">from XCD ${g.price60}</div>
       <div class="qty-controls" onclick="event.stopPropagation()">
         <button class="qty-btn" onclick="changeQty('${g.id}',-1)">−</button>
-        <span class="qty-display" id="qty-${g.id}">0</span>
+        <span class="qty-display" id="qty-${g.id}">${qty}</span>
         <button class="qty-btn" onclick="changeQty('${g.id}',1)">+</button>
       </div>
       <div class="gear-check">✓</div>
     </div>
   `;
-  }).join('') + comingSoonGear.map(g => `
+  }).join('') + offGear.map(g => `
+    <div class="gear-card" style="opacity:0.6;cursor:default" title="Not available at the moment">
+      ${iconFor(g)}
+      <div class="gear-name">${g.name}</div>
+      <div class="unavail">⛔ ${offReason(g.id)}</div>
+    </div>
+  `).join('') + comingSoonGear.map(g => `
     <div class="gear-card" style="opacity:0.55;cursor:default;position:relative" title="Coming soon — not yet available to book">
       <div class="gear-icon">${g.icon}</div>
       <div class="gear-name">${g.name}</div>
@@ -1366,6 +1450,7 @@ function toggleGear(id) {
 }
 
 function changeQty(id, delta) {
+  if (delta > 0 && isOff(id)) return;
   const cur = selectedGear[id] || 0;
   const next = Math.max(0, cur + delta);
   if (next === 0) {
@@ -1382,15 +1467,19 @@ function changeQty(id, delta) {
 
 // ── RENDER PACKAGES ──
 function renderPackages() {
-  document.getElementById('pkgList').innerHTML = PACKAGES.map(p => `
-    <div class="pkg-card" id="pkg-${p.id}" onclick="selectPackage('${p.id}')">
+  document.getElementById('pkgList').innerHTML = PACKAGES.map(p => {
+    const blockedBy = (p.uses || []).find(isOff);
+    return `
+    <div class="pkg-card" id="pkg-${p.id}" onclick="selectPackage('${p.id}')" ${blockedBy ? 'style="opacity:0.6;cursor:default"' : ''}>
       <div class="pkg-info">
         <div class="pkg-name">${p.name} <span class="pkg-tag">${p.duration}</span></div>
         <div class="pkg-desc">${p.desc}</div>
+        ${blockedBy ? `<div class="unavail">⛔ ${offReason(blockedBy)}</div>` : ''}
       </div>
       <div class="pkg-price">XCD ${p.price}</div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function renderPackageUI() {
@@ -1401,6 +1490,7 @@ function renderPackageUI() {
 }
 
 function selectPackage(id) {
+  if (packageBlocked(PACKAGES.find(p => p.id === id))) return;
   selectedGear = {};
   GEAR.forEach(g => {
     const el = document.getElementById('gc-'+g.id);
@@ -1892,7 +1982,7 @@ function renderRates() {
     </tr>
   ` : `
     <tr>
-      <td>${g.icon} ${g.name}</td>
+      <td>${g.icon} ${g.name}${isOff(g.id) ? '<div class="unavail" style="font-weight:600">⛔ Not available right now</div>' : ''}</td>
       <td>${fmt(g.price60)}</td>
       <td style="font-weight:700;color:#03939E">${fmt(g.priceFD)}</td>
       <td>${fmt(g.priceWE)}</td>

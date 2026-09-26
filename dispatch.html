@@ -45,6 +45,28 @@ header p{font-size:0.72rem;color:var(--muted);margin-top:2px}
 .btn.wa{background:#25D366;text-decoration:none;text-align:center;display:flex;align-items:center;justify-content:center}
 .empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:0.85rem}
 .refresh{width:100%;padding:10px;background:var(--surface);border:1px solid var(--line);color:var(--ink);border-radius:8px;font-weight:700;font-size:0.82rem;margin-bottom:14px}
+.svc-panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;margin-bottom:14px}
+.svc-panel summary{padding:12px 14px;font-weight:800;font-size:0.9rem;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.svc-panel summary::-webkit-details-marker{display:none}
+.svc-count{font-size:0.7rem;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(79,184,204,0.18);color:var(--teal)}
+.svc-count.warn{background:rgba(240,101,95,0.18);color:var(--coral)}
+.svc-body{padding:0 14px 12px}
+.svc-help{font-size:0.72rem;color:var(--muted);margin-bottom:10px}
+.svc-row{border-top:1px solid var(--line);padding:10px 0}
+.svc-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.svc-name{font-weight:700;font-size:0.88rem}
+.svc-state{font-size:0.72rem;font-weight:700;margin-top:2px}
+.svc-state.on{color:var(--teal)}
+.svc-state.off{color:var(--coral)}
+.svc-toggle{padding:8px 12px;border-radius:8px;border:none;font-weight:700;font-size:0.75rem;cursor:pointer;white-space:nowrap}
+.svc-toggle.turn-off{background:var(--coral);color:#fff}
+.svc-toggle.turn-on{background:var(--teal);color:var(--navy)}
+.svc-reason{display:none;margin-top:8px}
+.svc-reason.open{display:block}
+.svc-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.svc-chip{padding:6px 10px;border-radius:20px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:0.72rem;cursor:pointer}
+.svc-chip.picked{border-color:var(--coral);color:var(--coral)}
+.svc-input{width:100%;padding:9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:0.8rem;margin-bottom:8px}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--line);color:var(--ink);padding:10px 18px;border-radius:8px;font-size:0.8rem;z-index:999;display:none}
 </style>
 </head>
@@ -77,6 +99,13 @@ header p{font-size:0.72rem;color:var(--muted);margin-top:2px}
     <p>Name · gear · time · location only — no pricing shown here</p>
   </header>
   <div style="padding:14px">
+    <details class="svc-panel" id="svcPanel">
+      <summary>🛠️ Equipment &amp; Services <span class="svc-count" id="svcCount">Loading…</span></summary>
+      <div class="svc-body">
+        <div class="svc-help">Turn something off when it can't be used (boat maintenance, weather, all booked out…). Guests see "Not available at the moment" with your reason on the booking page right away.</div>
+        <div id="svcList"></div>
+      </div>
+    </details>
     <button class="refresh" onclick="fetchDispatch()">🔄 Refresh</button>
     <div id="list"></div>
   </div>
@@ -131,6 +160,7 @@ async function checkPin() {
     document.getElementById('pinScreen').style.display='none';
     document.getElementById('app').style.display='block';
     fetchDispatch();
+    fetchServiceStatus();
     startDispatchPolling();
   } else {
     showToast('Wrong PIN');
@@ -297,6 +327,87 @@ function shareLocation(ref) {
   }, err => {
     showToast('Location denied or unavailable');
   }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+// ── EQUIPMENT & SERVICES on/off (read publicly by index.html) ──
+// Keys must match SERVICE_KEYS in Code.gs and the GEAR ids in index.html.
+const SERVICES = [
+  { key:'DELIVERY', name:'📍 Free Beach Delivery' },
+  { key:'TOURS',    name:'🚤 Guided Tours (safety boat)' },
+  { key:'SUP',      name:'🏄 Paddle Boards' },
+  { key:'KAY2',     name:'🚣 Kayak (Double)' },
+  { key:'SNK',      name:'🤿 Snorkel Sets' },
+  { key:'FLT',      name:'🛟 Floating Tubes' },
+  { key:'FLC',      name:'🏊 Floating Lounge Chairs' },
+  { key:'BPG',      name:'🏓 Beach Paddle Games' },
+];
+const SERVICE_REASONS = ['Boat under maintenance', 'Equipment under maintenance', 'Weather conditions', 'All booked out'];
+let serviceStatus = {};
+
+async function fetchServiceStatus() {
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'getServiceStatus'}),signal:AbortSignal.timeout(10000)});
+    const data = await res.json();
+    if (data && data.ok) serviceStatus = data.status || {};
+    renderServices();
+  } catch (err) {
+    document.getElementById('svcCount').textContent = 'Could not load';
+  }
+}
+
+function renderServices() {
+  const offCount = SERVICES.filter(s => serviceStatus[s.key]).length;
+  const count = document.getElementById('svcCount');
+  count.textContent = offCount ? `${offCount} not available` : 'All available';
+  count.classList.toggle('warn', offCount > 0);
+  document.getElementById('svcList').innerHTML = SERVICES.map(s => {
+    const st = serviceStatus[s.key];
+    return `<div class="svc-row">
+      <div class="svc-top">
+        <div>
+          <div class="svc-name">${s.name}</div>
+          <div class="svc-state ${st?'off':'on'}">${st ? '⛔ Not available' + (st.reason ? ' — ' + escapeHtml(st.reason) : '') : '✅ Available'}</div>
+        </div>
+        ${st
+          ? `<button class="svc-toggle turn-on" onclick="saveService('${s.key}', false)">Make Available</button>`
+          : `<button class="svc-toggle turn-off" onclick="openReason('${s.key}')">Turn Off</button>`}
+      </div>
+      <div class="svc-reason" id="svcReason-${s.key}">
+        <div class="svc-chips">${SERVICE_REASONS.map(r => `<button class="svc-chip" onclick="pickReason('${s.key}', this)">${r}</button>`).join('')}</div>
+        <input class="svc-input" id="svcInput-${s.key}" maxlength="120" placeholder="Reason guests will see (optional)">
+        <div class="actions" style="margin-top:0">
+          <button class="btn" style="background:var(--coral)" onclick="saveService('${s.key}', true)">⛔ Mark Not Available</button>
+          <button class="btn" style="background:#3a4a5c" onclick="openReason('${s.key}')">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openReason(key) {
+  document.getElementById('svcReason-'+key)?.classList.toggle('open');
+}
+
+function pickReason(key, chip) {
+  chip.parentElement.querySelectorAll('.svc-chip').forEach(c => c.classList.remove('picked'));
+  chip.classList.add('picked');
+  document.getElementById('svcInput-'+key).value = chip.textContent;
+}
+
+async function saveService(key, off) {
+  const reason = off ? (document.getElementById('svcInput-'+key)?.value || '').trim() : '';
+  try {
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'setServiceStatus', token:STAFF_TOKEN, key, off, reason
+    }),signal:AbortSignal.timeout(15000)});
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error((data&&data.error)||'Failed');
+    serviceStatus = data.status || {};
+    renderServices();
+    showToast(off ? 'Marked not available ⛔' : 'Available again ✅');
+  } catch (err) {
+    showToast('Could not update: '+err.message);
+  }
 }
 
 async function setStatus(ref, status) {

@@ -675,6 +675,53 @@ function getSitePhotos() {
   return out;
 }
 
+// ── SERVICE STATUS (staff on/off switches, set from dispatch.html) ──
+// Lets staff mark a gear item, beach delivery, or guided tours as "not
+// available at the moment" with a short reason (boat maintenance, weather,
+// etc.). Read publicly by index.html so guests see it before booking.
+// Stored as one JSON blob in Script Properties — tiny, rarely-changed config.
+var SERVICE_KEYS = ['SUP', 'KAY2', 'SNK', 'FLT', 'FLC', 'BPG', 'DELIVERY', 'TOURS'];
+var SERVICE_STATUS_PROP = 'service_status';
+var MAX_SERVICE_REASON_LEN = 120;
+
+function getServiceStatus() {
+  try {
+    var raw = PropertiesService.getScriptProperties().getProperty(SERVICE_STATUS_PROP);
+    var parsed = raw ? JSON.parse(raw) : {};
+    var out = {};
+    SERVICE_KEYS.forEach(function (key) {
+      if (parsed[key] && parsed[key].off) out[key] = parsed[key];
+    });
+    return out;
+  } catch (err) {
+    _logError('getServiceStatus', err);
+    return {};
+  }
+}
+
+function setServiceStatus(p) {
+  var lock = LockService.getScriptLock();
+  try {
+    var key = String((p && p.key) || '');
+    if (SERVICE_KEYS.indexOf(key) === -1) return { ok: false, error: 'Unknown item.' };
+    lock.waitLock(10000);
+    var status = getServiceStatus();
+    if (p.off) {
+      var reason = String(p.reason || '').replace(/\s+/g, ' ').trim().slice(0, MAX_SERVICE_REASON_LEN);
+      status[key] = { off: true, reason: reason, at: new Date().toISOString() };
+    } else {
+      delete status[key];
+    }
+    PropertiesService.getScriptProperties().setProperty(SERVICE_STATUS_PROP, JSON.stringify(status));
+    return { ok: true, status: status };
+  } catch (err) {
+    _logError('setServiceStatus', err);
+    return { ok: false, error: GENERIC_ERROR };
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
 // ── DRIVERS (shared across staff — same sheet/GAS backend as bookings) ──
 function getDrivers() {
   try {
@@ -1245,6 +1292,10 @@ function doGet(e) {
       // public booking page to display.
       return _json({ ok: true, photos: getSitePhotos() });
     }
+    if (p.action === 'getServiceStatus') {
+      // Public — guests need to see what's unavailable before booking.
+      return _json({ ok: true, status: getServiceStatus() });
+    }
     if (p.action === 'getBookings') {
       if (!_authOk(p)) return _json({ ok: false, error: 'Unauthorized' });
       return _json({ ok: true, bookings: getBookings(parseInt(p.limit, 10) || 50) });
@@ -1391,6 +1442,14 @@ function doPost(e) {
     if (payload.action === 'uploadSitePhoto') {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json(uploadSitePhoto(payload));
+    }
+    if (payload.action === 'getServiceStatus') {
+      return _json({ ok: true, status: getServiceStatus() });
+    }
+    if (payload.action === 'setServiceStatus') {
+      // Staff-level on purpose — whoever is on the beach knows the boat is down.
+      if (!_dispatchAuthOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(setServiceStatus(payload));
     }
     if (payload.action === 'submit_feedback') {
       // Public — same posture as booking submission. A guest leaving
