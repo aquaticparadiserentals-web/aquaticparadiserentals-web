@@ -858,7 +858,9 @@ function getStockOverview() {
       return { key: k, label: GEAR_LABELS[k], total: n.total, repair: n.repair, outNow: n.held,
         leftNow: n.left, off: n.off, bookedToday: todayHeld[k] || 0 };
     });
-    return { ok: true, items: items, deals: _readJsonProp(DEALS_PROP, []), alarm: getAlarmStatus() };
+    var alarm = getAlarmStatus();
+    if (alarm.connected) _ensureTelegramTriggers(); // cheap no-op once installed
+    return { ok: true, items: items, deals: _readJsonProp(DEALS_PROP, []), alarm: alarm };
   } catch (err) {
     return _fail('getStockOverview', err);
   }
@@ -981,7 +983,9 @@ function _stockAlarmsAfterBooking(p, r) {
       if (a.left <= 0) soldOut.push(GEAR_LABELS[k]);
     });
     if (r.dealNote) lines.push(r.dealNote);
-    _alarm('New booking ' + p.ref, '🏄 ' + lines.join('\n'), false);
+    // New-booking ping carries Confirm/Decline buttons (handled by pollTelegram).
+    try { _tgSendButtons('🏄 ' + lines.join('\n'), _bookingButtons(p.ref, p.phone)); }
+    catch (tgErr) { _logError('_stockAlarmsAfterBooking.tg', tgErr); }
 
     if (r.short.length) {
       _alarm('OVERBOOKED ' + p.ref, '🚨🚨 OVERBOOKED — ' + p.ref + ' (' + guest + ', ' + String(p.phone || 'no phone') + ')\n' +
@@ -1032,6 +1036,7 @@ function setTelegramToken(p) {
     props.setProperty(TG_TOKEN_PROP, token);
     props.setProperty(TG_BOT_NAME_PROP, me.result.username || '');
     props.deleteProperty(TG_CHAT_PROP);
+    props.deleteProperty(TG_OFFSET_PROP);
     return { ok: true, botName: me.result.username || '' };
   } catch (err) {
     return _fail('setTelegramToken', err);
@@ -1047,7 +1052,12 @@ function connectTelegram() {
       .filter(function (m) { return m && m.chat && m.chat.type === 'private'; });
     if (!msgs.length) return { ok: false, error: 'No message found — open your bot in Telegram, send it "hi", then tap Connect again' };
     var chat = msgs[msgs.length - 1].chat;
-    PropertiesService.getScriptProperties().setProperty(TG_CHAT_PROP, String(chat.id));
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty(TG_CHAT_PROP, String(chat.id));
+    // Skip everything already sent to the bot so old taps/messages aren't replayed.
+    var lastId = (upd.result || []).reduce(function (m, u) { return Math.max(m, u.update_id); }, 0);
+    props.setProperty(TG_OFFSET_PROP, String(lastId + 1));
+    _ensureTelegramTriggers();
     _tgApi('sendMessage', { chat_id: chat.id, text: '✅ Aquatic Paradise alarms connected. Bookings, sold-out and overbooking alerts will arrive here.' });
     return { ok: true, name: [chat.first_name, chat.last_name].filter(Boolean).join(' ') };
   } catch (err) {
@@ -1069,6 +1079,212 @@ function _tgSend(text) {
   if (!chat) return false;
   var res = _tgApi('sendMessage', { chat_id: chat, text: String(text).slice(0, 4000) });
   return !!(res && res.ok);
+}
+
+// ── TELEGRAM OPERATIONS: booking buttons, daily briefing, /today ──
+// Telegram can push button taps to a webhook, but Apps Script answers every
+// POST with a 302 redirect, which Telegram treats as a failure and retries —
+// so instead a 1-minute trigger polls getUpdates. Taps land within ~1 minute.
+// Only taps/messages from the connected owner chat are ever acted on.
+var TG_OFFSET_PROP = 'TG_UPDATE_OFFSET';
+
+// WhatsApp links use the existing _waLink(phone, text) helper further down.
+function _bookingButtons(ref, phone) {
+  var rows = [[{ text: '✅ Confirm', callback_data: 'c|' + ref }, { text: '❌ Decline', callback_data: 'x|' + ref }]];
+  var wa = _waLink(phone, 'Hi, this is Aquatic Paradise Rentals about your booking ' + ref + '.');
+  if (wa) rows.push([{ text: '💬 WhatsApp guest', url: wa }]);
+  return { inline_keyboard: rows };
+}
+
+function _tgSendButtons(text, keyboard) {
+  var chat = PropertiesService.getScriptProperties().getProperty(TG_CHAT_PROP);
+  if (!chat) return false;
+  var res = _tgApi('sendMessage', { chat_id: chat, text: String(text).slice(0, 4000), reply_markup: keyboard });
+  return !!(res && res.ok);
+}
+
+function _findBooking(ref) {
+  var data = _sheet().getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][FIELDS.indexOf('ref')]) === String(ref)) {
+      var obj = {};
+      FIELDS.forEach(function (f, idx) { obj[f] = data[i][idx]; });
+      return obj;
+    }
+  }
+  return null;
+}
+
+// Makes sure the poll + 7am briefing triggers exist once Telegram is connected.
+function _ensureTelegramTriggers() {
+  try {
+    var have = {};
+    ScriptApp.getProjectTriggers().forEach(function (t) { have[t.getHandlerFunction()] = true; });
+    if (!have.pollTelegram) ScriptApp.newTrigger('pollTelegram').timeBased().everyMinutes(1).create();
+    if (!have.dailyBriefing) ScriptApp.newTrigger('dailyBriefing').timeBased().everyDays(1).atHour(7).nearMinute(0).create();
+  } catch (err) {
+    _logError('_ensureTelegramTriggers', err);
+  }
+}
+
+function pollTelegram() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(0)) return; // previous run still going
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var chat = props.getProperty(TG_CHAT_PROP);
+    if (!chat) return;
+    var offset = Number(props.getProperty(TG_OFFSET_PROP)) || 0;
+    var upd = _tgApi('getUpdates', { offset: offset, timeout: 0, allowed_updates: ['callback_query', 'message'] });
+    if (!upd || !upd.ok || !upd.result.length) return;
+    upd.result.forEach(function (u) {
+      offset = Math.max(offset, u.update_id + 1);
+      try {
+        if (u.callback_query) _handleTgTap(u.callback_query, chat);
+        else if (u.message && String(u.message.chat.id) === chat) _handleTgMessage(u.message);
+      } catch (err) {
+        _logError('pollTelegram.update', err);
+      }
+    });
+    props.setProperty(TG_OFFSET_PROP, String(offset));
+  } catch (err) {
+    _logError('pollTelegram', err);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function _handleTgMessage(msg) {
+  var text = String(msg.text || '').trim().toLowerCase();
+  if (text === '/today' || text === 'today') { _sendBriefing(); return; }
+  _tgSend('Commands: /today — today\'s briefing. Booking alerts have Confirm/Decline buttons.');
+}
+
+function _handleTgTap(cb, ownerChat) {
+  var msg = cb.message || {};
+  var answer = function (t) { _tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: t || '' }); };
+  if (!msg.chat || String(msg.chat.id) !== ownerChat) { answer('Not allowed'); return; }
+  var parts = String(cb.data || '').split('|');
+  var action = parts[0], ref = parts.slice(1).join('|');
+  var b = _findBooking(ref);
+  var edit = function (suffix, keyboard) {
+    _tgApi('editMessageText', { chat_id: msg.chat.id, message_id: msg.message_id,
+      text: String(msg.text || '').split('\n\n➡️')[0] + (suffix ? '\n\n➡️ ' + suffix : ''), reply_markup: keyboard || { inline_keyboard: [] } });
+  };
+
+  if (!b) {
+    answer('Booking not found');
+    edit('No longer in the system (deleted in admin?)');
+    return;
+  }
+  var guest = String(b.fname || 'there');
+  var status = String(b.status || '').trim(); if (!status || status === 'N/A') status = 'pending';
+
+  if (action === 'c') {
+    if (status !== 'pending') { answer('Already ' + status); edit('Already ' + status + ' — no change'); return; }
+    var r = updateStatus({ ref: ref, status: 'confirmed' });
+    if (!r.ok) { answer('Could not confirm'); return; }
+    answer('Confirmed ✅');
+    var waC = _waLink(b.phone, 'Hi ' + guest + ', your Aquatic Paradise booking ' + ref + ' is confirmed ✅ See you soon!');
+    edit('✅ CONFIRMED', waC ? { inline_keyboard: [[{ text: '💬 Tell guest it\'s confirmed', url: waC }]] } : null);
+  } else if (action === 'x') {
+    answer('Tap "Yes, decline" to confirm');
+    edit('Decline this booking?', { inline_keyboard: [[{ text: '🗑️ Yes, decline', callback_data: 'X|' + ref }, { text: '← Back', callback_data: 'b|' + ref }]] });
+  } else if (action === 'X') {
+    var d = deleteBooking({ ref: ref });
+    if (!d.ok) { answer('Could not decline'); return; }
+    answer('Declined');
+    var waX = _waLink(b.phone, 'Hi ' + guest + ', sorry — we can\'t take booking ' + ref + ' at that time. Can we suggest another time?');
+    edit('❌ DECLINED — moved to Deleted Bookings in admin (can be restored)', waX ? { inline_keyboard: [[{ text: '💬 Tell guest', url: waX }]] } : null);
+  } else if (action === 'b') {
+    answer('');
+    edit('', _bookingButtons(ref, b.phone));
+  } else {
+    answer('');
+  }
+}
+
+// ── 7AM DAILY BRIEFING (also on demand: send "/today" to the bot) ──
+function dailyBriefing() {
+  try { _sendBriefing(); } catch (err) { _logError('dailyBriefing', err); }
+}
+
+function _sendBriefing() {
+  var tz = Session.getScriptTimeZone();
+  var now = new Date();
+  var dayStart = new Date(now); dayStart.setHours(0, 0, 0, 0);
+  var dayEnd = new Date(dayStart.getTime() + 86400000);
+  var yStart = new Date(dayStart.getTime() - 86400000);
+  var data = _sheet().getDataRange().getValues();
+  var I = {}; FIELDS.forEach(function (f, i) { I[f] = i; });
+
+  var today = [], pending = 0, unpaid = 0, yIncome = 0, yCount = 0;
+  for (var r = 1; r < data.length; r++) {
+    var row = data[r];
+    var dt = row[I.datetime] instanceof Date ? row[I.datetime] : new Date(String(row[I.datetime]));
+    if (isNaN(dt.getTime())) continue;
+    var status = String(row[I.status] || '').trim(); if (!status || status === 'N/A') status = 'pending';
+    if (status === 'pending' && dt >= dayStart) pending++;
+    if (dt >= yStart && dt < dayStart) { yIncome += Number(row[I.total]) || 0; yCount++; }
+    if (dt >= dayStart && dt < dayEnd && ACTIVE_BOOKING_STATUSES.concat(['done']).indexOf(status) !== -1) {
+      if (String(row[I.depositStatus]) !== 'received' && status !== 'done') unpaid++;
+      today.push({ t: dt, line: Utilities.formatDate(dt, tz, 'h:mm a') + ' · ' + row[I.fname] + ' — ' + row[I.gear] + ' (' + status + ')' });
+    }
+  }
+  today.sort(function (a, b) { return a.t - b.t; });
+
+  var lines = ['☀️ Good morning — ' + Utilities.formatDate(now, tz, 'EEEE d MMMM'), ''];
+  try {
+    var w = _fetchWeather();
+    if (w && w.status !== 'unknown') {
+      lines.push('🌊 Weather: ' + (w.conditionIcon || '') + ' ' + (w.conditionLabel || '') + ', wind ' + Math.round(w.windNowKmh) +
+        ' km/h (max ' + Math.round(w.windMaxTodayKmh || w.windNowKmh) + ')' + (w.precipProbMaxToday != null ? ', rain ' + w.precipProbMaxToday + '%' : '') +
+        ' — ' + String(w.status).toUpperCase());
+    }
+  } catch (wErr) { _logError('_sendBriefing.weather', wErr); }
+
+  lines.push('📅 Today: ' + today.length + ' booking' + (today.length === 1 ? '' : 's'));
+  today.slice(0, 15).forEach(function (x) { lines.push('  ' + x.line); });
+  if (today.length > 15) lines.push('  …and ' + (today.length - 15) + ' more in admin');
+  if (pending) lines.push('⏳ ' + pending + ' upcoming booking' + (pending === 1 ? '' : 's') + ' still pending — confirm them');
+  if (unpaid) lines.push('💵 ' + unpaid + ' of today\'s bookings have no deposit recorded');
+  lines.push('💰 Yesterday: ' + yCount + ' booking' + (yCount === 1 ? '' : 's') + ', XCD ' + yIncome);
+
+  try {
+    var cfg = _stockConfig(), services = getServiceStatus(), stockNotes = [];
+    STOCK_KEYS.forEach(function (k) {
+      if (services[k] && services[k].off) stockNotes.push(GEAR_LABELS[k] + ' OFF (' + (services[k].reason || 'no reason') + ')');
+      else if (cfg[k] && cfg[k].repair) stockNotes.push(cfg[k].repair + ' ' + GEAR_LABELS[k] + ' in repair');
+    });
+    ['DELIVERY', 'TOURS'].forEach(function (k) { if (services[k] && services[k].off) stockNotes.push((k === 'DELIVERY' ? 'Delivery' : 'Tours') + ' OFF'); });
+    if (stockNotes.length) lines.push('🔧 ' + stockNotes.join(' · '));
+    _activeDeals().forEach(function (d) { lines.push('🏷️ Deal: ' + d.pct + '% off ' + GEAR_LABELS[d.gear] + ' — ' + (d.cap - d.used) + ' left'); });
+  } catch (sErr) { _logError('_sendBriefing.stock', sErr); }
+
+  _tgSend(lines.join('\n'));
+}
+
+// ── GUEST FEEDBACK ALERT ──
+function _feedbackAlarm(p) {
+  try {
+    var b = _findBooking(p.ref) || {};
+    var rating = Number(p.rating) || 0;
+    var stars = new Array(rating + 1).join('⭐');
+    var low = rating <= 3;
+    var text = (low ? '🚨 Low rating ' : '💬 New review ') + stars + ' (' + rating + '/5)\n' +
+      p.ref + ' — ' + String(b.fname || 'Guest') + ' ' + String(b.lname || '') + ' · ' + String(b.phone || 'no phone') + '\n' +
+      (p.comment ? '"' + String(p.comment).slice(0, 800) + '"' : '(no comment)') +
+      (low ? '\nReach out while they\'re still on the island.' : '');
+    var wa = _waLink(b.phone, 'Hi ' + String(b.fname || '') + ', thank you for your feedback on Aquatic Paradise' + (low ? ' — we\'re sorry it wasn\'t perfect. Can we make it right?' : '!'));
+    if (wa) _tgSendButtons(text, { inline_keyboard: [[{ text: '💬 WhatsApp guest', url: wa }]] });
+    else _tgSend(text);
+    if (low) {
+      try { GmailApp.sendEmail(NOTIFY_EMAIL, 'APR ALARM: low rating ' + rating + '/5 on ' + p.ref, text); }
+      catch (mailErr) { _logError('_feedbackAlarm.email', mailErr); }
+    }
+  } catch (err) {
+    _logError('_feedbackAlarm', err);
+  }
 }
 
 // Telegram for everything; urgent alarms (sold out, overbooked, deal
@@ -1809,7 +2025,7 @@ function doPost(e) {
     if (payload.action === 'getAvailability') {
       return _json(getAvailability(payload));
     }
-    if (['getStockOverview', 'setStock', 'createDeal', 'endDeal', 'setTelegramToken', 'connectTelegram', 'testAlarm'].indexOf(payload.action) !== -1) {
+    if (['getStockOverview', 'setStock', 'createDeal', 'endDeal', 'setTelegramToken', 'connectTelegram', 'testAlarm', 'sendBriefing'].indexOf(payload.action) !== -1) {
       // Owner-only: stock counts, deals and the alarm phone.
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       if (payload.action === 'getStockOverview') return _json(getStockOverview());
@@ -1818,6 +2034,7 @@ function doPost(e) {
       if (payload.action === 'endDeal') return _json(endDeal(payload));
       if (payload.action === 'setTelegramToken') return _json(setTelegramToken(payload));
       if (payload.action === 'connectTelegram') return _json(connectTelegram());
+      if (payload.action === 'sendBriefing') { _sendBriefing(); return _json({ ok: true }); }
       return _json(testAlarm());
     }
     if (payload.action === 'getServiceStatus') {
@@ -2917,6 +3134,7 @@ function saveFeedback(p) {
       _safe(p.comment, ''),
       new Date().toISOString()
     ]);
+    _feedbackAlarm(p); // never throws
     return { ok: true };
   } catch (err) {
     return _fail('saveFeedback', err);
