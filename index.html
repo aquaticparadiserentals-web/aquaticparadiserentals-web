@@ -1142,12 +1142,12 @@ document.addEventListener('click', (e) => {
 // Prices match the "Rental Price Chart — Bequia" image (2026-09-26):
 // Hour / Day / Weekend (2 days) / Week (7 days). The chart has no 30-min,
 // 2-hour or half-day tier, so those were dropped. Kayaks aren't on the
-// chart — the Double keeps its existing hour/day/week prices (no weekend
-// price), and the Single stays comingSoon.
+// chart — prices set by Delroy 2026-09-27 (Single 30/60/100/300, Double
+// 45/90/160/450; weeks ~5x the day rate like the rest of the chart).
 const GEAR = [
   { id:'SUP',  icon:'🏄', name:'Paddle Board',          codes:'PB', price60:20, priceFD:50, priceWE:90, priceWK:250 },
-  { id:'KAY',  icon:'🚣', name:'Kayak (Single)',         codes:'KY', comingSoon:true },
-  { id:'KAY2', icon:'🚣', name:'Kayak (Double)',         codes:'KY', price60:50, priceFD:50,             priceWK:100 },
+  { id:'KAY',  icon:'🚣', name:'Kayak (Single)',         codes:'KY', price60:30, priceFD:60, priceWE:100, priceWK:300 },
+  { id:'KAY2', icon:'🚣', name:'Kayak (Double)',         codes:'KY', price60:45, priceFD:90, priceWE:160, priceWK:450 },
   { id:'SNK',  icon:'🤿', name:'Snorkel Set',            codes:'SK', price60:10, priceFD:20, priceWE:35, priceWK:90  },
   { id:'FLT',  icon:'🛟', name:'Floating Tube',          codes:'FL', price60:8,  priceFD:15, priceWE:25, priceWK:60  },
   { id:'FLC',  icon:'🏊', name:'Floating Lounge Chair',  codes:'LC', price60:10, priceFD:20, priceWE:35, priceWK:90  },

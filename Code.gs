@@ -680,7 +680,7 @@ function getSitePhotos() {
 // available at the moment" with a short reason (boat maintenance, weather,
 // etc.). Read publicly by index.html so guests see it before booking.
 // Stored as one JSON blob in Script Properties — tiny, rarely-changed config.
-var SERVICE_KEYS = ['SUP', 'KAY2', 'SNK', 'FLT', 'FLC', 'BPG', 'DELIVERY', 'TOURS'];
+var SERVICE_KEYS = ['SUP', 'KAY', 'KAY2', 'SNK', 'FLT', 'FLC', 'BPG', 'DELIVERY', 'TOURS'];
 var SERVICE_STATUS_PROP = 'service_status';
 var MAX_SERVICE_REASON_LEN = 120;
 
@@ -730,10 +730,10 @@ function setServiceStatus(p) {
 // treated as unlimited — nothing is blocked until the owner enters numbers.
 // Bookings only store gear as text ("Paddle Board x2, Snorkel Set x1" or a
 // package name), so quantities are parsed back out of that text.
-var STOCK_KEYS = ['SUP', 'KAY2', 'SNK', 'FLT', 'FLC', 'BPG'];
-var GEAR_LABELS = { SUP: 'Paddle Board', KAY2: 'Kayak (Double)', SNK: 'Snorkel Set', FLT: 'Floating Tube', FLC: 'Floating Lounge Chair', BPG: 'Beach Paddle Games' };
+var STOCK_KEYS = ['SUP', 'KAY', 'KAY2', 'SNK', 'FLT', 'FLC', 'BPG'];
+var GEAR_LABELS = { SUP: 'Paddle Board', KAY: 'Kayak (Single)', KAY2: 'Kayak (Double)', SNK: 'Snorkel Set', FLT: 'Floating Tube', FLC: 'Floating Lounge Chair', BPG: 'Beach Paddle Games' };
 var GEAR_BY_NAME = {
-  'Paddle Board': 'SUP', 'Kayak (Double)': 'KAY2', 'Snorkel Set': 'SNK',
+  'Paddle Board': 'SUP', 'Kayak (Single)': 'KAY', 'Kayak (Double)': 'KAY2', 'Snorkel Set': 'SNK',
   'Floating Tube': 'FLT', 'Floater/Board': 'FLT', 'Floating Lounge Chair': 'FLC', 'Beach Paddle Games': 'BPG'
 };
 // Matched by prefix — package names carry emoji. Must mirror PACKAGES in index.html.
@@ -1316,7 +1316,8 @@ function _handleTgTap(cb, ownerChat) {
 // Prices mirror GEAR/PACKAGES in index.html.
 var PRICES = {
   SUP:  { '1 Hour': 20, 'Full Day': 50, 'Weekend (2 days)': 90, 'Week (7 days)': 250 },
-  KAY2: { '1 Hour': 50, 'Full Day': 50, 'Week (7 days)': 100 },
+  KAY:  { '1 Hour': 30, 'Full Day': 60, 'Weekend (2 days)': 100, 'Week (7 days)': 300 },
+  KAY2: { '1 Hour': 45, 'Full Day': 90, 'Weekend (2 days)': 160, 'Week (7 days)': 450 },
   SNK:  { '1 Hour': 10, 'Full Day': 20, 'Weekend (2 days)': 35, 'Week (7 days)': 90 },
   FLT:  { '1 Hour': 8,  'Full Day': 15, 'Weekend (2 days)': 25, 'Week (7 days)': 60 },
   FLC:  { '1 Hour': 10, 'Full Day': 20, 'Weekend (2 days)': 35, 'Week (7 days)': 90 },
@@ -1329,7 +1330,8 @@ var BOOK_GEAR_WORDS = [
   [/\b(lounge|lounger|chairs?)\b/i, 'FLC'],
   [/\b(tubes?|floats?|floaters?|floating\s*tubes?)\b/i, 'FLT'],
   [/\b(snorkel\w*|masks?)\b/i, 'SNK'],
-  [/\bkayaks?\b/i, 'KAY2'],
+  [/\bsingle\s*kayaks?\b|\bkayaks?\s*\(?single\b/i, 'KAY'],
+  [/\bkayaks?\b/i, 'KAY2'], // plain "kayak" = double; the preview shows which
   [/\b(paddle\s*boards?|paddleboards?|boards?|sups?|isups?)\b/i, 'SUP']
 ];
 var BOOK_PACKAGE_WORDS = [
