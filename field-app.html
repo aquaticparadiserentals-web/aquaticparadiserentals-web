@@ -4107,97 +4107,309 @@ window.ScreenFleet = ScreenFleet;
   </script>
 
   <script>
-// app-root — production single-phone shell + staff passcode gate.
+// app-root v2 — staff PIN login + LIVE dispatch data from the APR backend.
+// Replaces the standalone-passcode version. Reads getDispatchBookings and
+// writes status via update_status, using the backend's staff PIN (verifyPin).
 const {
   useState: uApp,
   useEffect: uAppE,
   useRef: uAppR
 } = React;
-const APR_HERO = "chart"; // welcome hero: chart | photo | waves | wordmark
-// SHA-256 of the staff passcode. Change it with (in the browser console):
-//   crypto.subtle.digest('SHA-256', new TextEncoder().encode('YOURPASS'))
-//     .then(b => console.log([...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')))
-const APR_PASS_HASH = "8a1d12848d76ef453920021064fd00ee2fc26aa7a36be5cbbd565c1af15f85c3";
-async function sha256Hex(str) {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
-  return [...new Uint8Array(buf)].map(x => x.toString(16).padStart(2, "0")).join("");
+var APR_API = "https://script.google.com/macros/s/AKfycbxnvG3dTUs-nSVowi9P6jqyDsubYFR7VHWcNvNAJplzR0BQpDr2n3blKx34x0fOdfT8-w/exec";
+var APR_HERO = "chart";
+var TOKEN = null;
+
+// POST text/plain so the browser skips the CORS preflight Apps Script can't answer.
+function apiCall(payload) {
+  return fetch(APR_API, {
+    method: "POST",
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8"
+    },
+    body: JSON.stringify(payload),
+    redirect: "follow"
+  }).then(function (r) {
+    return r.json();
+  });
 }
-function PhoneScreens({
-  theme,
-  screen,
-  go,
-  activeJob,
-  setActiveJob,
-  worker
-}) {
-  const t = theme;
-  const map = {
+function nav(v) {
+  v = (v == null ? "" : String(v)).trim();
+  return !v || v === "N/A" ? "" : v;
+}
+var DUR_MIN = {
+  "30 min": 30,
+  "1 Hour": 60,
+  "2 Hours": 120,
+  "Half Day": 240,
+  "Full Day": 480,
+  "Weekend (2 days)": 2880,
+  "Week (7 days)": 10080
+};
+function guessType(s) {
+  s = (s || "").toLowerCase();
+  if (/kayak/.test(s)) return "kayak";
+  if (/snorkel|mask/.test(s)) return "snorkel";
+  if (/lounge|float|tube/.test(s)) return "float";
+  if (/beach|game|umbrella|setup/.test(s)) return "beach";
+  return "paddleboard";
+}
+function parseGear(text) {
+  text = nav(text);
+  if (!text) return [{
+    code: "GEAR",
+    label: "Gear",
+    type: "paddleboard"
+  }];
+  return text.split(/[,;]+/).map(function (part) {
+    var p = part.trim() || "Item";
+    return {
+      code: p.length > 16 ? p.slice(0, 16) : p,
+      label: p,
+      type: guessType(p)
+    };
+  });
+}
+function addMinutes(hhmm, mins) {
+  var m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || "");
+  if (!m) return "";
+  var t = +m[1] * 60 + +m[2] + (mins || 0);
+  t = (t % 1440 + 1440) % 1440;
+  var h = Math.floor(t / 60),
+    mm = t % 60;
+  return (h < 10 ? "0" : "") + h + ":" + (mm < 10 ? "0" : "") + mm;
+}
+var STATUS_DISPLAY = {
+  pending: "scheduled",
+  confirmed: "ready",
+  delivering: "enroute",
+  done: "delivered"
+};
+
+// Map the backend's dispatch row to the shape the screens already expect.
+function mapJob(b) {
+  var name = (nav(b.fname) + " " + nav(b.lname)).trim() || "Guest";
+  var dt = nav(b.datetime);
+  var timeShort = dt.indexOf("T") >= 0 ? dt.split("T")[1].slice(0, 5) : dt || "—";
+  var dur = nav(b.duration) || "—";
+  var end = addMinutes(timeShort, DUR_MIN[dur] || 120);
+  var raw = (nav(b.status) || "pending").toLowerCase();
+  return {
+    id: nav(b.ref) || "job-" + Math.random().toString(36).slice(2),
+    ref: nav(b.ref),
+    when: (timeShort || "—") + " – " + (end || timeShort || ""),
+    timeShort: timeShort || "—",
+    duration: dur,
+    guest: name,
+    party: nav(b.groupSize) || 1,
+    whatsapp: nav(b.phone),
+    location: "",
+    // backend dispatch rows carry no delivery-location field
+    addr: nav(b.notes) || "—",
+    note: nav(b.notes),
+    items: parseGear(b.gear),
+    payment: "",
+    // dispatch view deliberately excludes pricing
+    total: "",
+    status: STATUS_DISPLAY[raw] || "scheduled",
+    backendStatus: raw,
+    pin: {
+      x: 160,
+      y: 150
+    }
+  };
+}
+function signOut() {
+  TOKEN = null;
+  try {
+    sessionStorage.removeItem("apr_staff_token");
+  } catch (e) {}
+  location.reload();
+}
+function PhoneScreens(props) {
+  var t = props.theme,
+    go = props.go;
+  var map = {
     welcome: /*#__PURE__*/React.createElement(ScreenWelcome, {
       theme: t,
       heroVariant: APR_HERO,
-      worker: worker,
+      worker: props.worker,
       go: go
     }),
     today: /*#__PURE__*/React.createElement(ScreenToday, {
       theme: t,
       go: go,
-      setActiveJob: setActiveJob
+      setActiveJob: props.setActiveJob
     }),
     job: /*#__PURE__*/React.createElement(ScreenJob, {
       theme: t,
       go: go,
-      job: activeJob
+      job: props.activeJob
     }),
     scan: /*#__PURE__*/React.createElement(ScreenScan, {
       theme: t,
       go: go,
-      job: activeJob
+      job: props.activeJob
     }),
     waiver: /*#__PURE__*/React.createElement(ScreenWaiver, {
       theme: t,
       go: go,
-      job: activeJob
+      job: props.activeJob
     }),
     deliver: /*#__PURE__*/React.createElement(ScreenDeliver, {
       theme: t,
       go: go,
-      job: activeJob
+      job: props.activeJob
     }),
     fleet: /*#__PURE__*/React.createElement(ScreenFleet, {
       theme: t,
       go: go
     })
   };
-  return map[screen] ?? map.today;
+  return map[props.screen] || map.today;
 }
-function FieldApp() {
+function StatusBar({
+  theme,
+  job,
+  onSet,
+  busy
+}) {
+  var t = theme;
+  if (!job) return null;
+  var opts = [["confirmed", "Confirm"], ["delivering", "Delivering"], ["done", "Done"]];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      alignItems: "center",
+      justifyContent: "center",
+      flexWrap: "wrap",
+      padding: "7px 10px",
+      background: t.paper,
+      borderBottom: `1px solid ${t.rule}`
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: window.APR_FONTS.mono,
+      fontSize: 9,
+      color: t.inkSoft,
+      marginRight: 2
+    }
+  }, job.ref || "job"), opts.map(function (o) {
+    var active = job.backendStatus === o[0];
+    return /*#__PURE__*/React.createElement("button", {
+      key: o[0],
+      disabled: busy,
+      onClick: function () {
+        onSet(o[0]);
+      },
+      style: {
+        padding: "6px 11px",
+        borderRadius: 999,
+        cursor: busy ? "default" : "pointer",
+        border: `1px solid ${active ? t.gold : t.ruleStrong}`,
+        background: active ? t.gold : "transparent",
+        color: active ? "#fff" : t.ink,
+        fontFamily: window.APR_FONTS.ui,
+        fontSize: 10,
+        fontWeight: 600,
+        letterSpacing: 1,
+        textTransform: "uppercase"
+      }
+    }, o[1]);
+  }));
+}
+function FieldApp(props) {
   const [themeKey, setThemeKey] = uApp("linen");
   const [screen, setScreen] = uApp("welcome");
-  const [activeJob, setActive] = uApp(window.APR_DATA.todayDispatches[0]);
+  const [jobs, setJobs] = uApp(props.jobs0 || []);
+  const [activeJob, setActive] = uApp(props.jobs0 && props.jobs0[0] || null);
   const [scale, setScale] = uApp(1);
+  const [busy, setBusy] = uApp(false);
+  const [msg, setMsg] = uApp("");
+  const topRef = uAppR(null);
   const worker = "Shamar";
   const t = window.APR_THEMES[themeKey];
-  const HEADER = 54;
-  uAppE(() => {
-    function fit() {
-      const s = Math.min(window.innerWidth / (320 + 20), (window.innerHeight - HEADER) / (660 + 20), 1.4);
-      setScale(s);
-    }
-    fit();
-    window.addEventListener("resize", fit);
-    window.addEventListener("orientationchange", fit);
-    return () => {
-      window.removeEventListener("resize", fit);
-      window.removeEventListener("orientationchange", fit);
+  function recalc() {
+    var top = topRef.current ? topRef.current.offsetHeight : 54;
+    setScale(Math.min(window.innerWidth / (320 + 20), (window.innerHeight - top) / (660 + 20), 1.4));
+  }
+  uAppE(function () {
+    recalc();
+    window.addEventListener("resize", recalc);
+    window.addEventListener("orientationchange", recalc);
+    return function () {
+      window.removeEventListener("resize", recalc);
+      window.removeEventListener("orientationchange", recalc);
     };
   }, []);
-  uAppE(() => {
+  uAppE(function () {
+    recalc();
+  }, [screen, activeJob, msg]);
+  uAppE(function () {
     document.body.style.background = t.bg;
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", t.bg);
   }, [t.bg]);
-  const go = s => setScreen(s);
-  const setActiveJob = j => setActive(j);
+  var go = function (s) {
+    setScreen(s);
+  };
+  var setActiveJob = function (j) {
+    setActive(j);
+  };
+  function refresh() {
+    setMsg("Refreshing…");
+    apiCall({
+      action: "getDispatchBookings",
+      token: TOKEN
+    }).then(function (res) {
+      if (res && res.ok && Array.isArray(res.bookings)) {
+        var mapped = res.bookings.map(mapJob);
+        window.APR_DATA.todayDispatches = mapped;
+        setJobs(mapped);
+        setMsg("");
+      } else if (res && /unauthor/i.test(res.error || "")) {
+        signOut();
+      } else setMsg("Couldn't load bookings.");
+    }).catch(function () {
+      setMsg("Offline — can't reach backend.");
+    });
+  }
+  function setStatus(back) {
+    if (!activeJob) return;
+    setBusy(true);
+    var prev = activeJob.backendStatus;
+    var upd = Object.assign({}, activeJob, {
+      backendStatus: back,
+      status: STATUS_DISPLAY[back] || activeJob.status
+    });
+    setActive(upd);
+    var arr = window.APR_DATA.todayDispatches || [];
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i].ref === upd.ref) {
+        arr[i].backendStatus = back;
+        arr[i].status = upd.status;
+      }
+    }
+    setJobs(arr.slice());
+    apiCall({
+      action: "update_status",
+      token: TOKEN,
+      ref: upd.ref,
+      status: back
+    }).then(function (res) {
+      setBusy(false);
+      if (!res || !res.ok) {
+        setActive(Object.assign({}, upd, {
+          backendStatus: prev,
+          status: STATUS_DISPLAY[prev]
+        }));
+        setMsg("Not saved: " + (res && res.error || "retry"));
+      } else setMsg("Saved ✓");
+    }).catch(function () {
+      setBusy(false);
+      setMsg("Offline — not saved.");
+    });
+  }
+  var showStatus = activeJob && ["job", "scan", "waiver", "deliver"].indexOf(screen) >= 0;
+  var I = window.Icons;
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
@@ -4208,15 +4420,15 @@ function FieldApp() {
       overflow: "hidden",
       transition: "background .45s ease"
     }
+  }, /*#__PURE__*/React.createElement("div", {
+    ref: topRef
   }, /*#__PURE__*/React.createElement("header", {
     style: {
-      height: HEADER,
-      flexShrink: 0,
-      paddingTop: "env(safe-area-inset-top)",
+      height: 54,
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
-      padding: "0 16px",
+      padding: "0 14px",
       borderBottom: `1px solid ${t.rule}`,
       background: t.chrome,
       backdropFilter: "blur(12px)",
@@ -4226,7 +4438,7 @@ function FieldApp() {
     style: {
       display: "flex",
       alignItems: "center",
-      gap: 10
+      gap: 9
     }
   }, /*#__PURE__*/React.createElement("img", {
     src: "assets/logo.jpeg",
@@ -4244,41 +4456,63 @@ function FieldApp() {
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: window.APR_FONTS.display,
-      fontSize: 16,
+      fontSize: 15,
       fontWeight: 500,
-      letterSpacing: 0.3,
       color: t.ink
     }
   }, "Aquatic Paradise"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: window.APR_FONTS.ui,
-      fontSize: 8.5,
-      letterSpacing: 2.2,
+      fontSize: 8,
+      letterSpacing: 2,
       textTransform: "uppercase",
-      color: t.inkSoft,
-      marginTop: 1
+      color: t.inkSoft
     }
-  }, "Field Dispatch \xB7 ", t.mode))), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setThemeKey(k => k === "linen" ? "midnight" : "linen"),
-    "aria-label": "Toggle day and night theme",
-    title: "Toggle day / night",
+  }, "Field Dispatch \xB7 live"))), /*#__PURE__*/React.createElement("div", {
     style: {
-      width: 40,
-      height: 40,
-      borderRadius: 999,
-      cursor: "pointer",
-      border: `1px solid ${t.chromeBorder}`,
-      background: t.paper,
-      color: t.ink,
       display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
+      gap: 7
     }
-  }, themeKey === "linen" ? /*#__PURE__*/React.createElement(Icons.moon, {
-    size: 17
-  }) : /*#__PURE__*/React.createElement(Icons.sun, {
-    size: 17
-  }))), /*#__PURE__*/React.createElement("main", {
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: refresh,
+    "aria-label": "Refresh",
+    style: iconBtn(t)
+  }, /*#__PURE__*/React.createElement(I.refresh, {
+    size: 16
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setThemeKey(function (k) {
+        return k === "linen" ? "midnight" : "linen";
+      });
+    },
+    "aria-label": "Theme",
+    style: iconBtn(t)
+  }, themeKey === "linen" ? /*#__PURE__*/React.createElement(I.moon, {
+    size: 16
+  }) : /*#__PURE__*/React.createElement(I.sun, {
+    size: 16
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: signOut,
+    "aria-label": "Sign out",
+    style: iconBtn(t)
+  }, /*#__PURE__*/React.createElement(I.x, {
+    size: 16
+  })))), showStatus ? /*#__PURE__*/React.createElement(StatusBar, {
+    theme: t,
+    job: activeJob,
+    onSet: setStatus,
+    busy: busy
+  }) : null, msg ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "5px 12px",
+      fontFamily: window.APR_FONTS.mono,
+      fontSize: 10,
+      color: t.inkSoft,
+      background: t.paperWarm,
+      borderBottom: `1px solid ${t.rule}`,
+      textAlign: "center"
+    }
+  }, msg) : null), /*#__PURE__*/React.createElement("main", {
     style: {
       flex: 1,
       minHeight: 0,
@@ -4307,43 +4541,92 @@ function FieldApp() {
     worker: worker
   })))));
 }
-
-// ── Staff passcode gate ────────────────────────────────────────────────────
-function Gate() {
-  const t = window.APR_THEMES.linen;
-  const [authed, setAuthed] = uApp(() => {
-    try {
-      return sessionStorage.getItem("apr_auth") === "1";
-    } catch (e) {
-      return false;
-    }
-  });
-  const [val, setVal] = uApp("");
-  const [err, setErr] = uApp(false);
+function iconBtn(t) {
+  return {
+    width: 38,
+    height: 38,
+    borderRadius: 999,
+    border: `1px solid ${t.chromeBorder}`,
+    background: t.paper,
+    color: t.ink,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer"
+  };
+}
+function StaffGate() {
+  const [authed, setAuthed] = uApp(false);
+  const [jobs0, setJobs0] = uApp(null);
+  const [pin, setPin] = uApp("");
+  const [err, setErr] = uApp("");
   const [busy, setBusy] = uApp(false);
   const inputRef = uAppR(null);
-  uAppE(() => {
+  const t = window.APR_THEMES.linen;
+  function loadThenAuth() {
+    apiCall({
+      action: "getDispatchBookings",
+      token: TOKEN
+    }).then(function (res) {
+      if (res && res.ok && Array.isArray(res.bookings)) {
+        var mapped = res.bookings.map(mapJob);
+        window.APR_DATA.todayDispatches = mapped;
+        setJobs0(mapped);
+        setAuthed(true);
+      } else {
+        try {
+          sessionStorage.removeItem("apr_staff_token");
+        } catch (e) {}
+        TOKEN = null;
+        setErr("Session expired — enter your PIN.");
+        setBusy(false);
+      }
+    }).catch(function () {
+      setErr("Can't reach backend — check connection.");
+      setBusy(false);
+    });
+  }
+  uAppE(function () {
+    try {
+      var s = sessionStorage.getItem("apr_staff_token");
+      if (s) {
+        TOKEN = s;
+        loadThenAuth();
+      }
+    } catch (e) {}
+  }, []);
+  uAppE(function () {
     if (!authed && inputRef.current) inputRef.current.focus();
   }, [authed]);
-  async function submit(e) {
+  function submit(e) {
     e.preventDefault();
-    if (busy) return;
+    if (pin.length !== 4 || busy) return;
     setBusy(true);
-    setErr(false);
-    const ok = (await sha256Hex(val)) === APR_PASS_HASH;
-    setBusy(false);
-    if (ok) {
-      try {
-        sessionStorage.setItem("apr_auth", "1");
-      } catch (e) {}
-      setAuthed(true);
-    } else {
-      setErr(true);
-      setVal("");
-      if (inputRef.current) inputRef.current.focus();
-    }
+    setErr("");
+    apiCall({
+      action: "verifyPin",
+      role: "staff",
+      pin: pin
+    }).then(function (res) {
+      if (res && res.ok && res.token) {
+        TOKEN = res.token;
+        try {
+          sessionStorage.setItem("apr_staff_token", TOKEN);
+        } catch (e) {}
+        loadThenAuth();
+      } else {
+        setBusy(false);
+        setErr(res && res.error || "Incorrect PIN");
+        setPin("");
+      }
+    }).catch(function () {
+      setBusy(false);
+      setErr("Can't reach backend.");
+    });
   }
-  if (authed) return /*#__PURE__*/React.createElement(FieldApp, null);
+  if (authed) return /*#__PURE__*/React.createElement(FieldApp, {
+    jobs0: jobs0
+  });
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
@@ -4365,7 +4648,7 @@ function Gate() {
       border: `1px solid ${t.rule}`,
       padding: "30px 26px 26px",
       textAlign: "center",
-      boxShadow: "0 24px 60px rgba(15,18,22,0.14)"
+      boxShadow: "0 24px 60px rgba(15,18,22,.14)"
     }
   }, /*#__PURE__*/React.createElement("img", {
     src: "assets/logo.jpeg",
@@ -4374,17 +4657,16 @@ function Gate() {
     style: {
       borderRadius: 999,
       objectFit: "cover",
-      border: `2px solid ${t.bg}`,
-      margin: "0 auto"
+      border: `2px solid ${t.bg}`
     }
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: window.APR_FONTS.display,
       fontSize: 26,
       fontWeight: 500,
-      color: t.ink,
       marginTop: 14,
-      letterSpacing: -0.3
+      letterSpacing: -0.3,
+      color: t.ink
     }
   }, "Aquatic Paradise"), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -4392,20 +4674,20 @@ function Gate() {
       letterSpacing: 2.4,
       textTransform: "uppercase",
       color: t.inkSoft,
-      marginTop: 4,
-      fontWeight: 600
+      fontWeight: 600,
+      marginTop: 2
     }
   }, "Field Dispatch \xB7 Staff access"), /*#__PURE__*/React.createElement("input", {
     ref: inputRef,
     type: "password",
-    inputMode: "text",
-    autoComplete: "current-password",
-    value: val,
-    onChange: e => {
-      setVal(e.target.value);
-      setErr(false);
+    inputMode: "numeric",
+    maxLength: 4,
+    value: pin,
+    onChange: function (e) {
+      setPin(e.target.value.replace(/\D/g, "").slice(0, 4));
+      setErr("");
     },
-    placeholder: "Enter staff passcode",
+    placeholder: "Staff PIN",
     style: {
       width: "100%",
       marginTop: 22,
@@ -4415,32 +4697,33 @@ function Gate() {
       border: `1px solid ${err ? t.danger : t.ruleStrong}`,
       background: t.bg,
       color: t.ink,
-      fontSize: 15,
-      fontFamily: window.APR_FONTS.ui,
+      fontSize: 22,
       textAlign: "center",
-      letterSpacing: 1,
-      outline: "none"
+      letterSpacing: 8,
+      outline: "none",
+      fontFamily: window.APR_FONTS.mono
     }
   }), /*#__PURE__*/React.createElement("div", {
     style: {
-      height: 18,
-      marginTop: 6,
+      minHeight: 18,
+      marginTop: 8,
       color: t.danger,
       fontSize: 11.5,
       fontWeight: 600
     }
-  }, err ? "Incorrect passcode — try again." : ""), /*#__PURE__*/React.createElement("button", {
+  }, err), /*#__PURE__*/React.createElement("button", {
     type: "submit",
-    disabled: busy || !val,
+    disabled: busy || pin.length !== 4,
     style: {
       width: "100%",
       marginTop: 4,
       padding: "15px",
       border: "none",
       borderRadius: 999,
-      background: busy || !val ? t.inkFaint : t.gold,
+      background: busy || pin.length !== 4 ? t.inkFaint : t.gold,
       color: "#fff",
-      cursor: busy || !val ? "default" : "pointer",
+      cursor: busy || pin.length !== 4 ? "default" : "pointer",
+      fontFamily: window.APR_FONTS.ui,
       fontSize: 12,
       fontWeight: 600,
       letterSpacing: 1.6,
@@ -4450,20 +4733,19 @@ function Gate() {
       justifyContent: "center",
       gap: 8
     }
-  }, busy ? "Checking…" : "Unlock", " ", /*#__PURE__*/React.createElement(Icons.arrowR, {
+  }, busy ? "Checking…" : "Sign in", " ", /*#__PURE__*/React.createElement(window.Icons.arrowR, {
     size: 14
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 16,
-      fontSize: 9.5,
-      lineHeight: 1.5,
-      color: t.inkFaint,
       fontFamily: window.APR_FONTS.mono,
+      fontSize: 9.5,
+      color: t.inkFaint,
       letterSpacing: 0.3
     }
-  }, "Staff only \xB7 Aquatic Paradise ISUP Rentals \xB7 Bequia")));
+  }, "Staff only \xB7 Bequia, SVG")));
 }
-ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(Gate, null));
+ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(StaffGate, null));
   </script>
 
   <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(function(){});}</script>
