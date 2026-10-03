@@ -286,6 +286,80 @@ Ranked by how directly they hit the goals Delroy's stated: more inbound leads, l
 
 ---
 
+## 11. Beach Depot — Unmanned Gear Cage Plan
+
+**Why this exists:** the 2 on-site staff in §3 are students who may not be reliably available once term picks up. Rather than replace them with a new hire, this plan removes the "last ten feet" handoff (someone physically handing a board to a guest) from a payroll relationship entirely. Full build spec and diagrams live in the published artifact — search "Beach Depot" in Claude artifacts, or re-generate from this session — this section is the offline-readable summary.
+
+### The model
+
+Two things replace two employees:
+1. A locked gear cage at each beach.
+2. One already-present beach bar per beach, paid a flat fee per hand-off — not a schedule, not payroll.
+
+Flow: guest books & pays online (existing app, §4) → booking confirmation auto-sends a WhatsApp ping to that beach's partner with guest name/gear/time (same pattern `dispatch.html` already uses for drivers) → partner unlocks, hands off, relocks. Under two minutes, no one scheduled.
+
+### The three sites
+
+| Beach | Partner candidate | Status |
+|---|---|---|
+| Princess Margaret Beach | Jack's Beach Bar | Pilot first |
+| Lower Bay | De Reef or Keegan's | Next |
+| Friendship Bay | The Sand Bar / Bequia Beach Hotel | Next |
+
+Run Princess Margaret alone for two weeks before replicating — existing gear and relationships are already there.
+
+### The gear cage — what PVC is and isn't for
+
+PVC racks the boards (cheap, rustproof, resizes easily) but **is not a lock** — a push-fit PVC frame pulls apart by hand in under a minute. The cage is two layers: a welded steel-and-mesh shell that actually locks, with PVC racking inside doing the organizing only.
+
+**Movable by design (added after the first draft, at Delroy's explicit request for safety):** Bequia sits in the Atlantic hurricane belt (June–November) and gets serious ground-swell surges even without a named storm. A structure bolted permanently into the sand becomes debris in high wind/surf — a real risk to people nearby, not just the gear. So the cage sits on a removable galvanized steel **skid base** with a welded tow point, held down by **4 removable screw-in ground anchors** (auger type, 700–900mm, hand-removable with a breaker bar) — not concrete. No jackhammer, no digging.
+
+**Bill of materials:**
+
+| Component | Spec | Qty | Notes |
+|---|---|---|---|
+| Outer shell | Welded galvanized angle-iron frame + expanded steel mesh panels | ~6ft × 4ft × 3ft, hinged mesh door | 1 per beach | The part that actually stops theft |
+| Skid base | Galvanized steel channel runners, full width of cage, welded tow point | ~6.5ft × 3ft footprint | 1 set | Cage bolts to this, not the sand — makes it draggable as one piece |
+| Board racking | Sch. 40 PVC, 1.5–2" pipe + T-fittings + end caps | Vertical slot rack, ~8" spacing | 1 rack | Holds boards on edge; reconfigures in minutes |
+| Kayak cradles | Sch. 40 PVC, 2" pipe, padded crossbars | 2-tier horizontal cradle | 1 rack | Foam insulation over crossbars prevents hull scuffing |
+| Small-gear locker | Marine dry box or lockable PVC-panel bin | Snorkel sets, life vests, paddles | 1 | Keep valuables separate from open racking |
+| Lock | Stainless marine-grade hasp + combination padlock | Weather-rated, salt-air tolerant | 1–2 | Combination not keyed — no physical key to lose. Code rotates weekly |
+| Ground screws | Galvanized screw-in earth anchors (auger type), 700–900mm + shackles | Hand-removable with breaker bar | 4 pts | ~20 min to pull all four before a storm |
+
+**Build order:** (1) weld the frame onto a skid base → (2) bolt on the mesh panels → (3) hang the door with hinge + hasp → (4) slide in the PVC racks → (5) screw down the 4 removable ground anchors (not cemented).
+
+**Before a storm:** back out the 4 ground screws (breaker bar, no digging) → hook a tow strap to the skid's welded tow point → drag it to high ground (property, a partner's yard, anywhere clear of surge). About 20 minutes, no special equipment.
+
+### Money, without payroll
+
+| Flow | Mechanism | Suggested rate |
+|---|---|---|
+| Rental payment | Collected online through the existing app — no cash at the cage | — |
+| Partner hand-off fee | Flat fee per pickup/return, tallied weekly, paid by WhatsApp transfer or cash | $5–10 XCD / hand-off |
+| Damage/loss deposit | Held via card at booking (existing ID verification flow) | existing flow |
+
+A small "Partner Payouts" ledger next to the existing admin Cash Flow/Commission reporting (§6/§7 style) would track who's owed what — light addition, not a new system.
+
+### Keep the students — as gig help, not staff
+
+Move them off a fixed schedule onto per-job WhatsApp dispatch for what the cage doesn't cover (villa delivery, oversized group bookings, equipment swaps) — reuses the existing driver share-link feature (§4), paid per job, fits around school.
+
+### Roadmap
+
+1. **Weeks 1–2:** Pilot at Princess Margaret Beach — get a quote/build from Fixman Workshops, buy hardware from Budget Marine, approach Jack's Beach Bar, wire the WhatsApp auto-ping into the booking flow.
+2. **Weeks 3–4:** Fix what broke, then build the second and third cages; approach Lower Bay and Friendship Bay partners.
+3. **Month 2+:** Add a solar/cellular trail camera per cage (Digicel/Flow coverage is good enough for phone alerts); add the Partner Payouts ledger to `admin.html`.
+
+### Contacts (unverified — small-shop listings go stale, confirm before committing)
+
+- **Fixman Workshops** (Robin Simpson Smith) — welding/fabrication in Bequia, well regarded locally. Right shop for the steel shell + skid, commissioned as one job.
+- **Budget Marine, Bequia branch** — marine-grade hardware (stainless fittings, locks, rope) that survives salt air. Screw-in ground anchors are standard mooring/agricultural hardware — ask for dinghy/mooring screws if the auger type isn't stocked by name.
+- **Bequia Tourism Association** — fastest way to verify the above are still active and get a second name if needed; also a live SEO lever (see the site's own SEO notes elsewhere in this repo's history).
+
+Benchmark note: commercial solar smart-locker systems (HiWater, Whenever Watersports, etc.) exist but assume steadier connectivity/volume than a single-operator Bequia business has, and cost far more than the welded-cage-plus-partner model above for the same outcome.
+
+---
+
 ## Credentials
 
 This manual intentionally excludes every password, PIN, account number, and API token — including `APP_TOKEN` and `STAFF_TOKEN` (see §4). As of 2026-07-28 these no longer live in source: they're generated on first use and stored in the Apps Script project's Script Properties (`APR_APP_TOKEN`/`APR_STAFF_TOKEN`), not committed to the (public) GitHub repo. Don't compound the old exposure by duplicating them into a doc either. Store real credentials — Google account passwords, admin/dispatch PINs, banking PINs, account numbers — in a proper password manager (Bitwarden's free tier, 1Password, or similar), never in a Word document or plaintext file, especially not one syncing to OneDrive or sitting in a shared folder. If you're currently keeping banking PINs or account numbers in a `.docx`, that should be moved out and that file deleted as soon as the credentials are safely stored elsewhere.
