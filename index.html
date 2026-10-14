@@ -302,6 +302,21 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
   .form-row{grid-template-columns:1fr}
   .duration-grid{grid-template-columns:repeat(2,1fr)}
 }
+
+/* ── Deposit request + partner referral (apr-config.js) ── */
+.deposit-box{max-width:360px;margin:6px auto 0;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 16px;text-align:left;box-shadow:0 6px 20px rgba(11,30,51,0.08)}
+.deposit-box .dep-kicker{font-size:0.68rem;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:var(--teal)}
+.deposit-box .dep-amount{font-family:'Cormorant Garamond',serif;font-size:2.1rem;font-weight:700;color:var(--ink);line-height:1.1;margin:4px 0 2px}
+.deposit-box .dep-amount small{font-family:'Outfit',sans-serif;font-size:0.8rem;font-weight:600;color:var(--muted);margin-left:6px}
+.deposit-box .dep-sub{font-size:0.78rem;color:var(--muted);margin-bottom:14px}
+.deposit-box .dep-row{display:flex;justify-content:space-between;font-size:0.78rem;color:var(--muted);padding:6px 0;border-top:1px dashed var(--line)}
+.deposit-box .dep-row strong{color:var(--ink)}
+.deposit-box a.dep-btn{display:block;text-align:center;padding:13px;border-radius:12px;font-weight:700;text-decoration:none;margin-top:10px;font-size:0.92rem}
+.deposit-box a.dep-card{background:var(--navy);color:#fff}
+.deposit-box a.dep-bank{background:#25D366;color:#fff}
+.deposit-box .dep-fine{font-size:0.7rem;color:var(--muted);margin-top:10px;line-height:1.45}
+.partner-note{margin-top:-6px;margin-bottom:14px;padding:10px 12px;border-radius:10px;background:rgba(14,124,144,0.08);border:1px solid rgba(14,124,144,0.25);font-size:0.8rem;color:var(--teal-ink);font-weight:600}
+@media (prefers-color-scheme: dark){.partner-note{color:#7fd3e0}}
 </style>
 </head>
 <body>
@@ -498,6 +513,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
         <option data-i18n="opt_other">Other</option>
       </select>
     </div>
+    <div id="partnerNote" class="partner-note" style="display:none"></div>
     <div class="form-group">
       <label data-i18n="label_notes">Special Requests / Notes</label>
       <textarea id="notes" placeholder="Anything we should know? Skill level, accessibility needs, etc." data-i18n-ph="ph_notes"></textarea>
@@ -576,7 +592,8 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
     <h2 data-i18n="success_title">Booking Received!</h2>
     <p data-i18n="success_desc">Your booking is <strong>pending</strong> — our team will confirm it on WhatsApp shortly. If you gave an email, a summary is on its way to your inbox.</p>
     <div class="booking-ref" id="bookingRef">APR-XXXXXX</div>
-    <p style="margin-top:16px;font-size:0.82rem;color:#777" data-i18n="success_note">Want to lock in your slot right away? Message us for bank-transfer deposit details — a deposit secures your booking.</p>
+    <div id="depositBox" class="deposit-box" style="display:none"></div>
+    <p id="successNote" style="margin-top:16px;font-size:0.82rem;color:#777" data-i18n="success_note">Want to lock in your slot right away? Message us for bank-transfer deposit details — a deposit secures your booking.</p>
     <button class="btn-primary" style="margin-top:20px;max-width:320px" onclick="newBooking()" data-i18n="btn_book_another">Book Another ↺</button>
     <a href="https://wa.me/17844963447" class="btn-secondary" style="display:block;max-width:320px;margin:8px auto;text-align:center;padding:13px;text-decoration:none;font-weight:700;border:2px solid var(--teal);border-radius:14px;color:var(--teal)" data-i18n="btn_whatsapp">
       💬 Message Us on WhatsApp
@@ -764,6 +781,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
   </div>
 </div>
 
+<script src="apr-config.js"></script>
 <script src="offline-queue.js"></script>
 <script>
 // ── CONFIG ──
@@ -1737,6 +1755,90 @@ function backToGear() {
   window.scrollTo(0,0);
 }
 
+
+// ── HOTEL & PARTNER REFERRALS ──────────────────────────────────────
+// A partner link (…/?ref=CODE) tags every booking that guest makes for
+// APR_CONFIG.partnerCreditDays. Stored in the existing `referral` column as
+// "Partner: CODE" — no backend change. Admin → 🤝 Partners reads it back.
+const APR_CFG = window.APR_CONFIG || {};
+const PARTNER_KEY = 'apr_partner_ref';
+function _cleanPartnerCode(raw) {
+  return String(raw || '').toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 24);
+}
+function capturePartnerRef() {
+  let code = '';
+  try { code = _cleanPartnerCode(new URLSearchParams(location.search).get('ref')); } catch (e) {}
+  const days = Number(APR_CFG.partnerCreditDays) || 30;
+  if (code) {
+    try { localStorage.setItem(PARTNER_KEY, JSON.stringify({ code, at: Date.now() })); } catch (e) {}
+    return code;
+  }
+  try {
+    const saved = JSON.parse(localStorage.getItem(PARTNER_KEY) || 'null');
+    if (saved && saved.code && Date.now() - saved.at < days * 864e5) return _cleanPartnerCode(saved.code);
+  } catch (e) {}
+  return '';
+}
+const PARTNER_CODE = capturePartnerRef();
+function partnerName(code) {
+  const p = (APR_CFG.partners || {})[code];
+  return (p && p.name) || '';
+}
+function partnerReferralValue(selected) {
+  if (!PARTNER_CODE) return selected;
+  return 'Partner: ' + PARTNER_CODE + (selected ? ' · ' + selected : '');
+}
+function showPartnerNote() {
+  const el = document.getElementById('partnerNote');
+  if (!el || !PARTNER_CODE) return;
+  const name = partnerName(PARTNER_CODE);
+  el.textContent = '🤝 ' + t('partner_note', 'Booking through our partner') + ': ' + (name || PARTNER_CODE);
+  el.style.display = 'block';
+  const sel = document.getElementById('referral');
+  if (sel && !sel.value) {
+    const hotelOpt = Array.from(sel.options).find(o => o.getAttribute('data-i18n') === 'opt_hotel');
+    if (hotelOpt) sel.value = hotelOpt.value;
+  }
+}
+document.addEventListener('DOMContentLoaded', showPartnerNote);
+
+// ── DEPOSIT REQUEST (success screen) ──────────────────────────────
+function depositFor(totalXCD) {
+  const total = Number(totalXCD) || 0;
+  if (total <= 0) return 0;
+  const pct = Number(APR_CFG.depositPct) || 30;
+  const min = Number(APR_CFG.depositMinXCD) || 0;
+  return Math.min(total, Math.max(min, Math.ceil(total * pct / 100)));
+}
+function renderDepositBox(ref, totalXCD, fname) {
+  const box = document.getElementById('depositBox');
+  const note = document.getElementById('successNote');
+  const dep = depositFor(totalXCD);
+  if (!box) return;
+  if (!dep) { box.style.display = 'none'; if (note) note.style.display = ''; return; }
+  const rate = Number(APR_CFG.xcdPerUsd) || 2.7;
+  const usd = Math.ceil(dep / rate);
+  const total = Number(totalXCD);
+  const wa = String(APR_CFG.whatsapp || '17844963447').replace(/\D/g, '');
+  const waText = `Hi APR! I'd like to pay the deposit for booking ${ref}` +
+    (fname ? ` (${fname})` : '') + `: XCD $${dep}. Please send the bank transfer details.`;
+  const paypal = String(APR_CFG.paypalMe || '').replace(/[^A-Za-z0-9_-]/g, '');
+  const cardBtn = paypal
+    ? `<a class="dep-btn dep-card" href="https://paypal.me/${paypal}/${usd}USD" target="_blank" rel="noopener">💳 ${t('dep_pay_card', 'Pay deposit by card')} · US$${usd}</a>`
+    : '';
+  box.innerHTML = `
+    <div class="dep-kicker">${t('dep_kicker', 'Secure your slot')}</div>
+    <div class="dep-amount">XCD $${dep}<small>≈ US$${usd}</small></div>
+    <div class="dep-sub">${t('dep_sub', 'Deposit to confirm this booking')}</div>
+    <div class="dep-row"><span>${t('booking_total', 'Booking Total')}</span><strong>XCD $${total.toFixed(0)}</strong></div>
+    <div class="dep-row"><span>${t('dep_balance', 'Balance on the beach')}</span><strong>XCD $${(total - dep).toFixed(0)}</strong></div>
+    ${cardBtn}
+    <a class="dep-btn dep-bank" href="https://wa.me/${wa}?text=${encodeURIComponent(waText)}" target="_blank" rel="noopener">🏦 ${t('dep_pay_bank', 'Pay by bank transfer (WhatsApp)')}</a>
+    <div class="dep-fine">${t('dep_fine', 'Quote your booking reference with payment. Unsafe sea conditions = free rebook or full refund.')}</div>`;
+  box.style.display = 'block';
+  if (note) note.style.display = 'none';
+}
+
 function newBooking() {
   selectedGear = {};
   selectedPackage = null;
@@ -2038,7 +2140,7 @@ async function submitBooking() {
     datetime: document.getElementById('datetime').value,
     groupSize: document.getElementById('groupSize').value,
     kidsCount: Number(document.getElementById('kidsCount').value) || 0,
-    referral: document.getElementById('referral').value,
+    referral: partnerReferralValue(document.getElementById('referral').value),
     beach: beachChoice,
     notes: (beachChoice ? '🏖️ Beach: ' + beachChoice + ' — ' : '') + (waiverSig ? '✍️ Signed: ' + waiverSig + (notesVal ? ' — ' : '') : '') + notesVal,
     gear: gear_summary,
@@ -2120,6 +2222,7 @@ async function submitBooking() {
 
   if (ok) {
     document.getElementById('bookingRef').textContent = refNum;
+    renderDepositBox(refNum, payload.total, payload.fname);
     document.getElementById('step-gear').style.display='none';
     document.getElementById('step-details').style.display='none';
     document.getElementById('successScreen').classList.add('show');

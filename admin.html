@@ -265,6 +265,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
     <div class="home-tile" onclick="switchATab('drivers')"><span class="ht-icon">🚚</span><span class="ht-label">Drivers</span><span class="ht-sub">Delivery drivers</span></div>
     <div class="home-tile" onclick="switchATab('feedback')"><span class="ht-icon">⭐</span><span class="ht-label">Feedback</span><span class="ht-sub">Customer reviews</span></div>
     <div class="home-tile" onclick="switchATab('commission')"><span class="ht-icon">💵</span><span class="ht-label">Commission</span><span class="ht-sub">Staff sales &amp; commission</span></div>
+    <div class="home-tile" onclick="switchATab('partners')"><span class="ht-icon">🤝</span><span class="ht-label">Partners</span><span class="ht-sub">Hotel links &amp; referrals</span></div>
     <div class="home-tile" onclick="switchATab('cashflow')"><span class="ht-icon">📈</span><span class="ht-label">Cash Flow</span><span class="ht-sub">Income, expenses &amp; forecast</span></div>
     <div class="home-tile" onclick="switchATab('chats')"><span class="ht-icon">💬</span><span class="ht-label">Chats</span><span class="ht-sub" id="chatsTileSub">Guest live chat</span></div>
     <div class="home-tile" onclick="switchATab('messages')"><span class="ht-icon">✉️</span><span class="ht-label">Messages</span><span class="ht-sub">Sent history</span></div>
@@ -652,6 +653,34 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   </div>
 </div>
 
+<!-- ═ PARTNERS (hotel referral links — apr-config.js + referral column) ═ -->
+<div class="asection" id="asec-partners">
+  <div class="sec-title">Hotel &amp; Partner Referrals</div>
+  <p style="font-size:0.72rem;color:var(--muted);margin-bottom:12px">Give each hotel, guesthouse or concierge its own link or QR code. Every booking made through it is tagged to that partner for 30 days. Commission is counted on <strong>completed</strong> bookings only, by rental date.</p>
+
+  <div class="card" style="margin-bottom:16px">
+    <div style="font-weight:800;font-size:0.85rem;margin-bottom:8px">🔗 Make a partner link</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input id="ptCode" placeholder="CODE e.g. SEASIDE-INN" maxlength="24" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9-]/g,'')" style="flex:1 1 160px;padding:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;font-size:0.82rem;letter-spacing:0.05em"/>
+      <button class="refresh-btn" onclick="makePartnerLink()">Create</button>
+    </div>
+    <div id="ptLinkOut"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="bk-btn" style="flex:0 0 auto;padding:8px 14px" onclick="setPartnerPeriod('month')">This Month</button>
+      <button class="bk-btn" style="flex:0 0 auto;padding:8px 14px" onclick="setPartnerPeriod('last')">Last Month</button>
+      <button class="bk-btn" style="flex:0 0 auto;padding:8px 14px" onclick="setPartnerPeriod('all')">All Time</button>
+    </div>
+    <div id="ptPeriodLabel" style="font-size:0.72rem;color:var(--muted);margin-top:8px"></div>
+  </div>
+
+  <div id="partnersContainer">
+    <div style="text-align:center;padding:30px;color:var(--muted)">Loading partner report…</div>
+  </div>
+</div>
+
 <!-- ═ CASH FLOW ═ -->
 <div class="asection" id="asec-cashflow">
   <div class="sec-title">Cash Flow</div>
@@ -863,6 +892,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   </div>
 </div>
 
+<script src="apr-config.js"></script>
 <script>
 const BACKEND = 'https://script.google.com/macros/s/AKfycbzr1KHela518-pgQ3dJyvv77tm9z2JWo_TTovRNys6RwYNBIUfdyJKxGF_ETzNk9m47Ww/exec';
 // No longer a hardcoded constant — anyone viewing this file's source used to
@@ -3593,8 +3623,8 @@ function toggleCustomer(key) {
 }
 
 // ── SECTION NAVIGATION (full-screen sections + back button) ──
-const ATABS = ['home','today','bookings','dispatch','chats','customers','inventory','safety','team','drivers','feedback','commission','cashflow','messages','settings','rates'];
-const ATAB_LABELS = {home:'Operations Dashboard',today:'📊 Today',bookings:'📋 Bookings',dispatch:'📦 Dispatch',chats:'💬 Guest Chats',customers:'🧾 Customers',inventory:'🏄 Fleet',safety:'🛡️ Safety',team:'👥 Team',drivers:'🚚 Drivers',feedback:'⭐ Feedback',commission:'💵 Commission',cashflow:'📈 Cash Flow',messages:'✉️ Messages',settings:'⚙️ Settings',rates:'💰 Rates'};
+const ATABS = ['home','today','bookings','dispatch','chats','customers','inventory','safety','team','drivers','feedback','commission','partners','cashflow','messages','settings','rates'];
+const ATAB_LABELS = {home:'Operations Dashboard',today:'📊 Today',bookings:'📋 Bookings',dispatch:'📦 Dispatch',chats:'💬 Guest Chats',customers:'🧾 Customers',inventory:'🏄 Fleet',safety:'🛡️ Safety',team:'👥 Team',drivers:'🚚 Drivers',feedback:'⭐ Feedback',commission:'💵 Commission',partners:'🤝 Partners',cashflow:'📈 Cash Flow',messages:'✉️ Messages',settings:'⚙️ Settings',rates:'💰 Rates'};
 function switchATab(tab) {
   // Every section opens as a full page from the top — without this, the scroll
   // position from the previous section carries over and you land at the bottom.
@@ -3612,12 +3642,192 @@ function switchATab(tab) {
   if (tab==='drivers') renderDrivers();
   if (tab==='feedback') fetchFeedback();
   if (tab==='commission') fetchCommissionReport();
+  if (tab==='partners') fetchPartnerReport();
   if (tab==='cashflow') fetchCashFlow();
   if (tab==='messages') fetchMessages();
   if (tab==='chats') { fetchChats(); startChatsPolling(); } else { stopChatsPolling(); }
   if (tab==='settings') fetchLockdownStatus();
 }
 function goHome() { switchATab('home'); }
+
+// ── PARTNERS (hotel referral links) ───────────────────────────────
+// Reads bookings tagged "Partner: CODE" in the referral column (set by the
+// guest page when it's opened via ?ref=CODE). Names + commission % come from
+// apr-config.js; codes not listed there still show up, at 0% commission.
+const SITE_URL = 'https://aquaticparadiserental.vacations/';
+let partnerPeriod = 'month';
+let partnerBookingsCache = null;
+
+function _partnerCfg() { return (window.APR_CONFIG && window.APR_CONFIG.partners) || {}; }
+function _partnerCodeOf(b) {
+  const m = /^Partner:\s*([A-Z0-9-]+)/.exec(String((b && b.referral) || ''));
+  return m ? m[1] : '';
+}
+function _sourceOf(b) {
+  if (_partnerCodeOf(b)) return '🤝 Partner links';
+  const r = String((b && b.referral) || '').trim();
+  return (!r || r === 'N/A') ? 'Not stated' : r;
+}
+function _bkStatus(b) { return (b && (bookingStates[b.ref] || b.status)) || 'pending'; }
+function _bkDate(b) {
+  const d = new Date(String((b && b.datetime) || '').replace(' ', 'T'));
+  return isNaN(d) ? null : d;
+}
+
+function setPartnerPeriod(p) { partnerPeriod = p; renderPartnerReport(); }
+
+function _partnerRange() {
+  const now = new Date();
+  if (partnerPeriod === 'all') return { start: null, end: null, label: 'All time' };
+  const y = now.getFullYear(), m = now.getMonth() - (partnerPeriod === 'last' ? 1 : 0);
+  const start = new Date(y, m, 1), end = new Date(y, m + 1, 1);
+  return { start, end, label: start.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) };
+}
+
+async function fetchPartnerReport() {
+  const el = document.getElementById('partnersContainer');
+  el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">⏳ Loading bookings…</div>';
+  try {
+    const res = await fetch(BACKEND, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'getBookings', token: APP_TOKEN, limit: 500 }), signal: AbortSignal.timeout(15000) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!data || !data.ok || !Array.isArray(data.bookings)) throw new Error((data && data.error) || 'No data');
+    partnerBookingsCache = data.bookings;
+    renderPartnerReport();
+  } catch (err) {
+    el.innerHTML = `<div style="text-align:center;padding:30px">
+      <div style="color:#ef4444;font-size:0.9rem;margin-bottom:12px">⚠️ Could not load bookings</div>
+      <div style="color:var(--muted);font-size:0.78rem">${escapeHtml(err.message)}</div>
+      <button class="refresh-btn" style="margin-top:12px" onclick="fetchPartnerReport()">🔄 Retry</button></div>`;
+  }
+}
+
+function renderPartnerReport() {
+  const el = document.getElementById('partnersContainer');
+  if (!partnerBookingsCache) return;
+  const { start, end, label } = _partnerRange();
+  document.getElementById('ptPeriodLabel').textContent = 'Showing: ' + label + ' (by rental date)';
+  const inRange = partnerBookingsCache.filter(b => {
+    if (!start) return true;
+    const d = _bkDate(b); return d && d >= start && d < end;
+  });
+
+  // Per-partner rows — configured partners always listed, even at zero.
+  const cfg = _partnerCfg();
+  const rows = {};
+  Object.keys(cfg).forEach(code => { rows[code] = { code, bookings: [], }; });
+  inRange.forEach(b => {
+    const code = _partnerCodeOf(b); if (!code) return;
+    (rows[code] = rows[code] || { code, bookings: [] }).bookings.push(b);
+  });
+  const list = Object.values(rows).map(r => {
+    const done = r.bookings.filter(b => _bkStatus(b) === 'done');
+    const revenue = done.reduce((s, b) => s + (Number(b.total) || 0), 0);
+    const pipeline = r.bookings.filter(b => _bkStatus(b) !== 'done').reduce((s, b) => s + (Number(b.total) || 0), 0);
+    const pct = Number((cfg[r.code] || {}).commissionPct) || 0;
+    return Object.assign(r, { name: (cfg[r.code] || {}).name || '', done: done.length, revenue, pipeline, pct, owed: revenue * pct / 100 });
+  }).sort((a, b) => b.revenue - a.revenue || b.bookings.length - a.bookings.length);
+
+  const partnerHtml = list.length ? list.map(r => `
+    <div class="card" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div>
+          <div style="font-weight:800;font-size:0.9rem">${escapeHtml(r.name || r.code)}</div>
+          <div style="font-size:0.7rem;color:var(--muted);letter-spacing:0.05em">${escapeHtml(r.code)}${cfg[r.code] ? '' : ' · not in apr-config.js (0% commission)'}</div>
+        </div>
+        <div style="text-align:right;flex:0 0 auto">
+          <div style="font-size:0.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em">Owed (${r.pct}%)</div>
+          <div style="font-weight:800;color:var(--gold);font-size:1rem;white-space:nowrap">XCD ${r.owed.toFixed(2)}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px;font-size:0.75rem;text-align:center">
+        <div><div style="font-weight:800;font-size:1rem">${r.bookings.length}</div><div style="color:var(--muted)">Bookings</div></div>
+        <div><div style="font-weight:800;font-size:1rem">XCD ${r.revenue.toFixed(0)}</div><div style="color:var(--muted)">Completed</div></div>
+        <div><div style="font-weight:800;font-size:1rem">XCD ${r.pipeline.toFixed(0)}</div><div style="color:var(--muted)">Upcoming</div></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="bk-btn" style="flex:1 1 auto;padding:8px" onclick="showPartnerLink('${r.code}')">🔗 Link &amp; QR</button>
+        <button class="bk-btn" style="flex:1 1 auto;padding:8px" onclick="sharePartnerStatement('${r.code}')" ${r.bookings.length ? '' : 'disabled'}>📄 Send statement</button>
+      </div>
+    </div>`).join('')
+    : `<div class="card" style="text-align:center;color:var(--muted);font-size:0.82rem;padding:20px">No partner bookings yet for ${escapeHtml(label)}.<br>Create a link above and hand it to a hotel front desk.</div>`;
+
+  // Where every booking came from (partner links + "How did you hear about us?")
+  const src = {};
+  inRange.forEach(b => {
+    const k = _sourceOf(b); src[k] = src[k] || { n: 0, xcd: 0 };
+    src[k].n++; src[k].xcd += Number(b.total) || 0;
+  });
+  const srcList = Object.entries(src).sort((a, b) => b[1].n - a[1].n);
+  const maxN = Math.max(1, ...srcList.map(([, v]) => v.n));
+  const srcHtml = srcList.length ? srcList.map(([k, v]) => `
+    <div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;font-size:0.78rem"><span>${escapeHtml(k)}</span><span style="color:var(--muted)">${v.n} · XCD ${v.xcd.toFixed(0)}</span></div>
+      <div style="height:6px;border-radius:3px;background:var(--line);margin-top:3px"><div style="height:6px;border-radius:3px;background:var(--teal);width:${(v.n / maxN * 100).toFixed(0)}%"></div></div>
+    </div>`).join('') : '<div style="color:var(--muted);font-size:0.8rem">No bookings in this period.</div>';
+
+  const totalOwed = list.reduce((s, r) => s + r.owed, 0);
+  el.innerHTML = partnerHtml + `
+    <div style="text-align:right;font-size:0.8rem;margin:4px 2px 18px">Total partner commission: <strong style="color:var(--gold)">XCD ${totalOwed.toFixed(2)}</strong></div>
+    <div class="sec-title" style="font-size:0.95rem">Where bookings come from</div>
+    <div class="card">${srcHtml}</div>
+    ${partnerBookingsCache.length >= 500 ? '<div style="font-size:0.68rem;color:var(--muted);margin-top:8px">Report covers the latest 500 bookings.</div>' : ''}`;
+}
+
+function makePartnerLink() {
+  const code = String(document.getElementById('ptCode').value || '').toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 24);
+  if (code.length < 3) { showToast('Code needs at least 3 letters/numbers', 'warn'); return; }
+  showPartnerLink(code);
+}
+
+function showPartnerLink(code) {
+  const url = SITE_URL + '?ref=' + encodeURIComponent(code);
+  const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=12&data=' + encodeURIComponent(url);
+  const name = (_partnerCfg()[code] || {}).name || code;
+  const waText = `Hi! Here's your Aquatic Paradise Rentals booking link for guests: ${url}\nEvery booking made through it is credited to ${name}. You can also print the QR code for the front desk.`;
+  const inCfg = !!_partnerCfg()[code];
+  document.getElementById('ptLinkOut').innerHTML = `
+    <div style="margin-top:12px;padding:12px;border:1px dashed var(--line);border-radius:10px;text-align:center">
+      <div style="font-weight:800;font-size:0.85rem;margin-bottom:6px">${escapeHtml(name)}</div>
+      <img src="${qr}" alt="QR code for ${escapeHtml(code)}" style="width:180px;height:180px;background:#fff;border-radius:8px;padding:4px"/>
+      <div style="font-size:0.74rem;word-break:break-all;margin:8px 0;color:var(--ink)">${escapeHtml(url)}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+        <button class="bk-btn" style="flex:0 0 auto;padding:8px 12px" onclick="copyText('${url}')">📋 Copy link</button>
+        <button class="bk-btn" style="flex:0 0 auto;padding:8px 12px" onclick="window.open('${qr.replace('320x320', '1000x1000')}','_blank','noopener')">⬇️ Print-size QR</button>
+        <button class="bk-btn" style="flex:0 0 auto;padding:8px 12px" onclick="window.open('https://wa.me/?text=${encodeURIComponent(waText).replace(/'/g, '%27')}','_blank','noopener')">💬 Send on WhatsApp</button>
+      </div>
+      ${inCfg ? '' : `<div style="font-size:0.68rem;color:var(--muted);margin-top:10px;text-align:left">Link works now. To show the hotel's name and count commission, add it to <strong>apr-config.js</strong> → partners:<br><code style="font-size:0.68rem">'${escapeHtml(code)}': { name: 'Hotel name', commissionPct: 10 },</code></div>`}
+    </div>`;
+  document.getElementById('ptLinkOut').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function copyText(txt) {
+  try {
+    navigator.clipboard.writeText(txt).then(() => showToast('Copied', 'ok'), () => prompt('Copy this:', txt));
+  } catch (e) { prompt('Copy this:', txt); }
+}
+
+function sharePartnerStatement(code) {
+  const { start, end, label } = _partnerRange();
+  const cfg = _partnerCfg()[code] || {};
+  const pct = Number(cfg.commissionPct) || 0;
+  const bks = (partnerBookingsCache || []).filter(b => _partnerCodeOf(b) === code)
+    .filter(b => { if (!start) return true; const d = _bkDate(b); return d && d >= start && d < end; })
+    .sort((a, b) => (_bkDate(a) || 0) - (_bkDate(b) || 0));
+  const lines = bks.map(b => {
+    const d = _bkDate(b);
+    const st = _bkStatus(b) === 'done' ? '✅' : '⏳';
+    return `${st} ${d ? d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '—'} · ${b.ref} · ${b.fname || 'Guest'} · XCD ${Number(b.total || 0).toFixed(0)}`;
+  });
+  const done = bks.filter(b => _bkStatus(b) === 'done').reduce((s, b) => s + (Number(b.total) || 0), 0);
+  const text = `Aquatic Paradise Rentals — partner statement\n${cfg.name || code} · ${label}\n\n${lines.join('\n')}\n\n` +
+    `Bookings: ${bks.length}\nCompleted sales: XCD ${done.toFixed(2)}` +
+    (pct ? `\nYour commission (${pct}%): XCD ${(done * pct / 100).toFixed(2)}` : '') +
+    `\n\n✅ completed · ⏳ upcoming\nThank you for sending guests our way! 🌊`;
+  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
+}
+
 
 // ── GUEST CHATS (chatSend/getChats/chatReplyAdmin in Code.gs) ──
 let openChatConvo = null, chatsPollTimer = null, chatsCache = [];
