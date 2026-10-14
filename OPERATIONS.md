@@ -31,28 +31,21 @@ Single reference for running both the business and the booking system. Written f
 
 Life jackets are **complimentary with every rental** — this is a standing policy, not an upsell.
 
-### Current pricing (as of last price sheet)
+### Current pricing (matches the live booking page — checked 2026-10-14)
 
-**Daily rates:**
-| Item | XCD/day | USD/day |
-|---|---|---|
-| Paddle board (convertible to kayak) | $50 | $19 |
-| Double kayak | $50 | $19 |
-| Floating tube | $15 | $6 |
-| Floating lounge chair | $20 | $8 |
-| Snorkeling set | $20 | $8 |
-| Beach paddle games | $15 | $6 |
-| Hand floater (kids) | Free | Free |
+**Gear rates** (XCD; USD ≈ XCD ÷ 2.7):
+| Item | 1 hour | Full day | Weekend (2 days) | Week (7 days) |
+|---|---|---|---|---|
+| Paddle board | $20 | $50 | $90 | $250 |
+| Kayak (single) | $30 | $60 | $100 | $300 |
+| Kayak (double) | $45 | $90 | $160 | $450 |
+| Snorkel set | $10 | $20 | $35 | $90 |
+| Floating tube | $8 | $15 | $25 | $60 |
+| Floating lounge chair | $10 | $20 | $35 | $90 |
+| Beach paddle games | $8 | $15 | $25 | $60 |
+| Hand floater (kids) | Free | Free | Free | Free |
 
-**Weekly rates** (roughly 7 days for the price of 3 — pitched at villa guests/extended stays):
-| Item | XCD/week | USD/week |
-|---|---|---|
-| Paddle board | $120 | $60 |
-| Adjustable paddle board (convertible) | $90 | $35 |
-| Double kayak | $100 | $40 |
-| Floaters (ring/lounge chair) | $10 | $4 |
-| Snorkel gear | $20 | $8 |
-| Snorkeling buoy | $40 | $15 |
+These same numbers live in three places that must stay in sync: `index.html` (GEAR), admin.html (Rates tab), and `Code.gs` (PRICES — the server flags "⚠️ PRICE CHECK" when a booking total doesn't match).
 
 **Combo packages:**
 | Package | Contents | XCD | USD |
@@ -70,7 +63,7 @@ Life jackets are **complimentary with every rental** — this is a standing poli
 | Weekend Group Rental | Paddle board + snorkel gear, Fri–Sun | $160 | $60 |
 | Group Rental (5–8 boards) | 20% off — WhatsApp to confirm & lock in | — | — |
 
-> **Note:** these numbers came from the last price sheet on file. If rates have changed since, update this table so it doesn't drift out of sync with reality — a manual is only useful if it's trustworthy.
+> **Note:** gear and combo prices match the live site. The weekend & group deals above come from the old price sheet and are NOT on the booking page — confirm whether they're still offered. If rates change, update this table so it doesn't drift out of sync with reality — a manual is only useful if it's trustworthy.
 
 ---
 
