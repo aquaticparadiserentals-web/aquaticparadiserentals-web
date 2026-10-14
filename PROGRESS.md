@@ -1,6 +1,6 @@
 # Aquatic Paradise Rentals — Build Progress
 
-**Last updated:** 2026-07-19 — all previously-staged backend work (2026-07-15 staff commission/deposits/feedback analytics/auto-GPS/e-signature, 2026-07-16 offline queue + booking-ref feedback check) is now **live**: `clasp push` + `clasp deploy -i` to the existing deployment ran today (now @24), confirmed the live `/exec` URL responds and matches the ID used by `index.html`.
+**Last updated:** 2026-10-14 (deposits + partner referrals); previously 2026-07-19 — all previously-staged backend work (2026-07-15 staff commission/deposits/feedback analytics/auto-GPS/e-signature, 2026-07-16 offline queue + booking-ref feedback check) is now **live**: `clasp push` + `clasp deploy -i` to the existing deployment ran today (now @24), confirmed the live `/exec` URL responds and matches the ID used by `index.html`.
 **Live site:** https://aquaticparadiserental.vacations
 **Repo:** aquaticparadiserentals-web (GitHub: aquaticparadiserentals-web/aquaticparadiserentals-web, branch `main`)
 **Stack:** Google Apps Script (`Code.gs`) + Google Sheets backend · HTML/JS frontend · PWA (`manifest.json`, `sw.js`) · GitHub Pages hosting · deployed via clasp
@@ -9,6 +9,17 @@
 Build started 2026-06-20. 55+ commits.
 
 ---
+
+## Deposits + hotel partner referrals — DONE 2026-10-14
+
+Frontend-only (no Apps Script redeploy). Settings live in **`apr-config.js`** — edit, upload, done.
+- **Deposit request** — booking success screen shows the exact deposit (default 30%, min XCD $20, capped at total) in XCD + USD, the balance due on the beach, and a WhatsApp button prefilled with booking ref + amount for bank-transfer details. Admin still marks deposits received manually (unchanged).
+- **Card deposits (optional, OFF)** — set `paypalMe` in apr-config.js to show a "Pay deposit by card" PayPal button (USD, amount prefilled). Left off because online gateways were declined 2026-07-15 — owner's call to switch on.
+- **Partner links** — `https://aquaticparadiserental.vacations/?ref=CODE`. Guest stays credited 30 days (localStorage); booking's existing `referral` column becomes `Partner: CODE · <dropdown choice>`. Partner name shows on the booking form.
+- **Admin → 🤝 Partners** — link + QR maker (print-size QR, WhatsApp share), per-partner bookings / completed sales / upcoming / commission owed (completed bookings only, by rental date; This Month / Last Month / All Time), WhatsApp statement per partner, and "where bookings come from" across all referral sources. Reads up to the latest 500 bookings.
+- **sw.js v8** — apr-config.js is network-first so config edits reach phones immediately.
+- New guest-facing strings fall back to English in other languages (keys: partner_note, dep_*).
+- ⚠️ **Owner:** add real partners to `apr-config.js` → `partners` (name + commissionPct); unlisted codes still track, at 0%.
 
 ## Domain & hosting — DONE (2026-07-09)
 
