@@ -262,9 +262,34 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 .help-back{background:none;border:none;color:var(--teal);font-size:0.8rem;font-weight:600;cursor:pointer;padding:0 0 12px;text-align:left}
 .help-answer{font-size:0.85rem;color:var(--ink);line-height:1.5;margin-bottom:12px}
 .help-note{font-size:0.75rem;color:var(--muted);background:var(--light);border-radius:6px;padding:10px 12px;margin-bottom:12px}
-.help-input{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:6px;font-size:0.85rem;margin-bottom:10px;box-sizing:border-box}
+.help-input{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:6px;font-size:0.85rem;margin-bottom:10px;box-sizing:border-box;background:var(--card);color:var(--ink)}
 .help-footer{padding:12px 16px;border-top:1px solid var(--line)}
 .help-wa-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:#25D366;color:#fff;padding:10px;border-radius:6px;text-decoration:none;font-weight:600;font-size:0.82rem}
+/* Guest chat (inside the help panel) */
+.help-tabs{display:flex;border-bottom:1px solid var(--line);background:var(--card)}
+.help-tab{flex:1;background:none;border:none;border-bottom:2px solid transparent;padding:10px 6px;font-size:0.82rem;font-weight:600;color:var(--muted);cursor:pointer}
+.help-tab.on{color:var(--teal);border-bottom-color:var(--teal)}
+.fab-badge{position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:#E5484D;color:#fff;font-size:0.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--card)}
+.fab-badge[hidden]{display:none}
+.chat-log{display:flex;flex-direction:column;gap:8px}
+.chat-b{max-width:84%;padding:8px 11px;border-radius:12px;font-size:0.85rem;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere}
+.chat-b.guest{align-self:flex-end;background:var(--teal);color:#fff;border-bottom-right-radius:3px}
+.chat-b.team{align-self:flex-start;background:var(--light);color:var(--ink);border:1px solid var(--line);border-bottom-left-radius:3px}
+.chat-b.failed{background:#FDECEC;color:#B42318;border:1px solid #F5C2C0;cursor:pointer}
+.chat-meta{display:block;font-size:0.65rem;opacity:0.75;margin-top:3px}
+.chat-who{display:block;font-size:0.68rem;font-weight:700;color:var(--teal);margin-bottom:2px}
+.chat-note{font-size:0.74rem;color:var(--muted);text-align:center;margin:2px 0 4px}
+.chat-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.chat-chip{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:6px 11px;font-size:0.76rem;color:var(--ink);cursor:pointer}
+.chat-chip:hover{border-color:var(--teal);color:var(--teal)}
+.chat-intro{background:var(--light);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:4px}
+.chat-intro label{display:block;font-size:0.72rem;font-weight:600;color:var(--muted);margin-bottom:4px}
+.chat-bar{display:none;gap:6px;padding:10px 12px;border-top:1px solid var(--line);background:var(--card)}
+.chat-bar.on{display:flex}
+.chat-bar textarea{flex:1;resize:none;height:40px;max-height:96px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:0.85rem;background:var(--card);color:var(--ink)}
+.chat-bar textarea:focus{outline:none;border-color:var(--teal)}
+.chat-send{background:var(--teal);color:#fff;border:none;border-radius:8px;padding:0 15px;font-weight:700;font-size:0.85rem;cursor:pointer}
+.chat-send:disabled{opacity:0.5}
 
 @media(max-width:400px){
   .gear-grid{grid-template-columns:1fr 1fr}
@@ -707,20 +732,28 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 <div class="toast" id="toast"></div>
 
 <!-- HELP DESK WIDGET -->
-<button class="help-fab" id="helpFab" onclick="toggleHelp()" title="Need help?">💬</button>
+<button class="help-fab" id="helpFab" onclick="toggleHelp()" title="Chat with us" aria-label="Chat with us">💬<span class="fab-badge" id="chatBadge" hidden></span></button>
 <div class="help-panel" id="helpPanel">
   <div class="help-header">
     <div>
-      <h3>👋 Need a hand?</h3>
-      <span>Quick answers, or message a real person</span>
+      <h3>👋 Chat with our team</h3>
+      <span id="chatStatusLine">Real people on the beach · usually reply in minutes</span>
     </div>
-    <button class="help-close" onclick="toggleHelp()">✕</button>
+    <button class="help-close" onclick="toggleHelp()" aria-label="Close">✕</button>
+  </div>
+  <div class="help-tabs">
+    <button class="help-tab on" id="helpTabChat" onclick="showHelpView('chat')">💬 Chat</button>
+    <button class="help-tab" id="helpTabAnswers" onclick="showHelpView('answers')">⚡ Quick answers</button>
   </div>
   <div class="help-body" id="helpBody"></div>
+  <div class="chat-bar" id="chatBar">
+    <textarea id="chatInput" placeholder="Type your message…" maxlength="1000" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+    <button class="chat-send" id="chatSendBtn" onclick="sendChat()">Send</button>
+  </div>
   <div class="help-footer">
     <a class="help-wa-btn" href="https://wa.me/17844963447?text=Hi%20APR!%20I%20have%20a%20question.">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-      Talk to a real person
+      Prefer WhatsApp? Message us there
     </a>
   </div>
 </div>
@@ -2157,12 +2190,202 @@ const HELP_TOPICS = [
   { id:'cancel',  label:'✏️ Cancel / Change My Booking' },
 ];
 
+let helpView = 'chat';
+
 function toggleHelp() {
   const panel = document.getElementById('helpPanel');
   const opening = !panel.classList.contains('open');
   panel.classList.toggle('open', opening);
-  if (opening) showHelpMenu();
+  if (opening) showHelpView(helpView);
+  scheduleChatPoll();
 }
+
+function showHelpView(view) {
+  helpView = view;
+  document.getElementById('helpTabChat').classList.toggle('on', view === 'chat');
+  document.getElementById('helpTabAnswers').classList.toggle('on', view === 'answers');
+  document.getElementById('chatBar').classList.toggle('on', view === 'chat');
+  if (view === 'chat') { renderChat(); markChatSeen(); pollChat(); }
+  else showHelpMenu();
+}
+
+// ── GUEST CHAT ──
+// Messages go to chatSend in Code.gs, which pushes them to the team's
+// Telegram; the team replies from Telegram (or Admin → Chats) and the reply
+// shows up here on the next poll. The thread lives in localStorage so it
+// survives reloads; the random conversation id is the only key to it.
+const CHAT_KEY = 'apr_chat';
+let chatState = (() => { try { return JSON.parse(localStorage.getItem(CHAT_KEY)) || {}; } catch (e) { return {}; } })();
+let chatTimer = null, chatSending = false, chatFastUntil = 0;
+
+function saveChat() { try { localStorage.setItem(CHAT_KEY, JSON.stringify(chatState)); } catch (e) {} }
+
+function chatConvoId() {
+  if (!chatState.convo) {
+    const a = new Uint8Array(16);
+    crypto.getRandomValues(a);
+    chatState.convo = Array.from(a, b => b.toString(16).padStart(2, '0')).join('');
+    saveChat();
+  }
+  return chatState.convo;
+}
+
+async function chatCall(body) {
+  const res = await fetch(BACKEND, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body), signal: AbortSignal.timeout(15000) });
+  return res.json();
+}
+
+function chatOpenNow() {
+  const h = Number(new Date().toLocaleString('en-US', { timeZone: 'America/St_Vincent', hour: 'numeric', hour12: false }));
+  return h >= 8 && h < 18;
+}
+
+function chatTime(iso) {
+  const d = new Date(iso);
+  return isNaN(d) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function renderChat() {
+  if (helpView !== 'chat') return;
+  const body = document.getElementById('helpBody');
+  const msgs = chatState.msgs || [];
+  const esc = escapeHtmlText;
+  let html = '<div class="chat-log">';
+  html += `<div class="chat-b team"><span class="chat-who">Aquatic Paradise</span>Hi! 👋 Ask us anything — gear, prices, delivery to your villa or boat. A real person answers right here.</div>`;
+  if (!chatOpenNow()) html += `<div class="chat-note">🌙 We're off the water now (open 8AM–6PM). Leave a message and we'll reply first thing.</div>`;
+  msgs.forEach((m, i) => {
+    if (m.failed) {
+      html += `<div class="chat-b guest failed" onclick="retryChat(${i})">${esc(m.text)}<span class="chat-meta">⚠️ Not sent — tap to retry</span></div>`;
+    } else {
+      const who = m.from === 'team' ? `<span class="chat-who">${esc(m.name || 'Aquatic Paradise')}</span>` : '';
+      html += `<div class="chat-b ${m.from === 'team' ? 'team' : 'guest'}">${who}${esc(m.text)}<span class="chat-meta">${m.pending ? 'Sending…' : chatTime(m.at)}</span></div>`;
+    }
+  });
+  const sent = msgs.filter(m => m.from === 'guest' && !m.failed && !m.pending).length;
+  const answered = msgs.some(m => m.from === 'team');
+  if (sent && !answered) html += `<div class="chat-note">✓ Sent to the team's phone — we'll reply here. You can close this and come back.</div>`;
+  html += '</div>';
+
+  if (!chatState.name) {
+    html += `<div class="chat-intro">
+      <label for="chatName">Your name *</label>
+      <input class="help-input" id="chatName" maxlength="60" placeholder="e.g. Sarah" autocomplete="given-name"/>
+      <label for="chatContact">WhatsApp number (optional)</label>
+      <input class="help-input" id="chatContact" maxlength="40" type="tel" placeholder="So we can reach you if you leave" autocomplete="tel" style="margin-bottom:0"/>
+    </div>`;
+  }
+  if (!msgs.length) {
+    html += `<div class="chat-chips">` + ['Is gear available today?', 'Can you deliver to my villa?', 'Where do I find you?', 'Do you have kids\' life jackets?']
+      .map(q => `<button class="chat-chip" onclick="chatPrefill(this.textContent)">${esc(q)}</button>`).join('') + `</div>`;
+  }
+  body.innerHTML = html;
+  body.scrollTop = msgs.length ? body.scrollHeight : 0;
+}
+
+function chatPrefill(text) {
+  const ta = document.getElementById('chatInput');
+  ta.value = text;
+  ta.focus();
+}
+
+// Server copy wins; keep any unsent local messages at the end.
+function applyChatMessages(serverMsgs) {
+  const unsent = (chatState.msgs || []).filter(m => m.failed);
+  chatState.msgs = (serverMsgs || []).concat(unsent);
+  saveChat();
+  const panelOpen = document.getElementById('helpPanel').classList.contains('open');
+  if (panelOpen && helpView === 'chat') { markChatSeen(); renderChat(); }
+  else updateChatBadge();
+}
+
+function teamReplyCount() { return (chatState.msgs || []).filter(m => m.from === 'team').length; }
+
+function markChatSeen() {
+  chatState.seenTeam = teamReplyCount();
+  saveChat();
+  updateChatBadge();
+}
+
+function updateChatBadge() {
+  const unread = Math.max(0, teamReplyCount() - (chatState.seenTeam || 0));
+  const badge = document.getElementById('chatBadge');
+  badge.hidden = !unread;
+  badge.textContent = unread;
+  document.title = (unread ? '(' + unread + ') ' : '') + document.title.replace(/^\(\d+\) /, '');
+}
+
+async function sendChat(retryText) {
+  if (chatSending) return;
+  const ta = document.getElementById('chatInput');
+  const text = (retryText || ta.value).trim();
+  if (!text) return;
+  if (!chatState.name) {
+    const name = (document.getElementById('chatName')?.value || '').trim();
+    if (!name) { showToast('Please add your name first', 'warn'); document.getElementById('chatName')?.focus(); return; }
+    chatState.name = name;
+    chatState.contact = (document.getElementById('chatContact')?.value || '').trim();
+  }
+  if (!retryText) ta.value = '';
+  chatSending = true;
+  document.getElementById('chatSendBtn').disabled = true;
+  const pending = { from: 'guest', text, at: new Date().toISOString(), pending: true };
+  chatState.msgs = (chatState.msgs || []).concat(pending);
+  renderChat();
+  try {
+    const d = await chatCall({ action: 'chatSend', convo: chatConvoId(), name: chatState.name, contact: chatState.contact || '', text });
+    if (!d || !d.ok) throw new Error((d && d.error) || 'Not sent');
+    chatState.msgs = chatState.msgs.filter(m => m !== pending);
+    applyChatMessages(d.messages);
+    chatFastUntil = Date.now() + 5 * 60000; // poll quickly while a reply is likely
+  } catch (err) {
+    pending.pending = false;
+    pending.failed = true;
+    saveChat();
+    renderChat();
+    showToast(err.message && err.message !== 'Offline' && !/fetch|abort|timeout/i.test(err.message)
+      ? err.message : 'No connection — tap the message to retry, or use WhatsApp', 'warn');
+  } finally {
+    chatSending = false;
+    document.getElementById('chatSendBtn').disabled = false;
+    scheduleChatPoll();
+  }
+}
+
+function retryChat(i) {
+  const m = (chatState.msgs || [])[i];
+  if (!m || !m.failed) return;
+  chatState.msgs.splice(i, 1);
+  sendChat(m.text);
+}
+
+async function pollChat() {
+  const msgs = chatState.msgs || [];
+  if (!chatState.convo || !msgs.some(m => !m.failed && !m.pending)) return;
+  try {
+    const d = await chatCall({ action: 'chatFetch', convo: chatState.convo });
+    if (d && d.ok) applyChatMessages(d.messages);
+  } catch (e) { /* offline — try again next tick */ }
+}
+
+// Fast while the chat is open and a reply is likely, slow in the background,
+// and stops altogether for chats that went quiet hours ago.
+function scheduleChatPoll() {
+  clearTimeout(chatTimer);
+  const msgs = (chatState.msgs || []).filter(m => !m.failed && !m.pending);
+  if (!chatState.convo || !msgs.length) return;
+  const open = document.getElementById('helpPanel').classList.contains('open') && helpView === 'chat';
+  const lastAt = Math.max(...msgs.map(m => Date.parse(m.at) || 0));
+  if (!open && Date.now() - lastAt > 6 * 3600000) return;
+  const delay = open ? (Date.now() < chatFastUntil ? 5000 : 15000) : 45000;
+  chatTimer = setTimeout(async () => {
+    if (!document.hidden) await pollChat();
+    scheduleChatPoll();
+  }, delay);
+}
+
+document.addEventListener('visibilitychange', () => { if (!document.hidden) pollChat(); });
+window.addEventListener('load', () => { updateChatBadge(); scheduleChatPoll(); });
 
 function showHelpMenu() {
   document.getElementById('helpBody').innerHTML = HELP_TOPICS.map(t =>

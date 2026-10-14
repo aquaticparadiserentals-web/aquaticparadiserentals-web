@@ -1241,9 +1241,13 @@ function pollTelegram() {
 function _handleTgMessage(msg) {
   var raw = String(msg.text || '').trim();
   var text = raw.toLowerCase();
+  // A reply to a guest-chat alert goes back to that guest's chat window.
+  var tagMatch = msg.reply_to_message && String(msg.reply_to_message.text || '').match(/Chat #([a-f0-9]{6})\b/);
+  if (tagMatch) { _chatReplyFromTelegram(tagMatch[1], raw, msg.from); return; }
   if (text === '/today' || text === 'today') { _sendBriefing(); return; }
+  if (text === '/chats' || text === 'chats') { _tgSend(_chatsDigest()); return; }
   if (/^\/book\b/.test(text)) { _startBookDraft(raw); return; }
-  _tgSend('Commands:\n/today — today\'s briefing\n/book — log a WhatsApp booking (send /book for how)\n\nBooking alerts have Confirm/Decline buttons.');
+  _tgSend('Commands:\n/today — today\'s briefing\n/chats — guest chats from the last 24 hours\n/book — log a WhatsApp booking (send /book for how)\n\nBooking alerts have Confirm/Decline buttons.\nTo answer a guest chat, swipe the chat message and Reply.');
 }
 
 function _handleTgTap(cb, ownerChat) {
@@ -2254,10 +2258,22 @@ function doPost(e) {
     if (_isLockedDown() && LOCKDOWN_EXEMPT_ACTIONS.indexOf(payload.action) === -1) {
       return _json({ ok: false, error: LOCKDOWN_MESSAGE });
     }
+    if (payload.action === 'chatSend' || payload.action === 'chatFetch') {
+      // Public guest chat. Own rate bucket so open chat windows polling for
+      // replies can never use up the budget real bookings need.
+      if (!_rateLimitOk('chat', CHAT_RATE_MAX_PER_MINUTE)) return _json({ ok: false, error: 'Busy — try again in a minute.' });
+      return _json(payload.action === 'chatSend' ? chatSend(payload) : chatFetch(payload));
+    }
     if (!_rateLimitOk('api', API_RATE_LIMIT_MAX_PER_MINUTE)) {
       return _json({ ok: false, error: 'Too many requests — please wait a minute.' });
     }
 
+    if (['getChats', 'getChatThread', 'chatReplyAdmin'].indexOf(payload.action) !== -1) {
+      if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      if (payload.action === 'getChats') return _json(getChats());
+      if (payload.action === 'getChatThread') return _json(getChatThread(payload));
+      return _json(chatReplyAdmin(payload));
+    }
     if (payload.action === 'setLockdown') {
       return _json(setLockdown(payload));
     }
@@ -3568,6 +3584,189 @@ function archiveOldBookingRows() {
   } catch (err) {
     _logError('archiveOldBookingRows', err);
   }
+}
+
+// ── GUEST CHAT ──
+// Guests chat from the booking page. Every guest message is pushed to the
+// owner's Telegram; replying to that Telegram message (swipe → Reply) sends
+// the answer straight back into the guest's chat window — so the team can
+// answer from the beach with no computer. Admin → Chats shows the same
+// threads and can reply too.
+// The conversation id is 32 random hex chars made on the guest's device and
+// is the only key to the thread (no login). Telegram shows just the first 6
+// as "Chat #abc123", which is how a reply finds its thread again.
+var CHAT_SHEET_NAME = 'CHAT';
+var CHAT_MAX_LEN = 1000;
+var CHAT_RATE_MAX_PER_MINUTE = 300; // own bucket, so guest polling never starves bookings
+var CHAT_CACHE_SECS = 21600;
+
+function _chatSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(CHAT_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(CHAT_SHEET_NAME);
+    sh.appendRow(['convo', 'from', 'name', 'contact', 'text', 'at']);
+    sh.getRange('1:1').setFontWeight('bold');
+    sh.getRange('A:F').setNumberFormat('@'); // keep everything as plain text
+  }
+  return sh;
+}
+
+// Guest text must never be read by Sheets as a formula.
+function _chatCell(v) {
+  var s = String(v == null ? '' : v);
+  return /^[=+\-@]/.test(s) ? "'" + s : s;
+}
+
+function _chatValidId(c) { return typeof c === 'string' && /^[a-f0-9]{32}$/.test(c); }
+
+function _chatRowToMsg(r) {
+  var at = r[5] instanceof Date ? r[5].toISOString() : String(r[5]);
+  return { from: String(r[1]), name: String(r[2]), contact: String(r[3]), text: String(r[4]), at: at };
+}
+
+function _chatThread(convo) {
+  var cache = CacheService.getScriptCache();
+  var hit = cache.get('chat_' + convo);
+  if (hit) { try { return JSON.parse(hit); } catch (e) {} }
+  var rows = _chatSheet().getDataRange().getValues();
+  var msgs = [];
+  for (var i = 1; i < rows.length; i++) if (String(rows[i][0]) === convo) msgs.push(_chatRowToMsg(rows[i]));
+  _chatCachePut(convo, msgs);
+  return msgs;
+}
+
+function _chatCachePut(convo, msgs) {
+  try { CacheService.getScriptCache().put('chat_' + convo, JSON.stringify(msgs.slice(-80)), CHAT_CACHE_SECS); }
+  catch (err) { _logError('_chatCachePut', err); }
+}
+
+function _chatAppend(convo, from, name, contact, text) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var msgs = _chatThread(convo);
+    var msg = { from: from, name: name, contact: contact || '', text: text, at: new Date().toISOString() };
+    _chatSheet().appendRow([convo, from, _chatCell(name), _chatCell(contact || ''), _chatCell(text), msg.at]);
+    msgs.push(msg);
+    _chatCachePut(convo, msgs);
+    return msgs;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// What the guest's page gets back — never the contact details.
+function _chatPublic(msgs) {
+  return msgs.slice(-80).map(function (m) { return { from: m.from, name: m.from === 'team' ? m.name : '', text: m.text, at: m.at }; });
+}
+
+function chatSend(p) {
+  try {
+    var convo = p && p.convo;
+    if (!_chatValidId(convo)) return { ok: false, error: 'Chat expired — reload the page.' };
+    var text = String((p && p.text) || '').trim();
+    var name = String((p && p.name) || '').trim().slice(0, 60);
+    var contact = String((p && p.contact) || '').trim().slice(0, 40);
+    if (!text) return { ok: false, error: 'Type a message first.' };
+    if (text.length > CHAT_MAX_LEN) return { ok: false, error: 'Message is too long (max ' + CHAT_MAX_LEN + ' characters).' };
+    if (!name) return { ok: false, error: 'Please add your name.' };
+    if (!_rateLimitOk('chat_' + convo, 8)) return { ok: false, error: 'Slow down a little — try again in a minute.' };
+
+    var isNew = _chatThread(convo).length === 0;
+    var msgs = _chatAppend(convo, 'guest', name, contact, text);
+
+    var tag = convo.slice(0, 6);
+    var alert = (isNew ? '💬 NEW GUEST CHAT' : '💬 Guest chat') + ' · Chat #' + tag + '\n' +
+      'From: ' + name + (contact ? ' · ' + contact : '') + '\n\n' + text +
+      '\n\n↩️ Swipe this message → Reply to answer in their chat.';
+    var wa = _waLink(contact, 'Hi ' + name.split(' ')[0] + ', this is Aquatic Paradise Rentals — following up on your chat.');
+    var notified = wa ? _tgSendButtons(alert, { inline_keyboard: [[{ text: '💬 WhatsApp guest', url: wa }]] }) : _tgSend(alert);
+    return { ok: true, messages: _chatPublic(msgs), notified: !!notified };
+  } catch (err) {
+    return _fail('chatSend', err);
+  }
+}
+
+function chatFetch(p) {
+  try {
+    var convo = p && p.convo;
+    if (!_chatValidId(convo)) return { ok: false, error: 'Chat expired — reload the page.' };
+    return { ok: true, messages: _chatPublic(_chatThread(convo)) };
+  } catch (err) {
+    return _fail('chatFetch', err);
+  }
+}
+
+// Newest-first conversation list for admin and /chats.
+function _chatSummaries(sinceMs) {
+  var rows = _chatSheet().getDataRange().getValues();
+  var byConvo = {}, order = [];
+  for (var i = 1; i < rows.length; i++) {
+    var c = String(rows[i][0]);
+    if (!_chatValidId(c)) continue;
+    var m = _chatRowToMsg(rows[i]);
+    var s = byConvo[c];
+    if (!s) { s = byConvo[c] = { convo: c, tag: c.slice(0, 6), name: '', contact: '', count: 0 }; order.push(c); }
+    if (m.from === 'guest') { s.name = m.name || s.name; s.contact = m.contact || s.contact; }
+    s.count++; s.lastText = m.text; s.lastFrom = m.from; s.lastAt = m.at;
+  }
+  return order.map(function (c) { return byConvo[c]; })
+    .filter(function (s) { return !sinceMs || new Date(s.lastAt).getTime() >= sinceMs; })
+    .sort(function (a, b) { return new Date(b.lastAt) - new Date(a.lastAt); });
+}
+
+function getChats() {
+  try {
+    return { ok: true, chats: _chatSummaries(0).slice(0, 100) };
+  } catch (err) {
+    return _fail('getChats', err);
+  }
+}
+
+function getChatThread(p) {
+  try {
+    if (!_chatValidId(p && p.convo)) return { ok: false, error: 'Unknown chat' };
+    return { ok: true, messages: _chatThread(p.convo) };
+  } catch (err) {
+    return _fail('getChatThread', err);
+  }
+}
+
+function chatReplyAdmin(p) {
+  try {
+    var convo = p && p.convo;
+    var text = String((p && p.text) || '').trim();
+    if (!_chatValidId(convo)) return { ok: false, error: 'Unknown chat' };
+    if (!text || text.length > CHAT_MAX_LEN) return { ok: false, error: 'Message must be 1-' + CHAT_MAX_LEN + ' characters' };
+    if (!_chatThread(convo).length) return { ok: false, error: 'Unknown chat' };
+    return { ok: true, messages: _chatAppend(convo, 'team', 'Aquatic Paradise', '', text) };
+  } catch (err) {
+    return _fail('chatReplyAdmin', err);
+  }
+}
+
+function _chatReplyFromTelegram(tag, text, from) {
+  if (!text) { _tgSend('Only text replies reach the guest chat for now.'); return; }
+  var match = _chatSummaries(0).filter(function (s) { return s.tag === tag; })[0];
+  if (!match) { _tgSend('Could not find Chat #' + tag + ' any more.'); return; }
+  var who = (from && from.first_name) ? from.first_name + ' · Aquatic Paradise' : 'Aquatic Paradise';
+  _chatAppend(match.convo, 'team', who, '', text.slice(0, CHAT_MAX_LEN));
+  var wa = _waLink(match.contact, text);
+  var ack = '✅ Sent to ' + (match.name || 'the guest') + ' in the app chat (Chat #' + tag + ').' +
+    (wa ? '\nIf they\'ve left the page, tap below to send it on WhatsApp too.' : '');
+  if (wa) _tgSendButtons(ack, { inline_keyboard: [[{ text: '💬 Also send on WhatsApp', url: wa }]] });
+  else _tgSend(ack);
+}
+
+function _chatsDigest() {
+  var list = _chatSummaries(Date.now() - 86400000);
+  if (!list.length) return 'No guest chats in the last 24 hours.';
+  return '💬 Guest chats (24h)\n\n' + list.slice(0, 15).map(function (s) {
+    var t = Utilities.formatDate(new Date(s.lastAt), 'America/St_Vincent', 'h:mm a');
+    return '• #' + s.tag + ' — ' + (s.name || 'Guest') + ' (' + t + ')\n  ' +
+      (s.lastFrom === 'team' ? '✅ You: ' : '❓ ') + String(s.lastText).slice(0, 80);
+  }).join('\n\n') + '\n\nTo answer one, reply to its original alert message — or open Admin → Chats.';
 }
 
 // ── WHATSAPP TAP-TO-SEND LINKS (no API, no tokens, no second number) ──
