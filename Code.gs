@@ -860,7 +860,7 @@ function getStockOverview() {
     });
     var alarm = getAlarmStatus();
     if (alarm.connected) _ensureTelegramTriggers(); // cheap no-op once installed
-    return { ok: true, items: items, deals: _readJsonProp(DEALS_PROP, []), alarm: alarm, sms: getSmsStatus(), wa: getWaStatus() };
+    return { ok: true, items: items, deals: _readJsonProp(DEALS_PROP, []), alarm: alarm, sms: getSmsStatus(), wa: getWaStatus(), cmb: getCmbStatus() };
   } catch (err) {
     return _fail('getStockOverview', err);
   }
@@ -1329,6 +1329,68 @@ function _waOwnerMessage(m) {
   }
   if (/^\/?chats?$/i.test(text)) { _waToOwner(_chatsDigest().replace('reply to its original alert message — or open Admin → Chats', 'reply to its alert, or send "#tag your message"')); return; }
   _waToOwner('To answer a guest, swipe their chat alert and Reply — or send "#abc123 your message" using the chat\'s tag.\nSend "chats" to list today\'s chats.');
+}
+
+// ── WHATSAPP ALERTS VIA CALLMEBOT (quick, free, one-way) ──
+// No Meta account needed: the owner messages CallMeBot's number once and gets
+// an API key back. Alerts only — replies happen from the link in the alert
+// (Admin → Chats) or Telegram. Guest name + message pass through CallMeBot.
+var CMB_PHONE_PROP = 'CMB_PHONE', CMB_KEY_PROP = 'CMB_APIKEY';
+var SITE_URL = 'https://aquaticparadiserental.vacations/';
+
+function getCmbStatus() {
+  var props = PropertiesService.getScriptProperties();
+  var phone = props.getProperty(CMB_PHONE_PROP) || '';
+  return { configured: !!(phone && props.getProperty(CMB_KEY_PROP)), phoneMasked: phone ? '+' + phone.slice(0, 1) + ' •••' + phone.slice(-4) : '' };
+}
+
+function setCmbConfig(p) {
+  try {
+    var phone = String((p && p.phone) || '').replace(/\D/g, '');
+    var key = String((p && p.apiKey) || '').trim();
+    if (phone.length === 10) phone = '1' + phone;
+    if (!/^\d{11,15}$/.test(phone)) return { ok: false, error: 'Phone needs the country code, e.g. 1 784 496 3447' };
+    if (!/^[A-Za-z0-9]{4,40}$/.test(key)) return { ok: false, error: 'Paste the apikey number CallMeBot sent you' };
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty(CMB_PHONE_PROP, phone);
+    props.setProperty(CMB_KEY_PROP, key);
+    var t = _cmbSend('✅ Aquatic Paradise: guest chat alerts are connected to this WhatsApp.');
+    return t.ok ? { ok: true } : { ok: false, error: 'Saved, but the test failed: ' + t.error };
+  } catch (err) {
+    return _fail('setCmbConfig', err);
+  }
+}
+
+function _cmbSend(text) {
+  var props = PropertiesService.getScriptProperties();
+  var phone = props.getProperty(CMB_PHONE_PROP), key = props.getProperty(CMB_KEY_PROP);
+  if (!phone || !key) return { ok: false, error: 'Not set up' };
+  try {
+    var res = UrlFetchApp.fetch('https://api.callmebot.com/whatsapp.php?phone=' + phone +
+      '&text=' + encodeURIComponent(String(text).slice(0, 700)) + '&apikey=' + encodeURIComponent(key), { muteHttpExceptions: true });
+    var body = res.getContentText();
+    if (res.getResponseCode() === 200 && !/error|invalid|not (allowed|authori)/i.test(body)) return { ok: true };
+    var msg = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160) || ('HTTP ' + res.getResponseCode());
+    _logError('_cmbSend', new Error(msg));
+    return { ok: false, error: msg };
+  } catch (err) {
+    _logError('_cmbSend', err);
+    return { ok: false, error: 'Could not reach CallMeBot' };
+  }
+}
+
+function testCmb() {
+  var r = _cmbSend('🔔 Test from Aquatic Paradise — guest chats will arrive here.');
+  return r.ok ? { ok: true } : r;
+}
+
+function _cmbChatAlert(convo, isNew, name, contact, text) {
+  if (!getCmbStatus().configured) return false;
+  var lines = [(isNew ? '💬 NEW GUEST CHAT' : '💬 Guest chat') + ' – ' + name + (contact ? ' (' + contact + ')' : ''), '', text, '',
+    '↩️ Reply here: ' + SITE_URL + 'admin.html#chat=' + convo];
+  var wa = _waLink(contact, 'Hi ' + name.split(' ')[0] + ', this is Aquatic Paradise Rentals about your chat.');
+  if (wa) lines.push('Or WhatsApp them: ' + wa);
+  return _cmbSend(lines.join('\n')).ok;
 }
 
 function _chatConvoByWaId(waId) {
@@ -2540,7 +2602,7 @@ function doPost(e) {
     if (payload.action === 'getAvailability') {
       return _json(getAvailability(payload));
     }
-    if (['getStockOverview', 'setStock', 'createDeal', 'endDeal', 'setTelegramToken', 'connectTelegram', 'testAlarm', 'sendBriefing', 'setSmsConfig', 'testSms', 'setWaConfig', 'testWa'].indexOf(payload.action) !== -1) {
+    if (['getStockOverview', 'setStock', 'createDeal', 'endDeal', 'setTelegramToken', 'connectTelegram', 'testAlarm', 'sendBriefing', 'setSmsConfig', 'testSms', 'setWaConfig', 'testWa', 'setCmbConfig', 'testCmb'].indexOf(payload.action) !== -1) {
       // Owner-only: stock counts, deals and the alarm phone.
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       if (payload.action === 'getStockOverview') return _json(getStockOverview());
@@ -2554,6 +2616,8 @@ function doPost(e) {
       if (payload.action === 'testSms') return _json(testSms());
       if (payload.action === 'setWaConfig') return _json(setWaConfig(payload));
       if (payload.action === 'testWa') return _json(testWa());
+      if (payload.action === 'setCmbConfig') return _json(setCmbConfig(payload));
+      if (payload.action === 'testCmb') return _json(testCmb());
       return _json(testAlarm());
     }
     if (payload.action === 'getServiceStatus') {
@@ -3880,6 +3944,8 @@ function chatSend(p) {
     var notified = wa ? _tgSendButtons(alert, { inline_keyboard: [[{ text: '💬 WhatsApp guest', url: wa }]] }) : _tgSend(alert);
     try { if (_waChatAlert(convo, _chatLastRow, isNew, name, contact, text)) notified = true; }
     catch (err) { _logError('chatSend.whatsapp', err); }
+    try { if (_cmbChatAlert(convo, isNew, name, contact, text)) notified = true; }
+    catch (err) { _logError('chatSend.callmebot', err); }
     return { ok: true, messages: _chatPublic(msgs), notified: !!notified };
   } catch (err) {
     return _fail('chatSend', err);

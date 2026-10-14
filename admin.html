@@ -436,7 +436,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   <div class="sec-title">📱 Text-Message Alarms (works with no internet)</div>
   <div class="card" id="smsCard">Loading…</div>
 
-  <div class="sec-title">🟢 Guest Chats on WhatsApp (Meta)</div>
+  <div class="sec-title">🟢 Guest Chats to Your WhatsApp (quick setup)</div>
+  <div class="card" id="cmbCard">Loading…</div>
+
+  <div class="sec-title">🟢 WhatsApp Two-Way via Meta (advanced, optional)</div>
   <div class="card" id="waCard">Loading…</div>
 
   <div class="sec-title">Fleet Summary</div>
@@ -1028,6 +1031,7 @@ async function checkPin() {
     document.getElementById('appShell').style.display='block';
     document.getElementById('sessionTime').textContent = new Date().toLocaleTimeString();
     onLogin();
+    openDeepLink();
     addLog('🔐 ' + currentUser.name + ' logged in');
     resetIdleTimer();
   } else {
@@ -2386,6 +2390,7 @@ async function fetchStockOverview() {
   renderAlarm();
   renderSms();
   renderWa();
+  renderCmb();
 }
 
 function renderStock() {
@@ -2526,6 +2531,37 @@ function renderSms() {
        <button class="stock-btn ghost" style="margin-top:8px" onclick="document.getElementById('smsSetup').style.display='block'">Change SMS settings</button>
        <div id="smsSetup" style="display:none;margin-top:12px">${setup}</div>`
     : setup;
+}
+
+// Guest chat alerts to the owner's WhatsApp via CallMeBot — free, no Meta account, alerts only.
+function renderCmb() {
+  const s = stockOverview.cmb || {};
+  const el = document.getElementById('cmbCard');
+  const field = (id, ph, type, val) => `<input id="${id}" type="${type||'text'}" autocomplete="off" placeholder="${ph}" value="${val||''}" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:0.85rem;box-sizing:border-box;margin-bottom:8px">`;
+  const setup = `<ol class="tg-steps">
+      <li>Save CallMeBot's number <b>+34 611 08 28 80</b> in your contacts (check it still matches <a href="https://www.callmebot.com/blog/free-api-whatsapp-messages/" target="_blank" style="color:var(--teal)">their page</a>).</li>
+      <li>From <b>your</b> WhatsApp, send that contact exactly: <code>I allow callmebot to send me messages</code></li>
+      <li>Within a couple of minutes it replies with your <b>apikey</b> (a number). Paste it below with your WhatsApp number.</li>
+    </ol>
+    ${field('cmbPhone', 'Your WhatsApp number', 'tel', '1 784 496 3447')}
+    ${field('cmbKey', 'apikey from CallMeBot', 'password')}
+    <button class="stock-btn" onclick="saveCmb()">💾 Save &amp; Send Test</button>
+    <div style="font-size:0.75rem;color:var(--muted);margin-top:8px">Each guest chat message arrives on your WhatsApp with a link — tap it to reply (asks for your PIN). Free service run by a third party: the guest's name and message pass through CallMeBot.</div>`;
+  el.innerHTML = s.configured
+    ? `<div style="font-weight:700;color:var(--teal);margin-bottom:8px">✅ Guest chats are sent to WhatsApp ${escapeHtml(s.phoneMasked)}</div>
+       <button class="stock-btn" onclick="alarmAction('testCmb','Test sent — check WhatsApp 🟢')">🟢 Send Test Message</button>
+       <button class="stock-btn ghost" style="margin-top:8px" onclick="document.getElementById('cmbSetup').style.display='block'">Change settings</button>
+       <div id="cmbSetup" style="display:none;margin-top:12px">${setup}</div>`
+    : setup;
+}
+
+async function saveCmb() {
+  const v = id => document.getElementById(id).value.trim();
+  try {
+    await stockApi('setCmbConfig', { phone: v('cmbPhone'), apiKey: v('cmbKey') });
+    showToast('Connected ✅ — check WhatsApp for the test');
+    fetchStockOverview();
+  } catch (err) { showToast(err.message, 'warn'); }
 }
 
 // Guest chats to the owner's WhatsApp via Meta's Cloud API (bot number → owner's number).
@@ -3607,7 +3643,7 @@ async function fetchChats() {
     if (!d || !d.ok) throw new Error();
     chatsCache = d.chats || [];
     renderChatsList();
-    if (openChatConvo) fetchChatThread(openChatConvo);
+    if (openChatConvo) { setChatHeader(openChatConvo); fetchChatThread(openChatConvo); }
   } catch (err) {
     showToast('Could not load chats', 'warn');
   }
@@ -3636,14 +3672,26 @@ function openChat(convo) {
   openChatConvo = convo;
   document.getElementById('chatsList').style.display = 'none';
   document.getElementById('chatThread').style.display = 'block';
+  setChatHeader(convo);
+  document.getElementById('chatThreadMsgs').innerHTML = '<div style="color:var(--muted);font-size:0.8rem">Loading…</div>';
+  fetchChatThread(convo);
+}
+
+function setChatHeader(convo) {
   const c = chatsCache.find(x => x.convo === convo) || {};
   document.getElementById('chatThreadHead').textContent = (c.name || 'Guest') + ' · Chat #' + convo.slice(0, 6);
   const digits = String(c.contact || '').replace(/\D/g, '');
   document.getElementById('chatThreadContact').innerHTML = c.contact
     ? escapeHtml(c.contact) + (digits.length >= 7 ? ` · <a href="https://wa.me/${digits}" target="_blank" style="color:#25D366;font-weight:700">Open in WhatsApp</a>` : '')
     : 'No phone given — reply here only';
-  document.getElementById('chatThreadMsgs').innerHTML = '<div style="color:var(--muted);font-size:0.8rem">Loading…</div>';
-  fetchChatThread(convo);
+}
+
+// Links in phone alerts: admin.html#chats or admin.html#chat=<id> open straight to it after the PIN.
+function openDeepLink() {
+  const m = location.hash.match(/^#chat=([a-f0-9]{32})$/);
+  if (location.hash !== '#chats' && !m) return;
+  switchATab('chats');
+  if (m) openChat(m[1]);
 }
 
 function closeChatThread() {
