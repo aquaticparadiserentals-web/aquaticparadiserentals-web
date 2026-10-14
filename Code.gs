@@ -860,7 +860,7 @@ function getStockOverview() {
     });
     var alarm = getAlarmStatus();
     if (alarm.connected) _ensureTelegramTriggers(); // cheap no-op once installed
-    return { ok: true, items: items, deals: _readJsonProp(DEALS_PROP, []), alarm: alarm, sms: getSmsStatus() };
+    return { ok: true, items: items, deals: _readJsonProp(DEALS_PROP, []), alarm: alarm, sms: getSmsStatus(), wa: getWaStatus() };
   } catch (err) {
     return _fail('getStockOverview', err);
   }
@@ -1159,6 +1159,193 @@ function _smsSend(text) {
 function testSms() {
   var r = _smsSend('Test text from Aquatic Paradise — SMS alarms are working.');
   return r.ok ? { ok: true } : r;
+}
+
+// ── WHATSAPP (Meta Cloud API) — guest chats to the owner's own WhatsApp ──
+// A dedicated bot number (registered in Meta) messages the owner's normal
+// WhatsApp. Replying to an alert there sends the answer into the guest's chat.
+// Meta's webhook can't reach Apps Script directly (every POST here answers with
+// a 302), so the platform server on Render relays the raw webhook body plus
+// Meta's signature, and it's verified here against the app secret.
+// Meta only allows free-form messages within 24h of the owner last messaging the
+// bot; outside that, alerts go out as the approved template (same one the
+// platform uses: "Aquatic Paradise Platform alert: {{1}}").
+var WA_TOKEN_PROP = 'WA_TOKEN', WA_PHONE_ID_PROP = 'WA_PHONE_ID', WA_TO_PROP = 'WA_TO';
+var WA_APP_SECRET_PROP = 'WA_APP_SECRET', WA_TEMPLATE_PROP = 'WA_TEMPLATE';
+var WA_LAST_IN_PROP = 'WA_LAST_IN', WA_LAST_HOOK_PROP = 'WA_LAST_HOOK';
+var WA_GRAPH = 'https://graph.facebook.com/v21.0/';
+var WA_WINDOW_MS = 23.5 * 3600000; // a little under Meta's 24h, for clock slack
+var _chatLastRow = 0; // row written by the latest _chatAppend in this execution
+
+function getWaStatus() {
+  var props = PropertiesService.getScriptProperties();
+  var to = props.getProperty(WA_TO_PROP) || '';
+  var lastIn = Number(props.getProperty(WA_LAST_IN_PROP)) || 0;
+  return {
+    configured: !!(props.getProperty(WA_TOKEN_PROP) && props.getProperty(WA_PHONE_ID_PROP) && to),
+    repliesOn: !!props.getProperty(WA_APP_SECRET_PROP),
+    toMasked: to ? '+' + to.slice(0, 1) + ' •••' + to.slice(-4) : '',
+    windowOpen: Date.now() - lastIn < WA_WINDOW_MS,
+    lastHook: props.getProperty(WA_LAST_HOOK_PROP) || ''
+  };
+}
+
+function setWaConfig(p) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var token = String((p && p.waToken) || '').trim();
+    var phoneId = String((p && p.phoneId) || '').trim();
+    var to = String((p && p.to) || '').replace(/\D/g, '');
+    var secret = String((p && p.appSecret) || '').trim();
+    if (to.length === 10) to = '1' + to;
+    if (token && !/^[A-Za-z0-9_-]{50,}$/.test(token)) return { ok: false, error: 'That access token looks incomplete — copy the whole thing' };
+    if (!/^\d{10,20}$/.test(phoneId)) return { ok: false, error: 'Phone Number ID is the long number shown under API Setup (not the phone number itself)' };
+    if (!/^\d{11,15}$/.test(to)) return { ok: false, error: 'Your WhatsApp number needs the country code, e.g. 1 784 496 3447' };
+    if (secret && !/^[a-f0-9]{32}$/i.test(secret)) return { ok: false, error: 'App Secret is 32 letters/numbers (App settings → Basic → App secret → Show)' };
+    if (!token && !props.getProperty(WA_TOKEN_PROP)) return { ok: false, error: 'Paste the access token' };
+    if (token) props.setProperty(WA_TOKEN_PROP, token);
+    if (secret) props.setProperty(WA_APP_SECRET_PROP, secret);
+    props.setProperty(WA_PHONE_ID_PROP, phoneId);
+    props.setProperty(WA_TO_PROP, to);
+    var tpl = String((p && p.template) || '').trim();
+    if (/^[a-z0-9_]{1,512}$/.test(tpl)) props.setProperty(WA_TEMPLATE_PROP, tpl);
+    return { ok: true };
+  } catch (err) {
+    return _fail('setWaConfig', err);
+  }
+}
+
+function _waPost(body) {
+  var props = PropertiesService.getScriptProperties();
+  var token = props.getProperty(WA_TOKEN_PROP), phoneId = props.getProperty(WA_PHONE_ID_PROP);
+  if (!token || !phoneId) return { ok: false, error: 'WhatsApp not set up' };
+  try {
+    var res = UrlFetchApp.fetch(WA_GRAPH + phoneId + '/messages', {
+      method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+      headers: { Authorization: 'Bearer ' + token }, payload: JSON.stringify(body)
+    });
+    var data = {};
+    try { data = JSON.parse(res.getContentText()); } catch (e) {}
+    if (res.getResponseCode() < 300 && data.messages && data.messages[0]) return { ok: true, id: data.messages[0].id };
+    var msg = (data.error && data.error.message) || ('HTTP ' + res.getResponseCode());
+    _logError('_waPost', new Error(msg));
+    return { ok: false, error: msg };
+  } catch (err) {
+    _logError('_waPost', err);
+    return { ok: false, error: 'Could not reach WhatsApp' };
+  }
+}
+
+// Free-form text while Meta's 24h window is open, otherwise the template.
+// forceTemplate is used when Meta reports a free-form message bounced.
+function _waToOwner(text, forceTemplate) {
+  var props = PropertiesService.getScriptProperties();
+  var to = props.getProperty(WA_TO_PROP);
+  if (!to) return { ok: false, error: 'WhatsApp not set up' };
+  var open = Date.now() - (Number(props.getProperty(WA_LAST_IN_PROP)) || 0) < WA_WINDOW_MS;
+  if (open && !forceTemplate) {
+    return _waPost({ messaging_product: 'whatsapp', to: to, type: 'text', text: { body: String(text).slice(0, 4000), preview_url: false } });
+  }
+  var param = String(text).replace(/[\r\n\t]+/g, ' ').replace(/ {4,}/g, '   ').slice(0, 1000);
+  return _waPost({ messaging_product: 'whatsapp', to: to, type: 'template', template: {
+    name: props.getProperty(WA_TEMPLATE_PROP) || 'booking_alert', language: { code: 'en' },
+    components: [{ type: 'body', parameters: [{ type: 'text', text: param }] }] } });
+}
+
+function testWa() {
+  var r = _waToOwner('🔔 Test from Aquatic Paradise — guest chats will arrive here. Reply to a chat alert to answer the guest.');
+  return r.ok ? { ok: true } : r;
+}
+
+// Sends a guest chat message to the owner's WhatsApp and remembers the
+// WhatsApp message id on that chat row, so a reply to it finds the thread.
+function _waChatAlert(convo, row, isNew, name, contact, text) {
+  if (!getWaStatus().configured) return false;
+  var body = (isNew ? '💬 NEW GUEST CHAT' : '💬 Guest chat') + ' · Chat #' + convo.slice(0, 6) + '\n' +
+    'From: ' + name + (contact ? ' · ' + contact : '') + '\n\n' + text + '\n\n↩️ Reply to this message to answer them.';
+  var r = _waToOwner(body);
+  if (r.ok && row) {
+    try {
+      var sh = _chatSheet();
+      if (!sh.getRange(1, 7).getValue()) sh.getRange(1, 7).setValue('waId').setFontWeight('bold');
+      sh.getRange(row, 7).setValue(r.id);
+    } catch (err) { _logError('_waChatAlert.store', err); }
+  }
+  return r.ok;
+}
+
+// Relayed from the platform server: { raw: <exact body Meta sent>, sig: <X-Hub-Signature-256> }.
+function waWebhook(p) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var secret = props.getProperty(WA_APP_SECRET_PROP);
+    var raw = String((p && p.raw) || '');
+    if (!secret || !raw) return { ok: false, error: 'Not set up' };
+    var mac = Utilities.computeHmacSha256Signature(raw, secret, Utilities.Charset.UTF_8)
+      .map(function (b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('');
+    if (String((p && p.sig) || '') !== 'sha256=' + mac) { _recordAuthFailure('whatsapp'); return { ok: false, error: 'Bad signature' }; }
+    props.setProperty(WA_LAST_HOOK_PROP, new Date().toISOString());
+
+    var data = JSON.parse(raw), owner = props.getProperty(WA_TO_PROP);
+    var cache = CacheService.getScriptCache();
+    (data.entry || []).forEach(function (entry) {
+      (entry.changes || []).forEach(function (change) {
+        var v = change.value || {};
+        (v.messages || []).forEach(function (m) {
+          if (String(m.from) !== owner) return; // only the owner can answer guests
+          if (cache.get('wamsg_' + m.id)) return; // Meta retries deliveries
+          cache.put('wamsg_' + m.id, '1', 21600);
+          props.setProperty(WA_LAST_IN_PROP, String(Date.now()));
+          _waOwnerMessage(m);
+        });
+        (v.statuses || []).forEach(function (s) {
+          // A free-form alert bounced because the 24h window had closed — resend it as the template.
+          var code = s.errors && s.errors[0] && s.errors[0].code;
+          if (s.status === 'failed' && code === 131047) _waResendAsTemplate(s.id);
+        });
+      });
+    });
+    return { ok: true };
+  } catch (err) {
+    return _fail('waWebhook', err);
+  }
+}
+
+function _waOwnerMessage(m) {
+  var text = m.type === 'text' && m.text ? String(m.text.body || '').trim() : '';
+  if (!text) { _waToOwner('Only text replies reach the guest chat for now.'); return; }
+  var convo = '';
+  var tagged = text.match(/^#([a-f0-9]{6})\s+([\s\S]+)/i);
+  if (m.context && m.context.id) convo = _chatConvoByWaId(m.context.id);
+  if (!convo && tagged) {
+    var hit = _chatSummaries(0).filter(function (s) { return s.tag === tagged[1].toLowerCase(); })[0];
+    if (hit) { convo = hit.convo; text = tagged[2].trim(); }
+  }
+  if (convo) {
+    var info = _chatSummaries(0).filter(function (s) { return s.convo === convo; })[0] || {};
+    _chatAppend(convo, 'team', 'Aquatic Paradise', '', text.slice(0, CHAT_MAX_LEN));
+    _waToOwner('✅ Sent to ' + (info.name || 'the guest') + ' (Chat #' + convo.slice(0, 6) + ').');
+    return;
+  }
+  if (/^\/?chats?$/i.test(text)) { _waToOwner(_chatsDigest().replace('reply to its original alert message — or open Admin → Chats', 'reply to its alert, or send "#tag your message"')); return; }
+  _waToOwner('To answer a guest, swipe their chat alert and Reply — or send "#abc123 your message" using the chat\'s tag.\nSend "chats" to list today\'s chats.');
+}
+
+function _chatConvoByWaId(waId) {
+  var rows = _chatSheet().getDataRange().getValues();
+  for (var i = rows.length - 1; i >= 1; i--) if (String(rows[i][6] || '') === String(waId)) return String(rows[i][0]);
+  return '';
+}
+
+function _waResendAsTemplate(waId) {
+  var sh = _chatSheet(), rows = sh.getDataRange().getValues();
+  for (var i = rows.length - 1; i >= 1; i--) {
+    if (String(rows[i][6] || '') !== String(waId)) continue;
+    var m = _chatRowToMsg(rows[i]), convo = String(rows[i][0]);
+    var r = _waToOwner('Chat #' + convo.slice(0, 6) + ' – ' + m.name + ': ' + m.text + ' (reply to this message to answer)', true);
+    if (r.ok) sh.getRange(i + 1, 7).setValue(r.id);
+    return;
+  }
 }
 
 // ── TELEGRAM OPERATIONS: booking buttons, daily briefing, /today ──
@@ -2258,6 +2445,11 @@ function doPost(e) {
     if (_isLockedDown() && LOCKDOWN_EXEMPT_ACTIONS.indexOf(payload.action) === -1) {
       return _json({ ok: false, error: LOCKDOWN_MESSAGE });
     }
+    if (payload.action === 'waWebhook') {
+      // Relayed by the platform server; authenticated by Meta's signature inside waWebhook().
+      if (!_rateLimitOk('chat', CHAT_RATE_MAX_PER_MINUTE)) return _json({ ok: false, error: 'Busy' });
+      return _json(waWebhook(payload));
+    }
     if (payload.action === 'chatSend' || payload.action === 'chatFetch') {
       // Public guest chat. Own rate bucket so open chat windows polling for
       // replies can never use up the budget real bookings need.
@@ -2348,7 +2540,7 @@ function doPost(e) {
     if (payload.action === 'getAvailability') {
       return _json(getAvailability(payload));
     }
-    if (['getStockOverview', 'setStock', 'createDeal', 'endDeal', 'setTelegramToken', 'connectTelegram', 'testAlarm', 'sendBriefing', 'setSmsConfig', 'testSms'].indexOf(payload.action) !== -1) {
+    if (['getStockOverview', 'setStock', 'createDeal', 'endDeal', 'setTelegramToken', 'connectTelegram', 'testAlarm', 'sendBriefing', 'setSmsConfig', 'testSms', 'setWaConfig', 'testWa'].indexOf(payload.action) !== -1) {
       // Owner-only: stock counts, deals and the alarm phone.
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       if (payload.action === 'getStockOverview') return _json(getStockOverview());
@@ -2360,6 +2552,8 @@ function doPost(e) {
       if (payload.action === 'sendBriefing') { _sendBriefing(); return _json({ ok: true }); }
       if (payload.action === 'setSmsConfig') return _json(setSmsConfig(payload));
       if (payload.action === 'testSms') return _json(testSms());
+      if (payload.action === 'setWaConfig') return _json(setWaConfig(payload));
+      if (payload.action === 'testWa') return _json(testWa());
       return _json(testAlarm());
     }
     if (payload.action === 'getServiceStatus') {
@@ -3647,7 +3841,9 @@ function _chatAppend(convo, from, name, contact, text) {
   try {
     var msgs = _chatThread(convo);
     var msg = { from: from, name: name, contact: contact || '', text: text, at: new Date().toISOString() };
-    _chatSheet().appendRow([convo, from, _chatCell(name), _chatCell(contact || ''), _chatCell(text), msg.at]);
+    var sh = _chatSheet();
+    sh.appendRow([convo, from, _chatCell(name), _chatCell(contact || ''), _chatCell(text), msg.at]);
+    _chatLastRow = sh.getLastRow();
     msgs.push(msg);
     _chatCachePut(convo, msgs);
     return msgs;
@@ -3682,6 +3878,8 @@ function chatSend(p) {
       '\n\n↩️ Swipe this message → Reply to answer in their chat.';
     var wa = _waLink(contact, 'Hi ' + name.split(' ')[0] + ', this is Aquatic Paradise Rentals — following up on your chat.');
     var notified = wa ? _tgSendButtons(alert, { inline_keyboard: [[{ text: '💬 WhatsApp guest', url: wa }]] }) : _tgSend(alert);
+    try { if (_waChatAlert(convo, _chatLastRow, isNew, name, contact, text)) notified = true; }
+    catch (err) { _logError('chatSend.whatsapp', err); }
     return { ok: true, messages: _chatPublic(msgs), notified: !!notified };
   } catch (err) {
     return _fail('chatSend', err);

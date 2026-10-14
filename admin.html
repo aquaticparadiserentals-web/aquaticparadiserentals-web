@@ -436,6 +436,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   <div class="sec-title">📱 Text-Message Alarms (works with no internet)</div>
   <div class="card" id="smsCard">Loading…</div>
 
+  <div class="sec-title">🟢 Guest Chats on WhatsApp (Meta)</div>
+  <div class="card" id="waCard">Loading…</div>
+
   <div class="sec-title">Fleet Summary</div>
   <div class="dash-grid" id="invSummary"></div>
   <button onclick="exportInventoryCSV()" style="margin-top:8px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--navy);padding:9px 16px;font-size:0.8rem;font-weight:700;cursor:pointer">📥 Export Inventory CSV</button>
@@ -697,7 +700,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
     <div class="sec-title" style="margin:0">Guest Chats</div>
     <button class="refresh-btn" onclick="fetchChats()">🔄 Refresh</button>
   </div>
-  <p style="font-size:0.72rem;color:var(--muted);margin-bottom:12px">Messages guests send from the booking page's 💬 button. Each one also pings the Telegram bot — away from the computer, swipe the Telegram message and Reply, and the guest sees it here and on their screen.</p>
+  <p style="font-size:0.72rem;color:var(--muted);margin-bottom:12px">Messages guests send from the booking page's 💬 button. Each one also goes to your Telegram bot and your WhatsApp (if set up in Fleet) — away from the computer, reply to that message on your phone and the guest sees it here and on their screen.</p>
   <div id="chatsList"></div>
   <div id="chatThread" style="display:none">
     <button class="refresh-btn" onclick="closeChatThread()" style="margin-bottom:10px">← All chats</button>
@@ -2382,6 +2385,7 @@ async function fetchStockOverview() {
   renderDeals();
   renderAlarm();
   renderSms();
+  renderWa();
 }
 
 function renderStock() {
@@ -2522,6 +2526,43 @@ function renderSms() {
        <button class="stock-btn ghost" style="margin-top:8px" onclick="document.getElementById('smsSetup').style.display='block'">Change SMS settings</button>
        <div id="smsSetup" style="display:none;margin-top:12px">${setup}</div>`
     : setup;
+}
+
+// Guest chats to the owner's WhatsApp via Meta's Cloud API (bot number → owner's number).
+function renderWa() {
+  const s = stockOverview.wa || {};
+  const el = document.getElementById('waCard');
+  const field = (id, ph, type, val) => `<input id="${id}" type="${type||'text'}" autocomplete="off" placeholder="${ph}" value="${val||''}" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:0.85rem;box-sizing:border-box;margin-bottom:8px">`;
+  const setup = `<ol class="tg-steps">
+      <li>In <b>developers.facebook.com</b> → your app → <b>WhatsApp → API Setup</b>, copy the <b>Phone Number ID</b> of the bot number.</li>
+      <li>In <b>business.facebook.com</b> → Settings → <b>System users</b>, generate a permanent token with <i>whatsapp_business_messaging</i> permission.</li>
+      <li>For replies: App settings → Basic → <b>App secret</b> → Show, and copy it.</li>
+    </ol>
+    ${field('waToken', s.configured ? 'Access token (leave blank to keep the saved one)' : 'Access token', 'password')}
+    ${field('waPhoneId', 'Phone Number ID (long number from API Setup)')}
+    ${field('waTo', 'Your WhatsApp that receives chats', 'tel', '1 784 496 3447')}
+    ${field('waSecret', s.repliesOn ? 'App secret (leave blank to keep the saved one)' : 'App secret (for replies)', 'password')}
+    <button class="stock-btn" onclick="saveWa()">💾 Save WhatsApp Settings</button>
+    <div style="font-size:0.75rem;color:var(--muted);margin-top:8px">Every guest chat message goes to your WhatsApp. Reply to it there and the guest sees your answer on the booking page.</div>`;
+  el.innerHTML = s.configured
+    ? `<div style="font-weight:700;color:var(--teal);margin-bottom:6px">✅ Guest chats go to WhatsApp ${escapeHtml(s.toMasked)}</div>
+       <div style="font-size:0.75rem;color:var(--muted);margin-bottom:10px">
+         Replies from WhatsApp: ${s.repliesOn ? (s.lastHook ? '✅ working (last seen ' + escapeHtml(new Date(s.lastHook).toLocaleString()) + ')' : '⏳ waiting for the first message from Meta') : '❌ add the App secret below'}<br>
+         ${s.windowOpen ? '🟢 Free messages open (you messaged the bot in the last 24h)' : '🟡 Using the paid template — message the bot "hi" to open 24h of free messages'}
+       </div>
+       <button class="stock-btn" onclick="alarmAction('testWa','Test sent — check WhatsApp 🟢')">🟢 Send Test Message</button>
+       <button class="stock-btn ghost" style="margin-top:8px" onclick="document.getElementById('waSetup').style.display='block'">Change WhatsApp settings</button>
+       <div id="waSetup" style="display:none;margin-top:12px">${setup}</div>`
+    : setup;
+}
+
+async function saveWa() {
+  const v = id => document.getElementById(id).value.trim();
+  try {
+    await stockApi('setWaConfig', { waToken: v('waToken'), phoneId: v('waPhoneId'), to: v('waTo'), appSecret: v('waSecret') });
+    showToast('WhatsApp saved — tap Send Test Message');
+    fetchStockOverview();
+  } catch (err) { showToast(err.message, 'warn'); }
 }
 
 async function saveSms() {
