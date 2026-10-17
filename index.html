@@ -131,7 +131,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 .gear-card .gear-name{font-size:0.9rem;font-weight:600;color:var(--ink)}
 .gear-card .gear-price{font-size:0.78rem;color:var(--teal);font-weight:600;margin-top:3px}
 .gear-card .qty-controls{display:flex;align-items:center;gap:8px;margin-top:10px}
-.qty-btn{width:26px;height:26px;border-radius:6px;border:1px solid var(--navy);background:var(--navy);color:#fff;font-size:0.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:600;transition:background 0.12s}
+.qty-btn{width:40px;height:40px;border-radius:6px;border:1px solid var(--navy);background:var(--navy);color:#fff;font-size:0.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:600;transition:background 0.12s}
 .qty-btn:hover{background:var(--navy-2)}
 .qty-display{font-weight:600;font-size:0.9rem;min-width:20px;text-align:center}
 .gear-check{position:absolute;top:10px;right:10px;width:18px;height:18px;background:var(--teal);border-radius:5px;display:none;align-items:center;justify-content:center;color:#fff;font-size:0.65rem}
@@ -169,10 +169,10 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 
 /* ── WAIVER ── */
 .waiver-box{background:var(--card);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);border:1px solid var(--line);margin-bottom:22px}
-.waiver-box h3{font-size:0.9rem;font-weight:600;color:var(--coral);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.waiver-box h3{font-size:0.9rem;font-weight:600;color:var(--ink);margin-bottom:10px;display:flex;align-items:center;gap:6px}
 .waiver-text{font-size:0.75rem;color:var(--muted);line-height:1.6;max-height:160px;overflow-y:auto;padding:10px;background:var(--light);border-radius:6px;margin-bottom:14px}
 .waiver-check{display:flex;align-items:flex-start;gap:10px;cursor:pointer}
-.waiver-check input{width:18px;height:18px;margin-top:1px;accent-color:var(--coral);flex-shrink:0}
+.waiver-check input{width:20px;height:20px;margin-top:1px;accent-color:var(--teal);flex-shrink:0}
 .waiver-check span{font-size:0.82rem;color:var(--ink);font-weight:500;line-height:1.4}
 .sig-pad-wrap{border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--card)}
 .sig-pad-wrap canvas{display:block;width:100%;height:150px;touch-action:none;cursor:crosshair}
@@ -234,6 +234,14 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.error{background:var(--coral)}
 .toast.success{background:var(--emerald)}
+.toast.warn{background:var(--amber);color:#1a1205}
+.toast{white-space:normal;max-width:calc(100vw - 32px);text-align:center}
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.form-group input:focus-visible,.form-group select:focus-visible,.form-group textarea:focus-visible{outline:none}
+::selection{background:rgba(14,124,144,.28)}
+.book-missing{font-size:0.78rem;color:var(--muted);text-align:center;margin-top:8px;line-height:1.45}
+@media (max-width:420px){.header-badge{display:none}}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 
 /* ── LOADING ── */
 .spinner{display:inline-block;width:18px;height:18px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px}
@@ -347,9 +355,9 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
   </div>
   <nav>
     <div class="nav-tabs">
-      <div class="nav-tab active" onclick="switchTab('book')" data-i18n="nav_book">📋 Book</div>
-      <div class="nav-tab" onclick="switchTab('rates')" data-i18n="nav_rates">💰 Rates</div>
-      <div class="nav-tab" onclick="switchTab('info')" data-i18n="nav_info">ℹ️ Info</div>
+      <div class="nav-tab active" role="button" tabindex="0" onclick="switchTab('book')" data-i18n="nav_book">📋 Book</div>
+      <div class="nav-tab" role="button" tabindex="0" onclick="switchTab('rates')" data-i18n="nav_rates">💰 Rates</div>
+      <div class="nav-tab" role="button" tabindex="0" onclick="switchTab('info')" data-i18n="nav_info">ℹ️ Info</div>
     </div>
   </nav>
 </header>
@@ -458,28 +466,28 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
     <div class="section-title" data-i18n="step3_title">3 · Your Details</div>
     <div class="form-group form-row">
       <div>
-        <label data-i18n="label_fname">First Name *</label>
+        <label for="fname" data-i18n="label_fname">First Name *</label>
         <input type="text" id="fname" placeholder="e.g. James" data-i18n-ph="ph_fname" autocomplete="given-name"/>
       </div>
       <div>
-        <label data-i18n="label_lname">Last Name *</label>
+        <label for="lname" data-i18n="label_lname">Last Name *</label>
         <input type="text" id="lname" placeholder="e.g. Smith" data-i18n-ph="ph_lname" autocomplete="family-name"/>
       </div>
     </div>
     <div class="form-group">
-      <label data-i18n="label_phone">WhatsApp / Phone *</label>
+      <label for="phone" data-i18n="label_phone">WhatsApp / Phone *</label>
       <input type="tel" id="phone" placeholder="+1 784 xxx xxxx" autocomplete="tel"/>
     </div>
     <div class="form-group">
-      <label data-i18n="label_email">Email</label>
+      <label for="email" data-i18n="label_email">Email</label>
       <input type="email" id="email" placeholder="your@email.com" autocomplete="email"/>
     </div>
     <div class="form-group">
-      <label data-i18n="label_datetime">Preferred Date &amp; Time *</label>
+      <label for="datetime" data-i18n="label_datetime">Preferred Date &amp; Time *</label>
       <input type="datetime-local" id="datetime"/>
     </div>
     <div class="form-group">
-      <label data-i18n="label_beach">🏖️ Choose Your Beach *</label>
+      <label for="beach" data-i18n="label_beach">🏖️ Choose Your Beach *</label>
       <select id="beach">
         <option value="" data-i18n="opt_select_beach">-- Select your beach --</option>
         <option>Princess Margaret Beach</option>
@@ -488,7 +496,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
       </select>
     </div>
     <div class="form-group">
-      <label data-i18n="label_groupsize">Group Size (people)</label>
+      <label for="groupSize" data-i18n="label_groupsize">Group Size (people)</label>
       <select id="groupSize">
         <option value="1" data-i18n="opt_group_1">Just me (1)</option>
         <option value="2" data-i18n="opt_group_2">2 people</option>
@@ -498,11 +506,11 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
       </select>
     </div>
     <div class="form-group">
-      <label data-i18n="label_kids">Kids in your group (12 and under)</label>
+      <label for="kidsCount" data-i18n="label_kids">Kids in your group (12 and under)</label>
       <input type="number" id="kidsCount" min="0" max="20" step="1" placeholder="0" value="0"/>
     </div>
     <div class="form-group">
-      <label data-i18n="label_hear">How did you hear about us?</label>
+      <label for="referral" data-i18n="label_hear">How did you hear about us?</label>
       <select id="referral">
         <option value="" data-i18n="opt_select">-- Select --</option>
         <option data-i18n="opt_instagram">Instagram</option>
@@ -515,7 +523,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
     </div>
     <div id="partnerNote" class="partner-note" style="display:none"></div>
     <div class="form-group">
-      <label data-i18n="label_notes">Special Requests / Notes</label>
+      <label for="notes" data-i18n="label_notes">Special Requests / Notes</label>
       <textarea id="notes" placeholder="Anything we should know? Skill level, accessibility needs, etc." data-i18n-ph="ph_notes"></textarea>
     </div>
 
@@ -523,7 +531,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
     <div class="id-upload-box">
       <h3 data-i18n="id_upload_h3">🪪 Upload a Photo ID</h3>
       <p class="id-upload-hint" data-i18n="id_upload_hint">Driver's license, passport, or national ID. This helps us verify your rental agreement — you can also show ID in person at pickup if you'd rather skip this step.</p>
-      <input type="file" id="idPhotoInput" class="id-upload-input" accept="image/*" onchange="handleIdPhotoSelect(event)"/>
+      <input type="file" id="idPhotoInput" aria-label="Photo ID" class="id-upload-input" accept="image/*" onchange="handleIdPhotoSelect(event)"/>
       <img id="idPhotoPreview" class="id-upload-preview" alt="ID preview"/>
       <div class="id-upload-status" id="idPhotoStatus"></div>
     </div>
@@ -547,18 +555,18 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
         <span data-i18n="waiver_agree">I have read, understood, and agree to the Liability Waiver and Safety Agreement above. I confirm all information provided is accurate.</span>
       </label>
       <div style="margin-top:14px" id="sigModeDrawn">
-        <label style="display:block;font-size:0.78rem;font-weight:700;color:var(--navy);margin-bottom:6px"><span data-i18n="sig_below">✍️ Sign below</span> <span style="color:var(--coral)">*</span></label>
+        <label style="display:block;font-size:0.78rem;font-weight:700;color:var(--ink);margin-bottom:6px"><span data-i18n="sig_below">✍️ Sign below</span> <span style="color:var(--coral)">*</span></label>
         <div class="sig-pad-wrap"><canvas id="waiverSigCanvas"></canvas></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:10px;flex-wrap:wrap">
           <button type="button" class="sig-clear-btn" onclick="clearWaiverSignature()" data-i18n="btn_clear">Clear</button>
           <a href="#" class="sig-mode-link" onclick="toggleSignatureMode(event)" data-i18n="sig_prefer_type">Prefer to type your name instead? →</a>
         </div>
-        <p style="font-size:0.7rem;color:#999;margin-top:5px" data-i18n="sig_draw_hint">Draw your signature above with your finger, stylus, or mouse — this is your legal signature on the agreement (adults booking for minors sign on their behalf).</p>
+        <p style="font-size:0.76rem;color:var(--muted);margin-top:5px;line-height:1.45" data-i18n="sig_draw_hint">Draw your signature above with your finger, stylus, or mouse — this is your legal signature on the agreement (adults booking for minors sign on their behalf).</p>
       </div>
       <div style="margin-top:14px;display:none" id="sigModeTyped">
-        <label style="display:block;font-size:0.78rem;font-weight:700;color:var(--navy);margin-bottom:6px"><span data-i18n="sig_type_label">✍️ Sign by typing your full legal name</span> <span style="color:var(--coral)">*</span></label>
-        <input type="text" id="waiverSignature" placeholder="e.g. Sarah Anne Mitchell" autocomplete="name" style="width:100%;padding:12px;border:2px solid #ddd;border-radius:10px;font-size:0.9rem;box-sizing:border-box;font-style:italic" data-i18n-ph="ph_sig_name"/>
-        <p style="font-size:0.7rem;color:#999;margin-top:5px" data-i18n="sig_type_hint">Your typed name acts as your signature on this agreement (adults booking for minors sign on their behalf).</p>
+        <label for="waiverSignature" style="display:block;font-size:0.78rem;font-weight:700;color:var(--ink);margin-bottom:6px"><span data-i18n="sig_type_label">✍️ Sign by typing your full legal name</span> <span style="color:var(--coral)">*</span></label>
+        <input type="text" id="waiverSignature" placeholder="e.g. Sarah Anne Mitchell" autocomplete="name" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:6px;font-size:0.9rem;box-sizing:border-box;font-style:italic;background:var(--card);color:var(--ink)" data-i18n-ph="ph_sig_name"/>
+        <p style="font-size:0.76rem;color:var(--muted);margin-top:5px;line-height:1.45" data-i18n="sig_type_hint">Your typed name acts as your signature on this agreement (adults booking for minors sign on their behalf).</p>
         <a href="#" class="sig-mode-link" onclick="toggleSignatureMode(event)" data-i18n="sig_prefer_draw">Prefer to draw your signature instead? →</a>
       </div>
       <a href="rules.html" target="_blank" style="display:inline-block;margin-top:12px;font-size:0.78rem;color:var(--teal);font-weight:600" data-i18n="link_rules">📄 View / Print Full Rules &amp; Regulations →</a>
@@ -567,9 +575,9 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
       <a href="privacy.html" target="_blank" style="display:block;margin-top:6px;font-size:0.78rem;color:var(--teal);font-weight:600" data-i18n="link_privacy">🔒 Privacy Notice — what we keep &amp; for how long →</a>
     </div>
 
-    <div class="info-card" style="margin-bottom:22px;border-left:4px solid var(--teal);padding:16px">
-      <h3 style="font-size:0.88rem;font-weight:800;color:var(--navy);margin-bottom:8px" data-i18n="cancel_title">🌦️ Cancellation &amp; Weather Policy</h3>
-      <ul style="font-size:0.8rem;color:#555;line-height:1.7;padding-left:18px;margin:0">
+    <div class="info-card" style="margin-bottom:22px;padding:16px">
+      <h3 style="font-size:0.88rem;font-weight:800;color:var(--ink);margin-bottom:8px" data-i18n="cancel_title">🌦️ Cancellation &amp; Weather Policy</h3>
+      <ul style="font-size:0.8rem;color:var(--muted);line-height:1.7;padding-left:18px;margin:0">
         <li data-i18n="cancel_1"><strong>Bad weather? You're covered.</strong> We check wind &amp; sea conditions daily. If it's unsafe at your rental time, you choose: free rebooking or a full refund of anything paid.</li>
         <li data-i18n="cancel_2"><strong>Change of plans?</strong> Cancel free of charge up to 2 hours before your start time — just message us on WhatsApp.</li>
         <li data-i18n="cancel_3">Cancellations within 2 hours of start may carry a 50% charge. No refunds for early returns.</li>
@@ -583,6 +591,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
     <button class="btn-primary" id="btnBook" onclick="submitBooking()" disabled data-i18n="btn_confirm">
       🎯 Confirm Booking
     </button>
+    <p class="book-missing" id="bookMissing" aria-live="polite"></p>
     <button class="btn-secondary" onclick="backToGear()" data-i18n="btn_change_gear">← Change Gear</button>
   </div>
 
@@ -593,7 +602,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
     <p data-i18n="success_desc">Your booking is <strong>pending</strong> — our team will confirm it on WhatsApp shortly. If you gave an email, a summary is on its way to your inbox.</p>
     <div class="booking-ref" id="bookingRef">APR-XXXXXX</div>
     <div id="depositBox" class="deposit-box" style="display:none"></div>
-    <p id="successNote" style="margin-top:16px;font-size:0.82rem;color:#777" data-i18n="success_note">Want to lock in your slot right away? Message us for bank-transfer deposit details — a deposit secures your booking.</p>
+    <p id="successNote" style="margin-top:16px;font-size:0.82rem;color:var(--muted)" data-i18n="success_note">Want to lock in your slot right away? Message us for bank-transfer deposit details — a deposit secures your booking.</p>
     <button class="btn-primary" style="margin-top:20px;max-width:320px" onclick="newBooking()" data-i18n="btn_book_another">Book Another ↺</button>
     <a href="https://wa.me/17844963447" class="btn-secondary" style="display:block;max-width:320px;margin:8px auto;text-align:center;padding:13px;text-decoration:none;font-weight:700;border:2px solid var(--teal);border-radius:14px;color:var(--teal)" data-i18n="btn_whatsapp">
       💬 Message Us on WhatsApp
@@ -683,24 +692,24 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
     </div>
     <div class="contact-row" style="align-items:flex-start">
       <span>📍</span>
-      <div style="font-size:0.88rem;color:#555;line-height:1.7">
-        <strong style="color:var(--navy)">Our Beaches — Bequia, SVG</strong><br/>
-        🏖️ Princess Margaret Beach <span style="font-size:0.76rem;color:#999">(main base, Admiralty Bay)</span><br/>
+      <div style="font-size:0.88rem;color:var(--muted);line-height:1.7">
+        <strong style="color:var(--ink)">Our Beaches — Bequia, SVG</strong><br/>
+        🏖️ Princess Margaret Beach <span style="font-size:0.76rem;color:var(--muted)">(main base, Admiralty Bay)</span><br/>
         🏖️ Lower Bay<br/>
         🏖️ Friendship Bay
       </div>
     </div>
     <div class="contact-row">
       <span>🕐</span>
-      <span style="font-size:0.88rem;color:#555">Open daily · 8:00 AM – 6:00 PM</span>
+      <span style="font-size:0.88rem;color:var(--muted)">Open daily · 8:00 AM – 6:00 PM</span>
     </div>
   </div>
 
   <div class="section-title">👋 Meet the Team</div>
   <div class="info-card">
-    <p style="font-size:0.8rem;color:#555;margin-bottom:10px">The people you'll actually meet on the beach or at delivery.</p>
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:10px">The people you'll actually meet on the beach or at delivery.</p>
     <div id="teamPublicList" style="display:flex;flex-direction:column;gap:10px">
-      <div style="text-align:center;padding:10px;color:#999;font-size:0.8rem">Loading team…</div>
+      <div style="text-align:center;padding:10px;color:var(--muted);font-size:0.8rem">Loading team…</div>
     </div>
   </div>
 
@@ -752,7 +761,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 </div>
 
 <!-- TOAST -->
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <!-- HELP DESK WIDGET -->
 <button class="help-fab" id="helpFab" onclick="toggleHelp()" title="Chat with us" aria-label="Chat with us">💬<span class="fab-badge" id="chatBadge" hidden></span></button>
@@ -1250,6 +1259,8 @@ window.addEventListener('DOMContentLoaded', () => {
   d.setDate(d.getDate() + 1);
   const pad = n => String(n).padStart(2, '0');
   document.getElementById('datetime').value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T10:00`;
+  const now = new Date();
+  document.getElementById('datetime').min = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T00:00`;
 
   loadWeatherBanner();
   loadTeamPublic();
@@ -1441,7 +1452,7 @@ async function loadTeamPublic() {
     team.forEach(t => {
       if (t.name === 'Operations Manager') { t.name = 'Delroy'; t.role = 'Owner & Operations Manager'; }
     });
-    if (!team.length) { el.innerHTML = '<div style="text-align:center;padding:10px;color:#999;font-size:0.8rem">Team info coming soon.</div>'; return; }
+    if (!team.length) { el.innerHTML = '<div style="text-align:center;padding:10px;color:var(--muted);font-size:0.8rem">Team info coming soon.</div>'; return; }
     el.innerHTML = team.map(t => {
       const thumb = driveThumbUrl(t.photoUrl);
       const emoji = t.kind === 'driver' ? '🚚' : '🙂';
@@ -1452,12 +1463,12 @@ async function loadTeamPublic() {
         ${avatar}
         <div>
           <div style="font-weight:700;font-size:0.88rem">${(t.name||'').replace(/</g,'&lt;')}</div>
-          <div style="font-size:0.76rem;color:#777">${(t.role||'').replace(/</g,'&lt;')}</div>
+          <div style="font-size:0.76rem;color:var(--muted)">${(t.role||'').replace(/</g,'&lt;')}</div>
         </div>
       </div>`;
     }).join('');
   } catch (err) {
-    el.innerHTML = '<div style="text-align:center;padding:10px;color:#999;font-size:0.8rem">Could not load team info right now.</div>';
+    el.innerHTML = '<div style="text-align:center;padding:10px;color:var(--muted);font-size:0.8rem">Could not load team info right now.</div>';
   }
 }
 
@@ -1566,15 +1577,15 @@ function renderGear() {
   document.getElementById('gearGrid').innerHTML = regularGear.map(g => {
     const qty = selectedGear[g.id] || 0;
     return `
-    <div class="gear-card ${qty?'selected':''}" id="gc-${g.id}" onclick="toggleGear('${g.id}')">
+    <div class="gear-card ${qty?'selected':''}" id="gc-${g.id}" role="button" tabindex="0" aria-pressed="${qty?'true':'false'}" onclick="toggleGear('${g.id}')">
       ${iconFor(g)}
       <div class="gear-name">${g.name}</div>
       <div class="gear-price">from XCD ${g.price60}</div>
       ${stockBadge(g)}
       <div class="qty-controls" onclick="event.stopPropagation()">
-        <button class="qty-btn" onclick="changeQty('${g.id}',-1)">−</button>
+        <button class="qty-btn" aria-label="Remove one ${g.name}" onclick="changeQty('${g.id}',-1)">−</button>
         <span class="qty-display" id="qty-${g.id}">${qty}</span>
-        <button class="qty-btn" onclick="changeQty('${g.id}',1)">+</button>
+        <button class="qty-btn" aria-label="Add one ${g.name}" onclick="changeQty('${g.id}',1)">+</button>
       </div>
       <div class="gear-check">✓</div>
     </div>
@@ -1631,7 +1642,7 @@ function renderPackages() {
   document.getElementById('pkgList').innerHTML = PACKAGES.map(p => {
     const blockedWhy = packageBlockReason(p);
     return `
-    <div class="pkg-card" id="pkg-${p.id}" onclick="selectPackage('${p.id}')" ${blockedWhy ? 'style="opacity:0.6;cursor:default"' : ''}>
+    <div class="pkg-card" id="pkg-${p.id}" role="button" tabindex="0" onclick="selectPackage('${p.id}')" ${blockedWhy ? 'style="opacity:0.6;cursor:default"' : ''}>
       <div class="pkg-info">
         <div class="pkg-name">${p.name} <span class="pkg-tag">${p.duration}</span></div>
         <div class="pkg-desc">${p.desc}</div>
@@ -1668,7 +1679,7 @@ function selectPackage(id) {
 // ── RENDER DURATIONS ──
 function renderDurations() {
   document.getElementById('durGrid').innerHTML = DURATIONS.map((d,i) => `
-    <div class="dur-btn ${i===0?'selected':''}" id="dur-${i}" onclick="selectDuration(${i})">${t(d.i18nKey, d.label)}</div>
+    <div class="dur-btn ${i===0?'selected':''}" id="dur-${i}" role="button" tabindex="0" onclick="selectDuration(${i})">${t(d.i18nKey, d.label)}</div>
   `).join('');
 }
 
@@ -1746,13 +1757,20 @@ function goToDetails() {
   document.getElementById('step-details').style.display='block';
   updateSummaryCard2();
   renderStockNotice();
-  window.scrollTo(0,0);
+  updateBookBtn();
+  scrollToStep('step-details');
 }
 
 function backToGear() {
   document.getElementById('step-details').style.display='none';
   document.getElementById('step-gear').style.display='block';
-  window.scrollTo(0,0);
+  scrollToStep('step-gear');
+}
+
+function scrollToStep(id) {
+  const el = document.getElementById(id);
+  const head = document.querySelector('header')?.offsetHeight || 0;
+  if (el) window.scrollTo(0, Math.max(0, el.getBoundingClientRect().top + window.scrollY - head - 12));
 }
 
 
@@ -1982,7 +2000,20 @@ function updateBookBtn() {
   const phone = document.getElementById('phone').value.trim();
   const dt = document.getElementById('datetime').value;
   const beach = document.getElementById('beach').value;
-  document.getElementById('btnBook').disabled = !(waiver && fname && phone && dt && beach && hasWaiverSignature());
+  const ok = waiver && fname && phone && dt && beach && hasWaiverSignature();
+  document.getElementById('btnBook').disabled = !ok;
+  // Tell the guest what is still missing instead of leaving a dead button.
+  // Uses the on-page label text so it follows the chosen language.
+  const lbl = sel => (document.querySelector(sel)?.textContent || '').replace(/[*✍️🏖️⚠]/gu, '').trim();
+  const missing = [];
+  if (!fname) missing.push(lbl('label[for="fname"]'));
+  if (!phone) missing.push(lbl('label[for="phone"]'));
+  if (!dt) missing.push(lbl('label[for="datetime"]'));
+  if (!beach) missing.push(lbl('label[for="beach"]'));
+  if (!waiver) missing.push(lbl('[data-i18n="waiver_h3"]'));
+  if (!hasWaiverSignature()) missing.push(lbl(sigMode === 'typed' ? '[data-i18n="sig_type_label"]' : '[data-i18n="sig_below"]'));
+  const m = document.getElementById('bookMissing');
+  if (m) m.textContent = ok ? '' : '⚠ ' + missing.join(' · ');
 }
 ['fname','lname','phone','email','datetime','groupSize','beach','waiverSignature'].forEach(id => {
   const el = document.getElementById(id);
@@ -2227,7 +2258,7 @@ async function submitBooking() {
     document.getElementById('step-details').style.display='none';
     document.getElementById('successScreen').classList.add('show');
     window.scrollTo(0,0);
-    showToast(queued ? 'Saved — will send once you\'re back online 📶' : 'Booking confirmed! ✅', queued ? '' : 'success');
+    showToast(queued ? 'Saved — will send once you\'re back online 📶' : 'Request sent — we\'ll confirm on WhatsApp', queued ? '' : 'success');
   } else {
     btn.disabled = false;
     btn.innerHTML = '🎯 Confirm Booking';
@@ -2568,6 +2599,14 @@ function sendCancelRequest() {
   const text = 'Hi APR, I\'d like to cancel or change my booking' + (ref ? ' ' + ref : '') + '. ';
   window.open('https://wa.me/17844963447?text=' + encodeURIComponent(text), '_blank');
 }
+
+// ── KEYBOARD: Enter/Space on role="button" divs (tabs, gear, packages, durations) ──
+document.addEventListener('keydown', e => {
+  const el = e.target;
+  if ((e.key === 'Enter' || e.key === ' ') && el.getAttribute && el.getAttribute('role') === 'button' && el.tagName !== 'BUTTON') {
+    e.preventDefault(); el.click();
+  }
+});
 
 // ── TOAST ──
 function showToast(msg, type='') {
