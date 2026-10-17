@@ -1452,6 +1452,7 @@ function _ensureTelegramTriggers() {
     ScriptApp.getProjectTriggers().forEach(function (t) { have[t.getHandlerFunction()] = true; });
     if (!have.pollTelegram) ScriptApp.newTrigger('pollTelegram').timeBased().everyMinutes(1).create();
     if (!have.dailyBriefing) ScriptApp.newTrigger('dailyBriefing').timeBased().everyDays(1).atHour(7).nearMinute(0).create();
+    if (!have.eveningWrapUp) ScriptApp.newTrigger('eveningWrapUp').timeBased().everyDays(1).atHour(18).nearMinute(0).create();
   } catch (err) {
     _logError('_ensureTelegramTriggers', err);
   }
@@ -1467,6 +1468,14 @@ function pollTelegram() {
     var chat = props.getProperty(TG_CHAT_PROP);
     if (!chat) return;
     props.setProperty(TG_LAST_POLL_PROP, new Date().toISOString()); // health check shown in admin
+    // One-time: installs the 6pm wrap-up trigger on existing setups and sends
+    // a preview so the owner sees what will arrive each evening.
+    if (!props.getProperty('EVENING_WRAPUP_V1')) {
+      props.setProperty('EVENING_WRAPUP_V1', new Date().toISOString());
+      _ensureTelegramTriggers();
+      try { _sendWrapUp('Preview: this now arrives every evening at 6pm. Send /tonight any time.'); }
+      catch (wErr) { _logError('pollTelegram.wrapUpPreview', wErr); }
+    }
     var offset = Number(props.getProperty(TG_OFFSET_PROP)) || 0;
     var upd = _tgApi('getUpdates', { offset: offset, timeout: 0, allowed_updates: ['callback_query', 'message'] });
     if (!upd || !upd.ok || !upd.result.length) return;
@@ -1494,9 +1503,10 @@ function _handleTgMessage(msg) {
   var tagMatch = msg.reply_to_message && String(msg.reply_to_message.text || '').match(/Chat #([a-f0-9]{6})\b/);
   if (tagMatch) { _chatReplyFromTelegram(tagMatch[1], raw, msg.from); return; }
   if (text === '/today' || text === 'today') { _sendBriefing(); return; }
+  if (text === '/tonight' || text === 'tonight' || text === '/wrapup') { _sendWrapUp(); return; }
   if (text === '/chats' || text === 'chats') { _tgSend(_chatsDigest()); return; }
   if (/^\/book\b/.test(text)) { _startBookDraft(raw); return; }
-  _tgSend('Commands:\n/today — today\'s briefing\n/chats — guest chats from the last 24 hours\n/book — log a WhatsApp booking (send /book for how)\n\nBooking alerts have Confirm/Decline buttons.\nTo answer a guest chat, swipe the chat message and Reply.');
+  _tgSend('Commands:\n/today — today\'s briefing\n/tonight — evening wrap-up (also sent at 6pm)\n/chats — guest chats from the last 24 hours\n/book — log a WhatsApp booking (send /book for how)\n\nBooking alerts have Confirm/Decline buttons.\nTo answer a guest chat, swipe the chat message and Reply.');
 }
 
 function _handleTgTap(cb, ownerChat) {
@@ -1818,6 +1828,99 @@ function _sendBriefing() {
     if (stockNotes.length) lines.push('🔧 ' + stockNotes.join(' · '));
     _activeDeals().forEach(function (d) { lines.push('🏷️ Deal: ' + d.pct + '% off ' + GEAR_LABELS[d.gear] + ' — ' + (d.cap - d.used) + ' left'); });
   } catch (sErr) { _logError('_sendBriefing.stock', sErr); }
+
+  _tgSend(lines.join('\n'));
+}
+
+// ── 6PM EVENING WRAP-UP (also on demand: send "/tonight" to the bot) ──
+// For running the business from away: how today went, money in and out,
+// reviews, unanswered guest chats, and what tomorrow looks like.
+function eveningWrapUp() {
+  try { _sendWrapUp(); } catch (err) { _logError('eveningWrapUp', err); }
+}
+
+function _sendWrapUp(note) {
+  var tz = Session.getScriptTimeZone();
+  var now = new Date();
+  var dayStart = new Date(now); dayStart.setHours(0, 0, 0, 0);
+  var dayEnd = new Date(dayStart.getTime() + 86400000);
+  var tmrEnd = new Date(dayEnd.getTime() + 86400000);
+  var todayKey = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
+  var data = _sheet().getDataRange().getValues();
+  var I = {}; FIELDS.forEach(function (f, i) { I[f] = i; });
+  var live = ACTIVE_BOOKING_STATUSES.concat(['done']);
+
+  var done = 0, open = [], income = 0, deposits = 0, newCount = 0, newTotal = 0, tomorrow = [], tmrPending = 0;
+  for (var r = 1; r < data.length; r++) {
+    var row = data[r];
+    var status = String(row[I.status] || '').trim(); if (!status || status === 'N/A') status = 'pending';
+    if (live.indexOf(status) === -1) continue;
+    var made = row[I.Timestamp] instanceof Date ? row[I.Timestamp] : new Date(String(row[I.Timestamp]));
+    if (!isNaN(made.getTime()) && made >= dayStart && made < dayEnd) { newCount++; newTotal += Number(row[I.total]) || 0; }
+    var dt = row[I.datetime] instanceof Date ? row[I.datetime] : new Date(String(row[I.datetime]));
+    if (isNaN(dt.getTime())) continue;
+    var line = Utilities.formatDate(dt, tz, 'h:mm a') + ' · ' + row[I.fname] + ' — ' + row[I.gear];
+    if (dt >= dayStart && dt < dayEnd) {
+      income += Number(row[I.total]) || 0;
+      if (status === 'done') done++; else open.push(line + ' (' + status + ')');
+    } else if (dt >= dayEnd && dt < tmrEnd) {
+      if (status === 'pending') tmrPending++;
+      tomorrow.push({ t: dt, line: line + (status === 'pending' ? ' (pending)' : '') });
+    }
+    var depAt = row[I.depositReceivedAt] instanceof Date ? row[I.depositReceivedAt] : new Date(String(row[I.depositReceivedAt] || ''));
+    if (String(row[I.depositStatus]) === 'received' && !isNaN(depAt.getTime()) && depAt >= dayStart && depAt < dayEnd) {
+      deposits += Number(row[I.depositAmount]) || 0;
+    }
+  }
+  tomorrow.sort(function (a, b) { return a.t - b.t; });
+
+  var spent = 0;
+  try {
+    var ex = _expensesSheet().getDataRange().getValues();
+    for (var e = 1; e < ex.length; e++) if (_dateCellToStr(ex[e][1]) === todayKey) spent += Number(ex[e][3]) || 0;
+  } catch (exErr) { _logError('_sendWrapUp.expenses', exErr); }
+
+  var reviews = [];
+  try {
+    var fb = _feedbackSheet().getDataRange().getValues();
+    for (var f = 1; f < fb.length; f++) {
+      var at = fb[f][3] instanceof Date ? fb[f][3] : new Date(String(fb[f][3]));
+      if (!isNaN(at.getTime()) && at >= dayStart && at < dayEnd) reviews.push({ stars: Number(fb[f][1]) || 0, comment: String(fb[f][2] || '') });
+    }
+  } catch (fbErr) { _logError('_sendWrapUp.feedback', fbErr); }
+
+  var waiting = [];
+  try {
+    waiting = _chatSummaries(now.getTime() - 86400000).filter(function (s) { return s.lastFrom !== 'team'; });
+  } catch (chErr) { _logError('_sendWrapUp.chats', chErr); }
+
+  var lines = ['🌙 Evening wrap-up — ' + Utilities.formatDate(now, tz, 'EEEE d MMMM')];
+  if (note) lines.push(note);
+  lines.push('');
+  var todayCount = done + open.length;
+  lines.push('Today: ' + todayCount + ' booking' + (todayCount === 1 ? '' : 's') + (todayCount ? ' — ' + done + ' done' : ''));
+  if (open.length) {
+    lines.push('⚠️ Not marked done:');
+    open.slice(0, 10).forEach(function (l) { lines.push('  ' + l); });
+  }
+  lines.push('Money: XCD ' + income + ' booked for today' + (deposits ? ', XCD ' + deposits + ' deposits in' : '') +
+    (spent ? ', XCD ' + spent + ' spent' : ''));
+  if (newCount) lines.push('New bookings made today: ' + newCount + ' (XCD ' + newTotal + ')');
+  if (reviews.length) {
+    var avg = reviews.reduce(function (a, x) { return a + x.stars; }, 0) / reviews.length;
+    lines.push('Reviews: ' + reviews.length + ', average ' + avg.toFixed(1) + '★');
+    reviews.filter(function (x) { return x.stars <= 3; }).slice(0, 3).forEach(function (x) {
+      lines.push('  ' + x.stars + '★ ' + (x.comment ? '"' + x.comment.slice(0, 100) + '"' : '(no comment)'));
+    });
+  }
+  if (waiting.length) {
+    lines.push('💬 ' + waiting.length + ' guest chat' + (waiting.length === 1 ? '' : 's') + ' waiting for a reply — send /chats');
+  }
+  lines.push('');
+  lines.push('Tomorrow: ' + tomorrow.length + ' booking' + (tomorrow.length === 1 ? '' : 's'));
+  tomorrow.slice(0, 12).forEach(function (x) { lines.push('  ' + x.line); });
+  if (tomorrow.length > 12) lines.push('  …and ' + (tomorrow.length - 12) + ' more in admin');
+  if (tmrPending) lines.push('⏳ ' + tmrPending + ' still pending — confirm them tonight');
 
   _tgSend(lines.join('\n'));
 }
