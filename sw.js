@@ -1,8 +1,8 @@
-// APR Service Worker v8.0
+// APR Service Worker v9.0
 // Bump CACHE whenever static assets (manifest, icons, logo) change — they're
 // cached-first with no expiry, so the version string is the only thing that
 // forces a refresh. HTML is network-first and self-heals on next reload.
-const CACHE = 'apr-v8';
+const CACHE = 'apr-v9';
 const ASSETS = [
   './manifest.json',
   './logo.jpg',
@@ -11,6 +11,11 @@ const ASSETS = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './offline-queue.js',
+  './img/gear/SUP.jpg',
+  './img/gear/KAY.jpg',
+  './img/gear/KAY2.jpg',
+  './img/gear/SNK.jpg',
+  './img/gear/FLT.jpg',
 ];
 // apr-config.js rides with the HTML (network-first) so edits to deposit %,
 // PayPal or partners reach guests immediately instead of sticking in cache.

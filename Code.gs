@@ -784,7 +784,9 @@ function _readJsonProp(key, fallback) {
   }
 }
 
-function _stockConfig() { return _readJsonProp(STOCK_PROP, {}); }
+// Used until the owner saves counts in admin (then the saved counts win).
+var DEFAULT_STOCK = { SUP: { total: 8, repair: 0 }, KAY: { total: 2, repair: 0 }, KAY2: { total: 2, repair: 0 } };
+function _stockConfig() { return _readJsonProp(STOCK_PROP, DEFAULT_STOCK); }
 
 // Units held per item by active bookings overlapping [start, end).
 function _heldInWindow(start, end, excludeRef) {

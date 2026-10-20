@@ -411,10 +411,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   <div class="dash-grid" id="stockKpis"></div>
   <div class="card" style="overflow-x:auto">
     <table class="stock-table">
-      <thead><tr><th style="text-align:left">Item</th><th>Avail. now</th><th>Out now</th><th>Booked today</th><th>We own</th><th>In repair</th></tr></thead>
-      <tbody id="stockRows"><tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px">Loading…</td></tr></tbody>
+      <thead><tr><th style="text-align:left">Item</th><th>Avail. now</th><th>Out now</th><th>Booked today</th><th>We own</th><th>In repair</th><th>Guests can book</th></tr></thead>
+      <tbody id="stockRows"><tr><td colspan="7"style="text-align:center;color:var(--muted);padding:14px">Loading…</td></tr></tbody>
     </table>
-    <p style="font-size:0.72rem;color:var(--muted);margin:10px 0">Change <b>We own</b> or <b>In repair</b>, then Save. Guests can't book more than what's left for their time — booked gear is held for its booking time and freed when the booking is marked done or deleted. Leave <b>We own</b> blank for no limit (∞).</p>
+    <p style="font-size:0.72rem;color:var(--muted);margin:10px 0">Change <b>We own</b> or <b>In repair</b>, then Save. Guests can't book more than what's left for their time — booked gear is held for its booking time and freed when the booking is marked done or deleted. Leave <b>We own</b> blank for no limit (∞). Tap <b>Turn off</b> to block an item — guests see "Not available at the moment" until you turn it back on (no Save needed).</p>
     <button class="stock-btn" onclick="saveStockCounts()">💾 Save Stock</button>
   </div>
 
@@ -2438,12 +2438,13 @@ function renderStock() {
     const left = i.leftNow;
     const cls = left === null ? '' : left === 0 ? 'zero' : left <= 1 ? 'low' : 'ok';
     return `<tr>
-      <td>${escapeHtml(i.label)}${i.off ? '<div style="font-size:0.68rem;color:var(--coral)">turned off in Dispatch</div>' : ''}</td>
+      <td>${escapeHtml(i.label)}${i.off ? '<div style="font-size:0.68rem;color:var(--coral)">Not available to guests</div>' : ''}</td>
       <td class="stock-left ${cls}">${left===null ? '∞' : left}</td>
       <td>${i.outNow}</td>
       <td>${i.bookedToday}</td>
       <td><input type="number" min="0" max="500" id="own-${i.key}" value="${i.total===null?'':i.total}" placeholder="∞"></td>
       <td><input type="number" min="0" max="500" id="rep-${i.key}" value="${i.repair||0}"></td>
+      <td><button class="stock-btn" style="margin:0;padding:6px 10px;font-size:0.75rem;${i.off ? 'background:var(--coral)' : ''}" onclick="toggleBookable('${i.key}', ${!i.off})">${i.off ? 'Off · Turn on' : 'On · Turn off'}</button></td>
     </tr>`;
   }).join('');
   const sel = document.getElementById('dealGear');
@@ -2462,6 +2463,20 @@ async function saveStockCounts() {
     showToast('Stock saved ✅');
     fetchStockOverview();
   } catch (err) { showToast('Could not save: '+err.message, 'warn'); }
+}
+
+// Same switch as Dispatch → Equipment & Services (Code.gs setServiceStatus).
+async function toggleBookable(key, off) {
+  let reason = '';
+  if (off) {
+    reason = prompt('Optional reason guests will see (e.g. "Back next week"). Leave blank for just "Not available at the moment".', '');
+    if (reason === null) return;
+  }
+  try {
+    await stockApi('setServiceStatus', { key, off, reason });
+    showToast(off ? 'Turned off — guests can\'t book it' : 'Turned on — guests can book it');
+    fetchStockOverview();
+  } catch (err) { showToast('Could not change: '+err.message, 'warn'); }
 }
 
 function renderDeals() {
