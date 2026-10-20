@@ -62,6 +62,7 @@
   --light: #F7F8FA;
   --card: #FFFFFF;
   --gold: #C9820A;
+  --amber-ink: #8A5A00;
   --radius: 8px;
   --shadow: 0 1px 2px rgba(16,24,40,.05);
   --shadow-md: 0 1px 3px rgba(16,24,40,.08), 0 1px 2px rgba(16,24,40,.05);
@@ -78,7 +79,7 @@
     --teal: #4FB8CC; --teal-ink: #7FD1E0;
     --emerald: #34D399; --amber: #F0A93B; --coral: #F0655F;
     --ink: #E7EBF3; --muted: #93A0B5; --line: #232E44;
-    --light: #0B1220; --card: #111A2C; --gold: #F0A93B;
+    --light: #0B1220; --card: #111A2C; --gold: #F0A93B; --amber-ink: #F0A93B;
     --shadow: 0 1px 2px rgba(0,0,0,.35); --shadow-md: 0 2px 6px rgba(0,0,0,.4);
   }
 }
@@ -109,6 +110,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 
 /* ── SECTION ── */
 .section{display:none}
+a:not([class]):not([style]){color:var(--teal)}
 .section.active{display:block}
 
 /* ── HERO CARD ── */
@@ -127,12 +129,12 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 .perk{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 10px;text-align:center;box-shadow:var(--shadow)}
 .perk-icon{display:flex;justify-content:center;color:var(--teal)}
 .perk-title{font-size:0.78rem;font-weight:700;color:var(--teal-ink);margin-top:4px}
-.perk-sub{font-size:0.7rem;color:var(--muted);margin-top:2px;line-height:1.3}
+.perk-sub{font-size:0.75rem;color:var(--muted);margin-top:2px;line-height:1.3}
 .perk-sub a{color:var(--teal);font-weight:600}
 .perk.off{opacity:0.7}
 .perk.off .perk-title{color:var(--coral);text-decoration:line-through}
 .deal-badge{display:inline-block;font-size:0.75rem;font-weight:700;color:#fff;background:var(--emerald);border-radius:10px;padding:2px 8px;margin-top:5px;line-height:1.35}
-.left-badge{font-size:0.75rem;font-weight:700;color:var(--amber);margin-top:4px}
+.left-badge{font-size:0.75rem;font-weight:700;color:var(--amber-ink);margin-top:4px}
 .unavail{font-size:0.75rem;font-weight:700;color:var(--coral);margin-top:3px;line-height:1.3}
 .notice-off{background:rgba(214,58,58,.08);border:1px solid rgba(214,58,58,.3);color:var(--coral);border-radius:var(--radius);padding:10px 12px;font-size:0.8rem;font-weight:600;margin-bottom:12px}
 @media (max-width:420px){.perks{gap:6px}.perk{padding:10px 6px}.perk-title{font-size:0.75rem}.perk-sub{font-size:0.75rem}}
@@ -159,7 +161,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 .pkg-info .pkg-name{font-weight:600;font-size:0.95rem;color:var(--ink)}
 .pkg-info .pkg-desc{font-size:0.78rem;color:var(--muted);margin-top:3px}
 .pkg-price{font-weight:700;font-size:1.05rem;color:var(--teal);white-space:nowrap;margin-left:12px}
-.pkg-tag{font-size:0.75rem;background:var(--coral);color:#fff;padding:2px 8px;border-radius:10px;font-weight:600;margin-left:8px;text-transform:uppercase}
+.pkg-tag{font-size:0.75rem;background:#B42318;color:#fff;padding:2px 8px;border-radius:10px;font-weight:600;margin-left:8px;text-transform:uppercase}
 
 /* ── DURATION ── */
 .duration-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:22px}
@@ -292,7 +294,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 .help-tabs{display:flex;border-bottom:1px solid var(--line);background:var(--card)}
 .help-tab{flex:1;background:none;border:none;border-bottom:2px solid transparent;padding:10px 6px;font-size:0.82rem;font-weight:600;color:var(--muted);cursor:pointer}
 .help-tab.on{color:var(--teal);border-bottom-color:var(--teal)}
-.fab-badge{position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:#E5484D;color:#fff;font-size:0.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--card)}
+.fab-badge{position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:#E5484D;color:#fff;font-size:0.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--card)}
 .fab-badge[hidden]{display:none}
 .chat-log{display:flex;flex-direction:column;gap:8px}
 .chat-b{max-width:84%;padding:8px 11px;border-radius:12px;font-size:0.85rem;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -337,7 +339,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 .deposit-box a.dep-btn{display:block;text-align:center;padding:13px;border-radius:12px;font-weight:700;text-decoration:none;margin-top:10px;font-size:0.92rem}
 .deposit-box a.dep-card{background:var(--navy);color:#fff}
 .deposit-box a.dep-bank{background:#157A41;color:#fff}
-.deposit-box .dep-fine{font-size:0.7rem;color:var(--muted);margin-top:10px;line-height:1.45}
+.deposit-box .dep-fine{font-size:0.75rem;color:var(--muted);margin-top:10px;line-height:1.45}
 .partner-note{margin-top:-6px;margin-bottom:14px;padding:10px 12px;border-radius:10px;background:rgba(14,124,144,0.08);border:1px solid rgba(14,124,144,0.25);font-size:0.8rem;color:var(--teal-ink);font-weight:600}
 @media (prefers-color-scheme: dark){.partner-note{color:#7fd3e0}.dur-btn.selected,.chat-b.guest,.chat-send,.gear-check{color:#04222A}}
 </style>
@@ -366,7 +368,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
         <button class="lang-option" data-lang="nl" onclick="setLanguage('nl')" style="display:block;width:100%;text-align:left;background:none;border:none;padding:9px 14px;font-size:0.82rem;font-weight:600;color:#0A4A5A;cursor:pointer">🇳🇱 Nederlands</button>
       </div>
     </div>
-    <button id="installAppBtn" onclick="installApp()" style="display:none;margin-left:10px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:0.72rem;font-weight:600;padding:6px 12px;border-radius:20px;white-space:nowrap;cursor:pointer">⬇ Install app</button>
+    <button id="installAppBtn" onclick="installApp()" style="display:none;margin-left:10px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:0.75rem;font-weight:600;padding:6px 12px;border-radius:20px;white-space:nowrap;cursor:pointer">⬇ Install app</button>
   </div>
   <nav>
     <div class="nav-tabs">
@@ -584,9 +586,9 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
     <div class="rates-scroll">
       <table class="rates-table">
         <thead><tr><th data-i18n="th_gear">Gear</th><th data-i18n="dur_1hr">1 hr</th>
-              <th style="color:#03939E" data-i18n="th_fullday">Full Day</th>
+              <th style="color:var(--sea)" data-i18n="th_fullday">Full Day</th>
               <th data-i18n="th_weekend">Weekend (2 days)</th>
-              <th style="color:#FBC62C" data-i18n="th_weekly">Weekly</th></tr></thead>
+              <th style="color:#F0A93B" data-i18n="th_weekly">Weekly</th></tr></thead>
         <tbody id="ratesBody"></tbody>
       </table>
     </div>
@@ -621,7 +623,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
         <a href="https://wa.me/17844963447?text=Hi%20APR!%20Please%20send%20me%20the%20bank%20transfer%20details%20for%20my%20booking." data-i18n="link_whatsapp_msg">Message us on WhatsApp</a> <span data-i18n="pay_bank_for">for the account details.</span></li>
       <li data-i18n="pay_card"><strong>Card</strong> — arranged via WhatsApp</li>
     </ul>
-    <p style="font-size:0.78rem;color:#888;margin-top:8px" data-i18n="pay_ref_note">Paying by bank transfer? Send us your booking reference (APR-…) with the payment so we can match it.</p>
+    <p style="font-size:0.78rem;color:var(--muted);margin-top:8px" data-i18n="pay_ref_note">Paying by bank transfer? Send us your booking reference (APR-…) with the payment so we can match it.</p>
   </div>
 </div>
 
@@ -644,7 +646,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
     .apr-quote-slide{display:none}
     .apr-quote-slide.active{display:block}
     .apr-quote-text{font-family:Georgia,'Times New Roman',serif;font-style:italic;color:#FBC62C;font-size:15px;line-height:1.45;letter-spacing:.01em;margin:0 0 .5rem}
-    .apr-quote-byline{font-family:Georgia,'Times New Roman',serif;color:#E0351B;font-size:10.5px;letter-spacing:.12em;margin:0;text-transform:uppercase}
+    .apr-quote-byline{font-family:Georgia,'Times New Roman',serif;color:#F2836F;font-size:12px;letter-spacing:.12em;margin:0;text-transform:uppercase}
     .apr-quote-dots{display:flex;gap:5px;justify-content:center;margin-top:.6rem}
     .apr-quote-dots button{width:6px;height:6px;border-radius:50%;border:none;background:rgba(255,255,255,.25);padding:0;cursor:pointer}
     .apr-quote-dots button.active{background:#FBC62C}
@@ -2055,7 +2057,7 @@ function setIdPhotoStatus(msg, isError) {
   const el = document.getElementById('idPhotoStatus');
   if (!el) return;
   el.textContent = msg || '';
-  el.style.color = isError ? '#E0351B' : '#03939E';
+  el.style.color = isError ? '#E0351B' : 'var(--teal-ink)';
 }
 
 async function handleIdPhotoSelect(event) {
@@ -2309,12 +2311,12 @@ function renderRates() {
     <tr>
       <td>${gearPhotoTag(g, 'rate-thumb', 80)}${g.name}${isOff(g.id) ? '<div class="unavail" style="font-weight:600">⛔ Not available right now</div>' : ''}</td>
       <td>${fmt(g.price60)}</td>
-      <td style="font-weight:700;color:#03939E">${fmt(g.priceFD)}</td>
+      <td style="font-weight:700;color:var(--teal-ink)">${fmt(g.priceFD)}</td>
       <td>${fmt(g.priceWE)}</td>
-      <td style="color:#FBC62C;font-weight:700">${fmt(g.priceWK, true)}</td>
+      <td style="color:var(--amber-ink);font-weight:700">${fmt(g.priceWK, true)}</td>
     </tr>
   `).join('');
-  tbody.innerHTML += '<tr style="background:#f0f9ff"><td colspan="5" style="font-size:0.72rem;color:#03939E;padding:8px 12px;white-space:normal;position:static;background:transparent">USD ≈ XCD ÷ 2.7 · Life jackets included free with all rentals</td></tr>';
+  tbody.innerHTML += '<tr style="background:var(--light)"><td colspan="5" style="font-size:0.75rem;color:var(--teal-ink);padding:8px 12px;white-space:normal;position:static;background:transparent">USD ≈ XCD ÷ 2.7 · Life jackets included free with all rentals</td></tr>';
 
   const pkgEl = document.getElementById('pkgRatesList');
   if (pkgEl) {
@@ -2326,7 +2328,7 @@ function renderRates() {
         </div>
         <div style="text-align:right;flex-shrink:0;margin-left:12px">
           <div class="pkg-price">XCD $${p.price}</div>
-          <div style="font-size:0.72rem;color:#888;margin-top:2px">~USD $${Math.round(p.price/2.7)}</div>
+          <div style="font-size:0.75rem;color:var(--muted);margin-top:2px">~USD $${Math.round(p.price/2.7)}</div>
         </div>
       </div>
     `).join('');
