@@ -47,7 +47,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png"/>
 <link rel="apple-touch-icon" href="/icons/icon-180.png"/>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700;800&display=swap');
 :root {
   --navy: #0B1E33;
   --navy-2: #13294B;
@@ -65,6 +65,12 @@
   --radius: 8px;
   --shadow: 0 1px 2px rgba(16,24,40,.05);
   --shadow-md: 0 1px 3px rgba(16,24,40,.08), 0 1px 2px rgba(16,24,40,.05);
+  /* Photo backdrop palette — sampled from hero.jpg (Princess Margaret water + sand) */
+  --sea: #3FC1D0;
+  --sand: #EBD9B4;
+  --on-photo: #FFFFFF;
+  --on-photo-muted: rgba(255,255,255,.78);
+  --display: 'Fraunces', Georgia, 'Times New Roman', serif;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -77,10 +83,14 @@
   }
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Inter',-apple-system,'Segoe UI',Helvetica,sans-serif;background:var(--light);color:var(--ink);min-height:100vh}
+body{font-family:'Inter',-apple-system,'Segoe UI',Helvetica,sans-serif;background:#0B1E33;color:var(--ink);min-height:100vh}
+/* Whole-page beach photo. A fixed pseudo-element instead of background-attachment:fixed,
+   which iPhones ignore. The navy tint keeps white text readable over sky and sand. */
+body::before{content:"";position:fixed;inset:0;z-index:-2;background:var(--page-photo,url('hero.jpg')) center 35%/cover no-repeat}
+body::after{content:"";position:fixed;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(7,20,36,.45) 0%,rgba(7,20,36,.72) 40%,rgba(7,20,36,.86) 100%)}
 
 /* ── HEADER ── */
-header{background:var(--navy);padding:0;position:sticky;top:0;z-index:100;border-bottom:1px solid rgba(255,255,255,.08)}
+header{background:rgba(7,20,36,.72);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);padding:0;position:sticky;top:0;z-index:100;border-bottom:1px solid rgba(255,255,255,.08)}
 .header-inner{display:flex;align-items:center;gap:14px;padding:14px 20px;max-width:700px;margin:0 auto}
 .header-logo{width:44px;height:44px;border-radius:8px;border:1px solid rgba(255,255,255,.15);flex-shrink:0}
 .header-text h1{font-size:1.05rem;font-weight:600;color:#fff;line-height:1.2;letter-spacing:-.01em}
@@ -88,10 +98,10 @@ header{background:var(--navy);padding:0;position:sticky;top:0;z-index:100;border
 .header-badge{margin-left:auto;background:rgba(255,255,255,.1);color:#fff;font-size:0.75rem;font-weight:600;padding:4px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:0.03em;white-space:nowrap}
 
 /* ── NAV TABS ── */
-nav{background:var(--navy);border-top:1px solid rgba(255,255,255,0.08)}
+nav{background:transparent;border-top:1px solid rgba(255,255,255,0.08)}
 .nav-tabs{display:flex;max-width:700px;margin:0 auto}
 .nav-tab{flex:1;padding:11px 6px;text-align:center;font-size:0.78rem;font-weight:500;color:rgba(255,255,255,0.55);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s}
-.nav-tab.active{color:#fff;border-bottom-color:var(--teal)}
+.nav-tab.active{color:#fff;border-bottom-color:var(--sea)}
 .nav-tab:hover{color:#fff}
 
 /* ── MAIN ── */
@@ -102,14 +112,15 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 .section.active{display:block}
 
 /* ── HERO CARD ── */
-.hero-card{background:linear-gradient(180deg, rgba(7,20,36,.35) 0%, rgba(7,20,36,.65) 55%, rgba(7,20,36,.92) 100%), url('hero.jpg') center/cover no-repeat;border:1px solid var(--navy-2);border-radius:var(--radius);padding:40px 24px;margin-bottom:22px;text-align:center}
-.hero-logo{width:64px;height:64px;border-radius:10px;border:1px solid rgba(255,255,255,.15);margin:0 auto 14px;display:block}
-.hero-card h2{color:#fff;font-size:1.3rem;font-weight:700;margin-bottom:6px;letter-spacing:-.01em}
-.hero-card p{color:rgba(255,255,255,0.68);font-size:0.88rem;line-height:1.5}
-.hero-card .tagline{color:var(--gold);font-size:0.78rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;margin-top:10px}
+/* The page itself is the photo now, so the hero is open text over it, not a boxed image. */
+.hero-card{background:transparent;border:0;border-radius:var(--radius);padding:44px 12px 36px;margin-bottom:14px;text-align:center}
+.hero-logo{width:64px;height:64px;border-radius:10px;border:1px solid rgba(255,255,255,.25);margin:0 auto 16px;display:block}
+.hero-card h2{font-family:var(--display);color:#fff;font-size:2rem;font-weight:600;line-height:1.15;margin-bottom:10px;letter-spacing:-.01em;text-shadow:0 1px 12px rgba(0,0,0,.35)}
+.hero-card p{color:var(--on-photo-muted);font-size:0.95rem;line-height:1.55;max-width:34ch;margin-left:auto;margin-right:auto}
+.hero-card .tagline{color:var(--sand);font-size:0.75rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;margin-top:14px}
 
 /* ── GEAR GRID ── */
-.section-title{font-size:.95rem;font-weight:600;color:var(--ink);margin:22px 0 12px;letter-spacing:-.005em}
+.section-title{font-family:var(--display);font-size:1.2rem;font-weight:600;color:var(--on-photo);margin:26px 0 12px;letter-spacing:-.005em}
 .gear-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:22px}
 .gear-card{background:var(--card);border-radius:var(--radius);padding:16px 14px;box-shadow:var(--shadow);border:1px solid var(--line);cursor:pointer;transition:border-color .15s,box-shadow .15s;position:relative}
 .perks{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
@@ -157,7 +168,7 @@ main{max-width:700px;margin:0 auto;padding:20px 16px 80px}
 
 /* ── FORM ── */
 .form-group{margin-bottom:16px}
-.form-group label{display:block;font-size:0.82rem;font-weight:500;color:var(--ink);margin-bottom:6px}
+.form-group label{display:block;font-size:0.82rem;font-weight:500;color:var(--on-photo);margin-bottom:6px}
 .form-group input,.form-group select,.form-group textarea{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:6px;font-size:0.9rem;font-family:inherit;color:var(--ink);background:var(--card);transition:border-color 0.15s;outline:none}
 .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(14,124,144,.14)}
 .form-group textarea{resize:vertical;min-height:80px}
@@ -1442,7 +1453,7 @@ async function loadSitePhotos() {
   const hero = document.querySelector('.hero-card');
   if (hero && sitePhotos.hero) {
     const img = driveThumbUrl(sitePhotos.hero, 1600);
-    hero.style.backgroundImage = `linear-gradient(180deg, rgba(7,20,36,.35) 0%, rgba(7,20,36,.65) 55%, rgba(7,20,36,.92) 100%), url('${img}')`;
+    document.body.style.setProperty('--page-photo', `url('${img}')`);
   }
   renderGear();
 }
