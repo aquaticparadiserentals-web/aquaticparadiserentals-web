@@ -64,12 +64,19 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 .back-btn{background:var(--line);border:1px solid var(--line);color:#fff;padding:8px 14px;border-radius:8px;font-size:0.8rem;font-weight:700;cursor:pointer;transition:all 0.2s;flex-shrink:0}
 .back-btn:hover{background:var(--teal);border-color:var(--teal)}
 .home-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-.home-tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 10px;text-align:center;cursor:pointer;transition:all 0.15s;display:flex;flex-direction:column;align-items:center;gap:8px}
-.home-tile:hover{border-color:var(--teal)}
-.home-tile:active{transform:scale(0.97);border-color:var(--teal)}
-.home-tile .ht-icon{font-size:1.7rem}
-.home-tile .ht-label{font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink)}
-.home-tile .ht-sub{font-size:0.65rem;color:var(--muted)}
+.home-tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 14px;text-align:left;cursor:pointer;transition:border-color 0.15s,background-color 0.15s,transform 0.1s;display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.home-tile:hover{border-color:var(--teal);background:#15213a}
+.home-tile:active{transform:scale(0.98);border-color:var(--teal)}
+.home-tile .ht-icon{display:flex;color:var(--teal);margin-bottom:8px}
+.home-tile .ht-label{font-size:0.92rem;font-weight:650;color:var(--ink)}
+.home-tile .ht-sub{font-size:0.72rem;color:var(--muted);line-height:1.35}
+
+/* Status dots and small text tags (replace emoji markers) */
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:1px;background:var(--muted)}
+.dot.ok{background:#34C77B}.dot.bad{background:var(--coral)}.dot.warn{background:var(--gold)}.dot.off{background:#5A6578}
+.tag{display:inline-block;font-size:0.62rem;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;padding:2px 6px;border-radius:4px;background:rgba(79,184,204,.15);color:var(--teal);vertical-align:2px}
+.tag.warn{background:rgba(240,169,59,.15);color:var(--gold)}
+#voiceNotesBtn svg{display:block}
 
 /* MAIN */
 .app-main{max-width:800px;margin:0 auto;padding:16px;padding-bottom:80px}
@@ -78,11 +85,13 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 
 /* CARDS */
 .dash-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:18px}
-.kpi-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;border-left:3px solid var(--teal)}
-.kpi-card.gold{border-left-color:var(--gold)}
-.kpi-card.coral{border-left-color:var(--coral)}
-.kpi-card.green{border-left-color:var(--green)}
+.kpi-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;--kpi:var(--teal)}
+.kpi-card.gold{--kpi:var(--gold)}
+.kpi-card.coral{--kpi:var(--coral)}
+.kpi-card.green{--kpi:var(--green)}
 .kpi-label{font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px}
+.kpi-card .kpi-label::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--kpi);margin-right:7px;vertical-align:1px}
+.kpi-val{font-variant-numeric:tabular-nums}
 .kpi-val{font-size:1.6rem;font-weight:800;color:var(--ink)}
 .kpi-sub{font-size:0.7rem;color:var(--muted);margin-top:2px}
 
@@ -104,7 +113,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 .bk-detail{font-size:0.78rem;color:var(--muted);line-height:1.5}
 .bk-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
 .bk-btn{padding:6px 12px;border-radius:8px;border:none;font-size:0.72rem;font-weight:700;cursor:pointer;transition:all 0.15s}
-.bk-btn.confirm{background:var(--green);color:#fff}
+.bk-btn.confirm{background:var(--green);color:var(--navy)}
 .bk-btn.done-btn{background:var(--line);color:var(--muted)}
 .bk-btn.wa{background:#25D366;color:#fff}
 .bk-btn:hover{opacity:0.85;transform:scale(1.03)}
@@ -113,7 +122,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 /* INVENTORY */
 .inv-filter{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .inv-chip{padding:6px 14px;border-radius:20px;background:var(--surface);color:var(--muted);font-size:0.75rem;font-weight:700;cursor:pointer;border:1px solid var(--line);transition:all 0.2s}
-.inv-chip.active{background:var(--teal);color:#fff;border-color:var(--teal)}
+.inv-chip.active{background:var(--teal);color:var(--navy);border-color:var(--teal)}
 .inv-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .inv-unit{background:var(--surface);border-radius:8px;padding:12px 10px;display:flex;align-items:center;gap:10px;border:1px solid var(--line)}
 .inv-unit.out{border-color:rgba(240,101,95,0.4);background:#1a1215}
@@ -140,7 +149,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 
 /* TEAM */
 .team-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-.team-avatar{width:40px;height:40px;border-radius:8px;background:var(--navy);display:flex;align-items:center;justify-content:center;font-size:1.15rem;flex-shrink:0;border:1px solid var(--line)}
+.team-avatar{width:40px;height:40px;border-radius:8px;background:var(--navy);display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;letter-spacing:0.04em;color:var(--teal);flex-shrink:0;border:1px solid var(--line)}
 .team-info{flex:1}
 .team-name{font-weight:700;color:var(--ink);font-size:0.92rem}
 .team-role{font-size:0.73rem;color:var(--muted);margin-top:2px}
@@ -171,7 +180,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 
 /* REFRESH BTN */
 .refresh-btn{background:var(--surface);border:1px solid var(--line);color:var(--muted);padding:7px 12px;border-radius:8px;font-size:0.72rem;cursor:pointer;transition:all 0.2s}
-.refresh-btn:hover{background:var(--teal);color:#fff}
+.refresh-btn:hover{background:var(--teal);color:var(--navy)}
 
 /* CARD (rates tab) — was used throughout but never defined, so it rendered
    with no background/border at all; adding it here to match the rest of
@@ -250,7 +259,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
     </div>
     <span class="online-pill" id="onlinePill">●</span>
     <button class="back-btn" id="backBtn" onclick="goHome()" style="display:none">← Back</button>
-    <button class="lock-btn" onclick="lockApp()">🔒 Lock</button>
+    <button class="lock-btn" onclick="lockApp()">Lock</button>
   </div>
 </header>
 
@@ -261,22 +270,22 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 <!-- ═ HOME MENU ═ -->
 <div class="asection active" id="asec-home">
   <div class="home-grid">
-    <div class="home-tile" onclick="switchATab('today')"><span class="ht-icon">📊</span><span class="ht-label">Today</span><span class="ht-sub">Dashboard &amp; KPIs</span></div>
-    <div class="home-tile" onclick="switchATab('bookings')"><span class="ht-icon">📋</span><span class="ht-label">Bookings</span><span class="ht-sub">Live bookings</span></div>
-    <div class="home-tile" onclick="switchATab('dispatch')"><span class="ht-icon">📦</span><span class="ht-label">Dispatch</span><span class="ht-sub">Deliveries &amp; status</span></div>
-    <div class="home-tile" onclick="switchATab('customers')"><span class="ht-icon">🧾</span><span class="ht-label">Customers</span><span class="ht-sub">Customer records</span></div>
-    <div class="home-tile" onclick="switchATab('inventory')"><span class="ht-icon">🏄</span><span class="ht-label">Fleet</span><span class="ht-sub">Units in/out</span></div>
-    <div class="home-tile" onclick="switchATab('safety')"><span class="ht-icon">🛡️</span><span class="ht-label">Safety</span><span class="ht-sub">Daily checklist</span></div>
-    <div class="home-tile" onclick="switchATab('team')"><span class="ht-icon">👥</span><span class="ht-label">Team</span><span class="ht-sub">Staff contacts</span></div>
-    <div class="home-tile" onclick="switchATab('drivers')"><span class="ht-icon">🚚</span><span class="ht-label">Drivers</span><span class="ht-sub">Delivery drivers</span></div>
-    <div class="home-tile" onclick="switchATab('feedback')"><span class="ht-icon">⭐</span><span class="ht-label">Feedback</span><span class="ht-sub">Customer reviews</span></div>
-    <div class="home-tile" onclick="switchATab('commission')"><span class="ht-icon">💵</span><span class="ht-label">Commission</span><span class="ht-sub">Staff sales &amp; commission</span></div>
-    <div class="home-tile" onclick="switchATab('partners')"><span class="ht-icon">🤝</span><span class="ht-label">Partners</span><span class="ht-sub">Hotel links &amp; referrals</span></div>
-    <div class="home-tile" onclick="switchATab('cashflow')"><span class="ht-icon">📈</span><span class="ht-label">Cash Flow</span><span class="ht-sub">Income, expenses &amp; forecast</span></div>
-    <div class="home-tile" onclick="switchATab('chats')"><span class="ht-icon">💬</span><span class="ht-label">Chats</span><span class="ht-sub" id="chatsTileSub">Guest live chat</span></div>
-    <div class="home-tile" onclick="switchATab('messages')"><span class="ht-icon">✉️</span><span class="ht-label">Messages</span><span class="ht-sub">Sent history</span></div>
-    <div class="home-tile" onclick="switchATab('settings')"><span class="ht-icon">⚙️</span><span class="ht-label">Settings</span><span class="ht-sub">PIN &amp; session</span></div>
-    <div class="home-tile" onclick="switchATab('rates')"><span class="ht-icon">💰</span><span class="ht-label">Rates</span><span class="ht-sub">Price list</span></div>
+    <div class="home-tile" onclick="switchATab('today')"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg></span><span class="ht-label">Today</span><span class="ht-sub">Dashboard &amp; KPIs</span></div>
+    <div class="home-tile" onclick="switchATab('bookings')"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg></span><span class="ht-label">Bookings</span><span class="ht-sub">Live bookings</span></div>
+    <div class="home-tile" onclick="switchATab('dispatch')"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></span><span class="ht-label">Dispatch</span><span class="ht-sub">Deliveries &amp; status</span></div>
+    <div class="home-tile" onclick="switchATab('customers')"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 2v2"/><path d="M7 22v-2a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/><path d="M8 2v2"/><circle cx="12" cy="11" r="3"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg></span><span class="ht-label">Customers</span><span class="ht-sub">Customer records</span></div>
+    <div class="home-tile" onclick="switchATab('inventory')"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></svg></span><span class="ht-label">Fleet</span><span class="ht-sub">Units in/out</span></div>
+    <div class="home-tile" onclick="switchATab('safety')"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span><span class="ht-label">Safety</span><span class="ht-sub">Daily checklist</span></div>
+    <div class="home-tile" onclick="switchATab('team')"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="ht-label">Team</span><span class="ht-sub">Staff contacts</span></div>
+    <div class="home-tile" onclick="switchATab('drivers')"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg></span><span class="ht-label">Drivers</span><span class="ht-sub">Delivery drivers</span></div>
+    <div class="home-tile" onclick="switchATab('feedback')"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.53 2.3a.53.53 0 0 1 .95 0l2.31 4.68a2.12 2.12 0 0 0 1.6 1.16l5.16.76a.53.53 0 0 1 .3.9l-3.74 3.64a2.12 2.12 0 0 0-.61 1.88l.88 5.14a.53.53 0 0 1-.77.56l-4.62-2.43a2.12 2.12 0 0 0-1.97 0L6.4 21.01a.53.53 0 0 1-.77-.56l.88-5.14a2.12 2.12 0 0 0-.61-1.88L2.16 9.8a.53.53 0 0 1 .3-.91l5.16-.75a2.12 2.12 0 0 0 1.6-1.16z"/></svg></span><span class="ht-label">Feedback</span><span class="ht-sub">Customer reviews</span></div>
+    <div class="home-tile" onclick="switchATab('commission')"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span><span class="ht-label">Commission</span><span class="ht-sub">Staff sales &amp; commission</span></div>
+    <div class="home-tile" onclick="switchATab('partners')"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span><span class="ht-label">Partners</span><span class="ht-sub">Hotel links &amp; referrals</span></div>
+    <div class="home-tile" onclick="switchATab('cashflow')"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></span><span class="ht-label">Cash Flow</span><span class="ht-sub">Income, expenses &amp; forecast</span></div>
+    <div class="home-tile" onclick="switchATab('chats')"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg></span><span class="ht-label">Chats</span><span class="ht-sub" id="chatsTileSub">Guest live chat</span></div>
+    <div class="home-tile" onclick="switchATab('messages')"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></span><span class="ht-label">Messages</span><span class="ht-sub">Sent history</span></div>
+    <div class="home-tile" onclick="switchATab('settings')"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg></span><span class="ht-label">Settings</span><span class="ht-sub">PIN &amp; session</span></div>
+    <div class="home-tile" onclick="switchATab('rates')"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.59 2.59A2 2 0 0 0 11.17 2H4a2 2 0 0 0-2 2v7.17a2 2 0 0 0 .59 1.42l8.7 8.7a2.43 2.43 0 0 0 3.42 0l6.58-6.58a2.43 2.43 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r="1"/></svg></span><span class="ht-label">Rates</span><span class="ht-sub">Price list</span></div>
   </div>
 
   <!-- APR Founder's Slogan — rotating quote slide (see index.html for the
@@ -366,10 +375,10 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 
   <div class="sec-title">Quick Actions</div>
   <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px">
-    <a href="index.html" style="display:block;background:var(--teal);color:#fff;padding:13px 16px;border-radius:var(--radius);font-weight:700;font-size:0.88rem;text-decoration:none;text-align:center">📋 Open Booking Page</a>
-    <a href="https://wa.me/17844963447" style="display:block;background:#25D366;color:#fff;padding:13px 16px;border-radius:var(--radius);font-weight:700;font-size:0.88rem;text-decoration:none;text-align:center">💬 Business WhatsApp</a>
-    <button onclick="switchATab('safety');window.scrollTo(0,0)" style="background:var(--surface);border:1px solid var(--line);color:#fff;padding:13px 16px;border-radius:var(--radius);font-weight:700;font-size:0.88rem;cursor:pointer;text-align:center">🛡️ Run Safety Checklist</button>
-    <button onclick="fetchBookings()" style="background:var(--surface);border:1px solid rgba(251,198,44,0.3);color:var(--gold);padding:13px 16px;border-radius:var(--radius);font-weight:700;font-size:0.88rem;cursor:pointer">🔄 Refresh Bookings</button>
+    <a href="index.html" style="display:block;background:var(--teal);color:var(--navy);padding:13px 16px;border-radius:var(--radius);font-weight:700;font-size:0.88rem;text-decoration:none;text-align:center">Open Booking Page</a>
+    <a href="https://wa.me/17844963447" style="display:block;background:#25D366;color:#fff;padding:13px 16px;border-radius:var(--radius);font-weight:700;font-size:0.88rem;text-decoration:none;text-align:center">Business WhatsApp</a>
+    <button onclick="switchATab('safety');window.scrollTo(0,0)" style="background:var(--surface);border:1px solid var(--line);color:#fff;padding:13px 16px;border-radius:var(--radius);font-weight:700;font-size:0.88rem;cursor:pointer;text-align:center">Run Safety Checklist</button>
+    <button onclick="fetchBookings()" style="background:var(--surface);border:1px solid rgba(251,198,44,0.3);color:var(--gold);padding:13px 16px;border-radius:var(--radius);font-weight:700;font-size:0.88rem;cursor:pointer">Refresh Bookings</button>
   </div>
 
   <div class="sec-title">Activity Log</div>
@@ -382,7 +391,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 <div class="asection" id="asec-bookings">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
     <div class="sec-title" style="margin:0">Live Bookings</div>
-    <button class="refresh-btn" onclick="fetchBookings()">🔄 Refresh</button>
+    <button class="refresh-btn" onclick="fetchBookings()">Refresh</button>
   </div>
   <div id="availWarning" style="display:none;background:#3b2f0d;color:#facc15;border-radius:12px;padding:10px 14px;font-size:0.78rem;margin-bottom:12px;line-height:1.6"></div>
   <div id="bookingsContainer">
@@ -395,14 +404,14 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px">
     <div class="sec-title" style="margin:0">Dispatch — Deliveries</div>
     <div style="display:flex;gap:8px">
-      <button class="refresh-btn" style="background:transparent;border:1px solid var(--line);color:var(--muted)" onclick="openDeletedBookings()">🗑 Recently Deleted</button>
-      <button class="refresh-btn" onclick="fetchDispatchAdmin()">🔄 Refresh</button>
+      <button class="refresh-btn" style="background:transparent;border:1px solid var(--line);color:var(--muted)" onclick="openDeletedBookings()">Recently Deleted</button>
+      <button class="refresh-btn" onclick="fetchDispatchAdmin()">Refresh</button>
     </div>
   </div>
   <p style="font-size:0.72rem;color:var(--muted);margin-bottom:12px">Delivery view — name, gear, time and location. No pricing shown. Same list the drivers see.</p>
-  <a href="dispatch.html" target="_blank" style="display:block;background:var(--surface);border:1px solid var(--line);color:#fff;padding:12px 16px;border-radius:var(--radius);font-weight:700;font-size:0.85rem;text-decoration:none;text-align:center;margin-bottom:14px">🚚 Open Driver Dispatch Page (for driver devices)</a>
+  <a href="dispatch.html" target="_blank" style="display:block;background:var(--surface);border:1px solid var(--line);color:#fff;padding:12px 16px;border-radius:var(--radius);font-weight:700;font-size:0.85rem;text-decoration:none;text-align:center;margin-bottom:14px">Open Driver Dispatch Page (for driver devices)</a>
 
-  <input type="text" id="dispatchSearchInput" placeholder="🔎 Search by name, ref or phone…" oninput="setDispatchSearch(this.value)" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--navy);color:#fff;font-size:0.85rem;margin-bottom:8px;box-sizing:border-box"/>
+  <input type="text" id="dispatchSearchInput" placeholder="Search by name, ref or phone…" oninput="setDispatchSearch(this.value)" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--navy);color:#fff;font-size:0.85rem;margin-bottom:8px;box-sizing:border-box"/>
   <div id="dispatchFilterBar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
 
   <div id="dispatchContainer">
@@ -413,7 +422,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 <!-- ═ INVENTORY / FLEET ═ -->
 <div class="asection" id="asec-inventory">
   <!-- ═ STOCK & DEALS ═ Counts here drive what guests can book (per date/time). -->
-  <div class="sec-title">📦 Stock — what's available right now</div>
+  <div class="sec-title">Stock — what's available right now</div>
   <div class="dash-grid" id="stockKpis"></div>
   <div class="card" style="overflow-x:auto">
     <table class="stock-table">
@@ -421,10 +430,10 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
       <tbody id="stockRows"><tr><td colspan="7"style="text-align:center;color:var(--muted);padding:14px">Loading…</td></tr></tbody>
     </table>
     <p style="font-size:0.72rem;color:var(--muted);margin:10px 0">Change <b>We own</b> or <b>In repair</b>, then Save. Guests can't book more than what's left for their time — booked gear is held for its booking time and freed when the booking is marked done or deleted. Leave <b>We own</b> blank for no limit (∞). Tap <b>Turn off</b> to block an item — guests see "Not available at the moment" until you turn it back on (no Save needed).</p>
-    <button class="stock-btn" onclick="saveStockCounts()">💾 Save Stock</button>
+    <button class="stock-btn" onclick="saveStockCounts()">Save Stock</button>
   </div>
 
-  <div class="sec-title">🏷️ Limited Deals</div>
+  <div class="sec-title">Limited Deals</div>
   <div class="card">
     <div class="stock-form">
       <select id="dealGear"></select>
@@ -432,29 +441,29 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
       <input id="dealCap" type="number" min="1" max="500" placeholder="How many">
       <input id="dealLabel" maxlength="60" placeholder="Name (optional), e.g. Weekend Special">
     </div>
-    <button class="stock-btn" onclick="createDealUI()">➕ Start Deal</button>
+    <button class="stock-btn" onclick="createDealUI()">Start Deal</button>
     <p style="font-size:0.72rem;color:var(--muted);margin:10px 0 0">The deal shows on the booking page with how many are left at that price and stops by itself once they're all used. You get an alarm when it runs out.</p>
     <div id="dealList" style="margin-top:12px"></div>
   </div>
 
-  <div class="sec-title">🔔 Alarms to Your Phone (Telegram)</div>
+  <div class="sec-title">Alarms to Your Phone (Telegram)</div>
   <div class="card" id="tgCard">Loading…</div>
 
-  <div class="sec-title">🏖️ Beach Partners (gear cage hand-offs)</div>
+  <div class="sec-title">Beach Partners (gear cage hand-offs)</div>
   <div class="card" id="partnerCard">Loading…</div>
 
-  <div class="sec-title">📱 Text-Message Alarms (works with no internet)</div>
+  <div class="sec-title">Text-Message Alarms (works with no internet)</div>
   <div class="card" id="smsCard">Loading…</div>
 
-  <div class="sec-title">🟢 Guest Chats to Your WhatsApp (quick setup)</div>
+  <div class="sec-title">Guest Chats to Your WhatsApp (quick setup)</div>
   <div class="card" id="cmbCard">Loading…</div>
 
-  <div class="sec-title">🟢 WhatsApp Two-Way via Meta (advanced, optional)</div>
+  <div class="sec-title">WhatsApp Two-Way via Meta (advanced, optional)</div>
   <div class="card" id="waCard">Loading…</div>
 
   <div class="sec-title">Fleet Summary</div>
   <div class="dash-grid" id="invSummary"></div>
-  <button onclick="exportInventoryCSV()" style="margin-top:8px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--navy);padding:9px 16px;font-size:0.8rem;font-weight:700;cursor:pointer">📥 Export Inventory CSV</button>
+  <button onclick="exportInventoryCSV()" style="margin-top:8px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--navy);padding:9px 16px;font-size:0.8rem;font-weight:700;cursor:pointer">Export Inventory CSV</button>
 
   <div class="sec-title" style="margin-top:18px">Restock</div>
   <div class="card" style="margin-bottom:16px">
@@ -469,9 +478,9 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
     <div style="display:flex;gap:8px;margin-bottom:8px">
       <input type="number" id="restockQty" min="1" max="50" value="1" style="width:80px;padding:10px 12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;font-size:0.85rem;box-sizing:border-box"/>
       <input type="text" id="restockNotes" placeholder="Notes (e.g. color, board name) — optional" style="flex:1;padding:10px 12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;font-size:0.85rem;box-sizing:border-box"/>
-      <button id="voiceNotesBtn" onclick="startVoiceNotes()" style="display:none;padding:10px 14px;background:var(--surface);color:#fff;border:2px solid var(--teal);border-radius:8px;font-size:1rem;cursor:pointer" title="Speak notes instead of typing">🎤</button>
+      <button id="voiceNotesBtn" onclick="startVoiceNotes()" style="display:none;padding:10px 14px;background:var(--surface);color:#fff;border:2px solid var(--teal);border-radius:8px;font-size:1rem;cursor:pointer" title="Speak notes instead of typing" aria-label="Speak notes"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg></button>
     </div>
-    <button onclick="restockInventory()" style="width:100%;padding:10px;background:var(--teal);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.88rem;cursor:pointer">📦 Restock</button>
+    <button onclick="restockInventory()" style="width:100%;padding:10px;background:var(--teal);color:var(--navy);border:none;border-radius:8px;font-weight:700;font-size:0.88rem;cursor:pointer">Restock</button>
   </div>
 
   <div class="sec-title" style="margin-top:18px">Equipment</div>
@@ -491,11 +500,11 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 <!-- ═ SAFETY ═ -->
 <div class="asection" id="asec-safety">
   <div class="checklist-intro">
-    ⚠️ Complete this pre-dispatch safety checklist for <strong>every rental</strong>. Items marked * are mandatory — dispatch cannot proceed without them.
+    Complete this pre-dispatch safety checklist for <strong>every rental</strong>. Items marked * are mandatory — dispatch cannot proceed without them.
   </div>
   <div id="safetyChecklist"></div>
   <button class="safety-submit" id="safetySubmitBtn" onclick="completeSafetyCheck()">
-    ✅ Mark Dispatch Safe — Proceed
+    Mark Dispatch Safe — Proceed
   </button>
   <div style="margin-top:16px;background:var(--surface);border-radius:var(--radius);padding:14px">
     <div class="sec-title" style="margin:0 0 10px">Recent Safety Checks</div>
@@ -504,7 +513,6 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 
   <div style="margin-top:18px;background:#0f1a1f;border:1px solid #dc2626;border-radius:var(--radius);overflow:hidden">
     <div style="background:#dc2626;padding:10px 14px;display:flex;align-items:center;gap:8px">
-      <span style="font-size:1.2rem">🆘</span>
       <span style="font-weight:800;font-size:0.95rem;color:#fff;letter-spacing:0.5px">EMERGENCY PROCEDURES — BEQUIA APR</span>
     </div>
     <div style="padding:14px;display:grid;gap:10px">
@@ -554,7 +562,6 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
       </div>
 
       <div style="background:#1a1200;border:1px solid #fbbf24;border-radius:8px;padding:10px;display:flex;gap:10px;align-items:flex-start">
-        <span style="font-size:1.1rem">📌</span>
         <div style="font-size:0.76rem;color:var(--ink);line-height:1.55">
           <strong style="color:#fbbf24">Key Numbers:</strong><br/>
           Bequia Hospital: 784-458-3294 · Bequia Police: 784-458-3350<br/>
@@ -571,7 +578,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 <div class="asection" id="asec-team">
   <div style="display:flex;justify-content:space-between;align-items:center">
     <div class="sec-title" style="margin:0">Ground Team</div>
-    <button class="refresh-btn" onclick="notifyAllStaff()">🔔 Notify All</button>
+    <button class="refresh-btn" onclick="notifyAllStaff()">Notify All</button>
   </div>
   <div id="teamList"></div>
 
@@ -582,7 +589,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
     <input type="tel" id="newStaffPhone" placeholder="WhatsApp number, e.g. +1 784 XXX XXXX" style="width:100%;padding:10px 12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;font-size:0.85rem;margin-bottom:8px;box-sizing:border-box"/>
     <label style="display:block;font-size:0.72rem;color:var(--muted);margin-bottom:4px">Photo (shown to guests — optional)</label>
     <input type="file" accept="image/*" id="newStaffPhotoFile" style="width:100%;margin-bottom:10px;font-size:0.8rem"/>
-    <button onclick="addStaffMember()" style="width:100%;padding:10px;background:var(--teal);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.88rem;cursor:pointer">➕ Add Staff Member</button>
+    <button onclick="addStaffMember()" style="width:100%;padding:10px;background:var(--teal);color:var(--navy);border:none;border-radius:8px;font-weight:700;font-size:0.88rem;cursor:pointer">Add Staff Member</button>
   </div>
 
   <div class="sec-title">Operations</div>
@@ -614,7 +621,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
     <input type="tel" id="newDriverPhone" placeholder="WhatsApp number, e.g. +1 784 XXX XXXX" style="width:100%;padding:10px 12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;font-size:0.85rem;margin-bottom:8px;box-sizing:border-box"/>
     <label style="display:block;font-size:0.72rem;color:var(--muted);margin-bottom:4px">Photo (shown to guests — optional)</label>
     <input type="file" accept="image/*" id="newDriverPhotoFile" style="width:100%;margin-bottom:10px;font-size:0.8rem"/>
-    <button onclick="addDriver()" style="width:100%;padding:10px;background:var(--teal);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.88rem;cursor:pointer">➕ Add Driver</button>
+    <button onclick="addDriver()" style="width:100%;padding:10px;background:var(--teal);color:var(--navy);border:none;border-radius:8px;font-weight:700;font-size:0.88rem;cursor:pointer">Add Driver</button>
   </div>
 </div>
 
@@ -632,7 +639,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
   <div class="sec-title">Trend (avg rating by week)</div>
   <div class="card" id="feedbackTrend" style="margin-bottom:16px"></div>
 
-  <div class="sec-title">⚠️ Needs Follow-up (≤2★)</div>
+  <div class="sec-title">Needs Follow-up (≤2★)</div>
   <div id="feedbackFlagged" style="margin-bottom:16px"></div>
 
   <div class="sec-title">All Reviews</div>
@@ -653,7 +660,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
       <input type="date" id="commissionStart" style="padding:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;font-size:0.8rem"/>
       <span style="color:var(--muted);font-size:0.8rem">to</span>
       <input type="date" id="commissionEnd" style="padding:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;font-size:0.8rem"/>
-      <button class="refresh-btn" onclick="fetchCommissionReport()">🔄 Run Report</button>
+      <button class="refresh-btn" onclick="fetchCommissionReport()">Run Report</button>
     </div>
   </div>
 
@@ -668,7 +675,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
   <p style="font-size:0.72rem;color:var(--muted);margin-bottom:12px">Give each hotel, guesthouse or concierge its own link or QR code. Every booking made through it is tagged to that partner for 30 days. Commission is counted on <strong>completed</strong> bookings only, by rental date.</p>
 
   <div class="card" style="margin-bottom:16px">
-    <div style="font-weight:800;font-size:0.85rem;margin-bottom:8px">🔗 Make a partner link</div>
+    <div style="font-weight:800;font-size:0.85rem;margin-bottom:8px">Make a partner link</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <input id="ptCode" placeholder="CODE e.g. SEASIDE-INN" maxlength="24" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9-]/g,'')" style="flex:1 1 160px;padding:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;font-size:0.82rem;letter-spacing:0.05em"/>
       <button class="refresh-btn" onclick="makePartnerLink()">Create</button>
@@ -704,7 +711,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
       <input type="date" id="cashflowStart" style="padding:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;font-size:0.8rem"/>
       <span style="color:var(--muted);font-size:0.8rem">to</span>
       <input type="date" id="cashflowEnd" style="padding:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;font-size:0.8rem"/>
-      <button class="refresh-btn" onclick="fetchCashFlow()">🔄 Refresh</button>
+      <button class="refresh-btn" onclick="fetchCashFlow()">Refresh</button>
     </div>
   </div>
 
@@ -727,7 +734,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
       </select>
       <input type="number" id="expenseAmount" placeholder="Amount (XCD)" min="0.01" step="0.01" style="padding:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;font-size:0.8rem;width:130px"/>
       <input type="text" id="expenseNote" placeholder="Note (optional)" maxlength="500" style="flex:1;min-width:140px;padding:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;font-size:0.8rem"/>
-      <button class="refresh-btn" onclick="submitExpense()">➕ Add Expense</button>
+      <button class="refresh-btn" onclick="submitExpense()">Add Expense</button>
     </div>
     <p id="expenseFormMsg" style="font-size:0.75rem;margin-top:8px;min-height:16px"></p>
   </div>
@@ -739,9 +746,9 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 <div class="asection" id="asec-chats">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
     <div class="sec-title" style="margin:0">Guest Chats</div>
-    <button class="refresh-btn" onclick="fetchChats()">🔄 Refresh</button>
+    <button class="refresh-btn" onclick="fetchChats()">Refresh</button>
   </div>
-  <p style="font-size:0.72rem;color:var(--muted);margin-bottom:12px">Messages guests send from the booking page's 💬 button. Each one also goes to your Telegram bot and your WhatsApp (if set up in Fleet) — away from the computer, reply to that message on your phone and the guest sees it here and on their screen.</p>
+  <p style="font-size:0.72rem;color:var(--muted);margin-bottom:12px">Messages guests send from the booking page's button. Each one also goes to your Telegram bot and your WhatsApp (if set up in Fleet) — away from the computer, reply to that message on your phone and the guest sees it here and on their screen.</p>
   <div id="chatsList"></div>
   <div id="chatThread" style="display:none">
     <button class="refresh-btn" onclick="closeChatThread()" style="margin-bottom:10px">← All chats</button>
@@ -752,7 +759,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
     </div>
     <div style="display:flex;gap:8px">
       <textarea id="chatReplyInput" rows="2" maxlength="1000" placeholder="Type a reply…" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-size:0.85rem;resize:vertical" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatReply();}"></textarea>
-      <button id="chatReplyBtn" onclick="sendChatReply()" style="background:var(--teal);color:#fff;border:none;border-radius:8px;padding:0 18px;font-weight:700;cursor:pointer">Send</button>
+      <button id="chatReplyBtn" onclick="sendChatReply()" style="background:var(--teal);color:var(--navy);border:none;border-radius:8px;padding:0 18px;font-weight:700;cursor:pointer">Send</button>
     </div>
   </div>
 </div>
@@ -760,7 +767,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 <div class="asection" id="asec-messages">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
     <div class="sec-title" style="margin:0">Message History</div>
-    <button class="refresh-btn" onclick="fetchMessages()">🔄 Refresh</button>
+    <button class="refresh-btn" onclick="fetchMessages()">Refresh</button>
   </div>
   <p style="font-size:0.72rem;color:var(--muted);margin-bottom:12px">Emails the system actually sent — booking notifications to you and confirmations to guests. WhatsApp taps aren't logged here since those open outside the app.</p>
   <div id="messagesList"></div>
@@ -769,7 +776,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 <!-- ═ CUSTOMERS ═ -->
 <div class="asection" id="asec-customers">
   <div class="sec-title">Customer Records</div>
-  <input type="text" id="customerSearch" placeholder="🔍 Search name or phone…" oninput="renderCustomers()"
+  <input type="text" id="customerSearch" placeholder="Search name or phone…" oninput="renderCustomers()"
     style="width:100%;padding:10px 12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;font-size:0.85rem;margin-bottom:12px;box-sizing:border-box"/>
   <div class="card" style="margin-bottom:16px;text-align:center">
     <div style="display:flex;justify-content:space-around">
@@ -779,11 +786,11 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
       </div>
       <div>
         <div style="font-size:1.4rem;font-weight:800;color:var(--gold)" id="custRegularCount">0</div>
-        <div style="font-size:0.68rem;color:var(--muted)">⭐ Regulars</div>
+        <div style="font-size:0.68rem;color:var(--muted)">Regulars</div>
       </div>
       <div>
         <div style="font-size:1.4rem;font-weight:800;color:var(--coral)" id="custConflictCount">0</div>
-        <div style="font-size:0.68rem;color:var(--muted)">⚠️ Conflicts</div>
+        <div style="font-size:0.68rem;color:var(--muted)">Conflicts</div>
       </div>
     </div>
   </div>
@@ -804,7 +811,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 
   <div class="sec-title">Security</div>
   <div class="setting-card">
-    <h3>🔐 Change Admin PIN</h3>
+    <h3>Change Admin PIN</h3>
     <p style="font-size:0.75rem;color:var(--muted);margin-bottom:10px">Enter new 4-digit PIN twice to change — this unlocks this console (admin.html)</p>
     <div class="pin-change-form">
       <input class="pin-input" type="password" maxlength="4" inputmode="numeric" placeholder="New PIN" id="newPin1"/>
@@ -814,7 +821,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
     <p id="pinChangeMsg" style="font-size:0.75rem;margin-top:8px;min-height:16px"></p>
   </div>
   <div class="setting-card">
-    <h3>🔐 Change Staff/Dispatch PIN</h3>
+    <h3>Change Staff/Dispatch PIN</h3>
     <p style="font-size:0.75rem;color:var(--muted);margin-bottom:10px">Enter new 4-digit PIN twice to change — this unlocks dispatch.html for delivery staff. Change this whenever a staff member leaves.</p>
     <div class="pin-change-form">
       <input class="pin-input" type="password" maxlength="4" inputmode="numeric" placeholder="New PIN" id="newStaffPin1"/>
@@ -826,12 +833,12 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 
   <div class="sec-title">Documents</div>
   <div class="setting-card">
-    <a href="rules.html" target="_blank" style="display:block;text-align:center;background:var(--teal);border-radius:8px;color:#fff;padding:10px 16px;font-size:0.85rem;font-weight:700;text-decoration:none">📄 Open Printable Rules &amp; Regulations</a>
+    <a href="rules.html" target="_blank" style="display:block;text-align:center;background:var(--teal);border-radius:8px;color:#fff;padding:10px 16px;font-size:0.85rem;font-weight:700;text-decoration:none">Open Printable Rules &amp; Regulations</a>
   </div>
 
   <div class="sec-title">Photos</div>
   <div class="setting-card">
-    <h3>📸 Booking Page Photos</h3>
+    <h3>Booking Page Photos</h3>
     <p style="font-size:0.75rem;color:var(--muted);margin-bottom:12px">Upload real photos for the booking page — pick a file, hit Upload, it goes live right away. Leave a slot empty to keep the default look.</p>
     <div id="sitePhotoSlots"></div>
   </div>
@@ -839,14 +846,14 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
   <div class="sec-title">Weather</div>
   <div class="setting-card">
     <p style="font-size:0.75rem;color:var(--muted);margin-bottom:10px">Turns on the hourly conditions check on the server (wind alerts by email/WhatsApp, and the safety banner on the booking page). Run this once — or again if the weather alerts ever stop.</p>
-    <button onclick="reinstallWeatherTrigger()" id="btnWeatherTrigger" style="width:100%;background:var(--teal);border:none;border-radius:8px;color:#fff;padding:10px 16px;font-size:0.85rem;font-weight:700;cursor:pointer">🌦️ Turn On Weather Checks</button>
+    <button onclick="reinstallWeatherTrigger()" id="btnWeatherTrigger" style="width:100%;background:var(--teal);border:none;border-radius:8px;color:#fff;padding:10px 16px;font-size:0.85rem;font-weight:700;cursor:pointer">Turn On Weather Checks</button>
     <p id="weatherTriggerMsg" style="font-size:0.75rem;margin-top:8px;min-height:16px"></p>
   </div>
 
   <div class="setting-card">
     <h3>Backups</h3>
     <p style="font-size:0.75rem;color:var(--muted);margin-bottom:10px">Copies the whole business spreadsheet to an "APR Backups" folder in Google Drive every Sunday (~3 AM) and keeps the last 8. Takes a first backup immediately when you turn it on. Run once — or again if backups ever stop appearing.</p>
-    <button onclick="reinstallBackupTrigger()" id="btnBackupTrigger" style="width:100%;background:var(--teal);border:none;border-radius:8px;color:#fff;padding:10px 16px;font-size:0.85rem;font-weight:700;cursor:pointer">💾 Turn On Weekly Backups</button>
+    <button onclick="reinstallBackupTrigger()" id="btnBackupTrigger" style="width:100%;background:var(--teal);border:none;border-radius:8px;color:#fff;padding:10px 16px;font-size:0.85rem;font-weight:700;cursor:pointer">Turn On Weekly Backups</button>
     <p id="backupTriggerMsg" style="font-size:0.75rem;margin-top:8px;min-height:16px"></p>
   </div>
 
@@ -854,18 +861,18 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
   <div class="setting-card">
     <div class="setting-row"><span class="setting-label">Queued bookings</span><span class="setting-val" id="queueCount">0</span></div>
     <button onclick="syncQueue()" style="margin-top:10px;background:var(--teal);border:none;border-radius:8px;color:#fff;padding:9px 16px;font-size:0.8rem;font-weight:700;cursor:pointer">Sync Now</button>
-    <button onclick="exportCSV()" style="margin-top:8px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--navy);padding:9px 16px;font-size:0.8rem;font-weight:700;cursor:pointer">📥 Export Bookings CSV</button>
+    <button onclick="exportCSV()" style="margin-top:8px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--navy);padding:9px 16px;font-size:0.8rem;font-weight:700;cursor:pointer">Export Bookings CSV</button>
   </div>
 
   <div class="sec-title">Danger Zone</div>
   <div class="setting-card">
-    <h3 style="color:var(--coral)">🚨 Emergency Lockdown</h3>
+    <h3 style="color:var(--coral)">Emergency Lockdown</h3>
     <p style="font-size:0.75rem;color:var(--muted);margin-bottom:10px">If you think someone is actively poking at bookings/customer data, hit this. It immediately stops <strong>everything</strong> — new bookings, admin, dispatch — for everyone except you logging back in here to switch it off. Only your admin PIN can turn it on or off.</p>
     <p id="lockdownStatusMsg" style="font-size:0.78rem;font-weight:700;margin-bottom:10px">Checking status…</p>
-    <button onclick="toggleLockdown()" id="btnLockdown" style="width:100%;padding:12px;background:rgba(224,53,27,0.15);border:1px solid var(--coral);border-radius:8px;color:var(--coral);font-weight:700;cursor:pointer;font-size:0.88rem">🚨 Turn On Lockdown</button>
+    <button onclick="toggleLockdown()" id="btnLockdown" style="width:100%;padding:12px;background:rgba(224,53,27,0.15);border:1px solid var(--coral);border-radius:8px;color:var(--coral);font-weight:700;cursor:pointer;font-size:0.88rem">Turn On Lockdown</button>
   </div>
   <div class="setting-card">
-    <button onclick="lockApp()" style="width:100%;padding:12px;background:rgba(224,53,27,0.15);border:1px solid var(--coral);border-radius:8px;color:var(--coral);font-weight:700;cursor:pointer;font-size:0.88rem">🔒 Lock &amp; Exit Console</button>
+    <button onclick="lockApp()" style="width:100%;padding:12px;background:rgba(224,53,27,0.15);border:1px solid var(--coral);border-radius:8px;color:var(--coral);font-weight:700;cursor:pointer;font-size:0.88rem">Lock &amp; Exit Console</button>
   </div>
 </div>
 
@@ -877,14 +884,14 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 <!-- ═ DELIVERY NOTIFY MODAL ═ -->
 <div id="deliveryModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:900;align-items:center;justify-content:center">
   <div style="background:var(--surface);border-radius:16px;padding:22px;width:90%;max-width:360px;color:#fff">
-    <div style="font-weight:800;font-size:1rem;margin-bottom:6px">🚚 Notify Driver</div>
+    <div style="font-weight:800;font-size:1rem;margin-bottom:6px">Notify Driver</div>
     <div style="font-size:0.78rem;color:var(--muted);margin-bottom:10px">Booking <span id="deliveryRefLabel"></span></div>
     <div id="deliveryAlreadySent" style="font-size:0.72rem;color:var(--gold);margin-bottom:8px;min-height:14px"></div>
     <select id="deliveryDriverSelect" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--navy);color:#fff;font-size:0.85rem;margin-bottom:10px"></select>
     <input type="text" id="deliveryLocation" maxlength="200" placeholder="Delivery location / address (optional)" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--navy);color:#fff;font-size:0.85rem;margin-bottom:14px;box-sizing:border-box"/>
     <div style="display:flex;gap:8px">
       <button onclick="closeDeliveryModal()" style="flex:1;padding:10px;background:var(--line);border:none;border-radius:8px;color:#fff;font-weight:700;cursor:pointer">Cancel</button>
-      <button onclick="confirmDelivery()" style="flex:1;padding:10px;background:var(--teal);border:none;border-radius:8px;color:#fff;font-weight:700;cursor:pointer">Send 🔔</button>
+      <button onclick="confirmDelivery()" style="flex:1;padding:10px;background:var(--teal);border:none;border-radius:8px;color:#fff;font-weight:700;cursor:pointer">Send </button>
     </div>
   </div>
 </div>
@@ -893,7 +900,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 <div id="deletedModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:900;align-items:center;justify-content:center;padding:20px">
   <div style="background:var(--surface);border-radius:16px;padding:22px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto;color:#fff">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <div style="font-weight:800;font-size:1rem">🗑 Recently Deleted</div>
+      <div style="font-weight:800;font-size:1rem">Recently Deleted</div>
       <button onclick="closeDeletedBookings()" style="background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer;line-height:1">✕</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-bottom:12px">Deleted bookings are kept here so a misclick can be undone.</p>
@@ -1047,7 +1054,7 @@ async function checkPin() {
   let serverResult = null;
   try {
     if (isLockedOut()) {
-      document.getElementById('pinError').textContent = '🔒 Locked. Try again later.';
+      document.getElementById('pinError').textContent = 'Locked. Try again later.';
       pinBuffer=''; updatePinDots();
       return;
     }
@@ -1071,14 +1078,14 @@ async function checkPin() {
     document.getElementById('sessionTime').textContent = new Date().toLocaleTimeString();
     onLogin();
     openDeepLink();
-    addLog('🔐 ' + currentUser.name + ' logged in');
+    addLog('' + currentUser.name + ' logged in');
     resetIdleTimer();
   } else {
     attempts++;
     const remaining = MAX_ATTEMPTS - attempts;
     document.getElementById('pinError').textContent = attempts >= MAX_ATTEMPTS
-      ? '🔒 Too many attempts. Try again in 5 minutes.'
-      : `❌ Incorrect PIN. ${remaining} attempt${remaining!==1?'s':''} left.`;
+      ? 'Too many attempts. Try again in 5 minutes.'
+      : `Incorrect PIN. ${remaining} attempt${remaining!==1?'s':''} left.`;
     if (remaining > 0) document.getElementById('pinAttempts').textContent = '';
 
     for (let i=0;i<4;i++) document.getElementById('d'+i).className='pin-dot error';
@@ -1102,7 +1109,7 @@ async function checkPin() {
 }
 
 function lockApp() {
-  if (currentUser) addLog('🔒 ' + currentUser.name + ' locked the console');
+  if (currentUser) addLog('' + currentUser.name + ' locked the console');
   currentUser = null;
   goHome();
   clearTimeout(idleTimer);
@@ -1147,7 +1154,7 @@ async function changePin() {
     msg.style.color=var_coral(); msg.textContent='Network error — PIN not changed'; return;
   }
   await setPersonPin(currentUser.id, currentUser.name, p1);
-  msg.style.color='#4ade80'; msg.textContent='✅ PIN updated!';
+  msg.style.color='#4ade80'; msg.textContent='PIN updated!';
   document.getElementById('newPin1').value='';
   document.getElementById('newPin2').value='';
   setTimeout(()=>msg.textContent='',3000);
@@ -1177,7 +1184,7 @@ async function changeStaffPin() {
     console.error('changeStaffPin server call failed:', err);
     msg.style.color=var_coral(); msg.textContent='Network error — PIN not changed'; return;
   }
-  msg.style.color='#4ade80'; msg.textContent='✅ Staff PIN updated! Tell delivery staff the new PIN.';
+  msg.style.color='#4ade80'; msg.textContent='Staff PIN updated! Tell delivery staff the new PIN.';
   document.getElementById('newStaffPin1').value='';
   document.getElementById('newStaffPin2').value='';
   setTimeout(()=>msg.textContent='',5000);
@@ -1237,7 +1244,7 @@ async function uploadSitePhotoSlot(key) {
     if (!data || !data.ok) throw new Error((data && data.error) || 'Upload failed');
     sitePhotosCache[key] = data.url;
     renderSitePhotoSlots();
-    showToast('Photo uploaded — live on the booking page now ✅','ok');
+    showToast('Photo uploaded — live on the booking page now ','ok');
   } catch (err) {
     showToast('Could not upload photo: '+err.message, 'warn');
   }
@@ -1274,7 +1281,7 @@ let bookingStates = safeParseJSON('apr_bk_states', {});
 
 async function fetchBookings() {
   const el = document.getElementById('bookingsContainer');
-  el.innerHTML='<div style="text-align:center;padding:30px;color:var(--muted)">⏳ Loading bookings…</div>';
+  el.innerHTML='<div style="text-align:center;padding:30px;color:var(--muted)">Loading bookings…</div>';
   try {
     const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'getBookings',token:APP_TOKEN,limit:50}),signal:AbortSignal.timeout(10000)});
     if(!res.ok) throw new Error('HTTP '+res.status);
@@ -1290,7 +1297,7 @@ async function fetchBookings() {
       renderBookings();
       updateKPIs();
       renderWeekStrip();
-      addLog('📋 Bookings refreshed: '+allBookings.length+' total');
+      addLog('Bookings refreshed: '+allBookings.length+' total');
       showToast('Bookings refreshed','ok');
     } else {
       throw new Error((data && data.error) || 'No data');
@@ -1299,14 +1306,14 @@ async function fetchBookings() {
     const cached = Array.isArray(allBookings) ? allBookings.length : 0;
     const safeErrMsg = escapeHtml((e && e.message) || 'Network error');
     el.innerHTML=`<div style="text-align:center;padding:30px">
-      <div style="color:#ef4444;font-size:0.9rem;margin-bottom:12px">⚠️ Could not reach backend</div>
+      <div style="color:#ef4444;font-size:0.9rem;margin-bottom:12px">Could not reach backend</div>
       <div style="color:var(--muted);font-size:0.78rem;margin-bottom:16px">${safeErrMsg}<br/>Check internet connection or Google Apps Script deployment</div>
       ${cached?'<div style="color:var(--muted);font-size:0.75rem;margin-bottom:12px">Showing '+cached+' cached bookings</div>':''}
-      <button onclick="fetchBookings()" style="background:var(--teal);color:#fff;border:none;padding:10px 20px;border-radius:8px;font-weight:700;cursor:pointer">🔄 Retry</button>
-      <div style="margin-top:14px"><a href="index.html" style="color:var(--teal);font-size:0.8rem">📋 Open Booking Form →</a></div>
+      <button onclick="fetchBookings()" style="background:var(--teal);color:var(--navy);border:none;padding:10px 20px;border-radius:8px;font-weight:700;cursor:pointer">Retry</button>
+      <div style="margin-top:14px"><a href="index.html" style="color:var(--teal);font-size:0.8rem">Open Booking Form →</a></div>
     </div>`;
     if(cached){ renderBookings(); updateKPIs(); renderWeekStrip(); }
-    addLog('⚠️ Booking fetch failed: '+((e&&e.message)||'unknown error'));
+    addLog('Booking fetch failed: '+((e&&e.message)||'unknown error'));
   }
 }
 
@@ -1408,21 +1415,21 @@ function renderBookings() {
         <span class="bk-status ${statusClass}">${statusLabel}</span>
       </div>
       <div class="bk-name">${escapeHtml(b.fname||'N/A')} ${escapeHtml(b.lname||'')}</div>
-      <div class="bk-detail">📱 ${escapeHtml(b.phone||'N/A')}</div>
-      <div class="bk-detail">🏄 ${escapeHtml(b.gear||'N/A')} · ${escapeHtml(b.duration||'N/A')}</div>
-      <div class="bk-detail">📅 ${escapeHtml(b.datetime||'N/A')}</div>
-      <div class="bk-detail">👥 Group: ${escapeHtml(b.groupSize||'1')}</div>
-      ${hasLoc?`<div class="bk-detail">📍 Driver: <a href="${mapUrl}" target="_blank" style="color:var(--teal)">view on map</a> (${escapeHtml(b.driverLocAt)})</div>`:''}
-      ${b.notes&&b.notes!=='N/A'?'<div class="bk-detail">📝 '+escapeHtml(b.notes)+'</div>':''}
+      <div class="bk-detail">${escapeHtml(b.phone||'N/A')}</div>
+      <div class="bk-detail">${escapeHtml(b.gear||'N/A')} · ${escapeHtml(b.duration||'N/A')}</div>
+      <div class="bk-detail">${escapeHtml(b.datetime||'N/A')}</div>
+      <div class="bk-detail">Group: ${escapeHtml(b.groupSize||'1')}</div>
+      ${hasLoc?`<div class="bk-detail">Driver: <a href="${mapUrl}" target="_blank" style="color:var(--teal)">view on map</a> (${escapeHtml(b.driverLocAt)})</div>`:''}
+      ${b.notes&&b.notes!=='N/A'?'<div class="bk-detail">'+escapeHtml(b.notes)+'</div>':''}
       <div class="bk-total">XCD ${Number(b.total||0).toFixed(2)}</div>
       ${depositBadge(b)}
       <div class="bk-actions">
-        ${state==='pending'?`<button class="bk-btn confirm" data-ref="${refAttr}" onclick="setBkState(this.dataset.ref,'confirmed')">✅ Confirm</button>`:''}
-        ${state!=='done'?`<button class="bk-btn done-btn" data-ref="${refAttr}" onclick="setBkState(this.dataset.ref,'done')">☑ Done</button>`:''}
-        ${phone?`<a class="bk-btn wa" href="https://wa.me/${encodeURIComponent(phone)}?text=${waMsg}" target="_blank">💬 WhatsApp</a>`:''}
-        <button class="bk-btn" data-ref="${refAttr}" onclick="notifyDelivery(this.dataset.ref)">🚚 Notify Driver</button>
-        ${b.idPhotoUrl && b.idPhotoUrl!=='N/A'?`<button class="bk-btn" data-ref="${refAttr}" onclick="viewIdPhoto(this.dataset.ref)">🪪 View ID</button>`:''}
-        ${b.signatureUrl && b.signatureUrl!=='N/A'?`<button class="bk-btn" data-ref="${refAttr}" onclick="viewSignature(this.dataset.ref)">✍️ View Signature</button>`:''}
+        ${state==='pending'?`<button class="bk-btn confirm" data-ref="${refAttr}" onclick="setBkState(this.dataset.ref,'confirmed')">Confirm</button>`:''}
+        ${state!=='done'?`<button class="bk-btn done-btn" data-ref="${refAttr}" onclick="setBkState(this.dataset.ref,'done')">Done</button>`:''}
+        ${phone?`<a class="bk-btn wa" href="https://wa.me/${encodeURIComponent(phone)}?text=${waMsg}" target="_blank">WhatsApp</a>`:''}
+        <button class="bk-btn" data-ref="${refAttr}" onclick="notifyDelivery(this.dataset.ref)">Notify Driver</button>
+        ${b.idPhotoUrl && b.idPhotoUrl!=='N/A'?`<button class="bk-btn" data-ref="${refAttr}" onclick="viewIdPhoto(this.dataset.ref)">View ID</button>`:''}
+        ${b.signatureUrl && b.signatureUrl!=='N/A'?`<button class="bk-btn" data-ref="${refAttr}" onclick="viewSignature(this.dataset.ref)">View Signature</button>`:''}
       </div>
       <div style="flex:1 1 100%;display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
         <span style="font-size:0.72rem;color:var(--muted)">Staff credit</span>
@@ -1434,7 +1441,7 @@ function renderBookings() {
       <div style="flex:1 1 100%;display:flex;align-items:center;gap:8px;margin-top:6px">
         <span style="font-size:0.72rem;color:var(--muted)">Deposit</span>
         <input type="number" min="0" step="0.01" id="depAmt-${refAttr}" placeholder="Amount" value="${(b.depositAmount&&b.depositAmount!=='N/A')?escapeHtml(b.depositAmount):''}" style="width:90px;padding:6px 8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;font-size:0.78rem"/>
-        <button class="bk-btn" style="flex:0 0 auto" data-ref="${refAttr}" onclick="markDepositReceivedUI(this.dataset.ref)">💰 Mark Received</button>
+        <button class="bk-btn" style="flex:0 0 auto" data-ref="${refAttr}" onclick="markDepositReceivedUI(this.dataset.ref)">Mark Received</button>
       </div>
     </div>`;
   }).join('');
@@ -1444,9 +1451,9 @@ function depositBadge(b) {
   const status = (b.depositStatus && b.depositStatus !== 'N/A') ? b.depositStatus : 'pending';
   const amt = (b.depositAmount && b.depositAmount !== 'N/A') ? Number(b.depositAmount).toFixed(2) : null;
   if (status === 'received') {
-    return `<div class="bk-detail" style="color:#4ade80">✅ Deposit received: XCD ${amt||'0.00'}${b.depositReceivedAt&&b.depositReceivedAt!=='N/A'?' ('+escapeHtml(b.depositReceivedAt)+')':''}</div>`;
+    return `<div class="bk-detail" style="color:#4ade80">Deposit received: XCD ${amt||'0.00'}${b.depositReceivedAt&&b.depositReceivedAt!=='N/A'?' ('+escapeHtml(b.depositReceivedAt)+')':''}</div>`;
   }
-  return `<div class="bk-detail" style="color:var(--muted)">⏳ Deposit pending</div>`;
+  return `<div class="bk-detail" style="color:var(--muted)">Deposit pending</div>`;
 }
 
 async function assignBookingStaffUI(ref) {
@@ -1467,8 +1474,8 @@ async function assignBookingStaffUI(ref) {
   }
   const b = allBookings.find(x=>x && x.ref===ref);
   if (b) { b.staffId = staffId; b.staffName = staff ? staff.name : ''; }
-  addLog(`👥 Booking ${ref} credited to `+(staff?staff.name:'unassigned'));
-  showToast('Staff assigned ✅','ok');
+  addLog(`Booking ${ref} credited to `+(staff?staff.name:'unassigned'));
+  showToast('Staff assigned ','ok');
 }
 
 async function markDepositReceivedUI(ref, confirmOverwrite) {
@@ -1499,8 +1506,8 @@ async function markDepositReceivedUI(ref, confirmOverwrite) {
   const b = allBookings.find(x=>x && x.ref===ref);
   if (b) { b.depositAmount = amount; b.depositStatus = 'received'; b.depositReceivedAt = new Date().toISOString(); }
   renderBookings();
-  addLog(`💰 Deposit recorded for ${ref}: XCD ${amount.toFixed(2)}`);
-  showToast('Deposit marked received ✅','ok');
+  addLog(`Deposit recorded for ${ref}: XCD ${amount.toFixed(2)}`);
+  showToast('Deposit marked received ','ok');
 }
 
 async function setBkState(ref, state) {
@@ -1510,7 +1517,7 @@ async function setBkState(ref, state) {
   localStorage.setItem('apr_bk_states', JSON.stringify(bookingStates));
   renderBookings();
   updateKPIs();
-  addLog(`📋 Booking ${ref} → ${state}`);
+  addLog(`Booking ${ref} → ${state}`);
 
   try {
     const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
@@ -1584,7 +1591,7 @@ function stopDispatchPolling() {
 
 async function fetchDispatchAdmin() {
   const el = document.getElementById('dispatchContainer');
-  el.innerHTML='<div style="text-align:center;padding:30px;color:var(--muted)">⏳ Loading deliveries…</div>';
+  el.innerHTML='<div style="text-align:center;padding:30px;color:var(--muted)">Loading deliveries…</div>';
   renderDispatchFilterBar();
   try {
     const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'getDispatchBookings',token:APP_TOKEN,limit:50}),signal:AbortSignal.timeout(10000)});
@@ -1594,14 +1601,14 @@ async function fetchDispatchAdmin() {
     dispatchBookings = data.bookings;
     renderDispatchAdmin();
     ensureTrackingAdmin();
-    addLog('📦 Dispatch refreshed: '+dispatchBookings.length+' deliveries');
+    addLog('Dispatch refreshed: '+dispatchBookings.length+' deliveries');
   } catch(e) {
     el.innerHTML=`<div style="text-align:center;padding:30px">
-      <div style="color:#ef4444;font-size:0.9rem;margin-bottom:12px">⚠️ Could not load deliveries</div>
+      <div style="color:#ef4444;font-size:0.9rem;margin-bottom:12px">Could not load deliveries</div>
       <div style="color:var(--muted);font-size:0.78rem;margin-bottom:16px">${escapeHtml((e&&e.message)||'Network error')}</div>
-      <button onclick="fetchDispatchAdmin()" style="background:var(--teal);color:#fff;border:none;padding:10px 20px;border-radius:8px;font-weight:700;cursor:pointer">🔄 Retry</button>
+      <button onclick="fetchDispatchAdmin()" style="background:var(--teal);color:var(--navy);border:none;padding:10px 20px;border-radius:8px;font-weight:700;cursor:pointer">Retry</button>
     </div>`;
-    addLog('⚠️ Dispatch fetch failed: '+((e&&e.message)||'unknown error'));
+    addLog('Dispatch fetch failed: '+((e&&e.message)||'unknown error'));
   }
 }
 
@@ -1633,23 +1640,23 @@ function renderDispatchAdmin() {
         <span class="bk-status ${statusClass}">${escapeHtml(status)}</span>
       </div>
       <div class="bk-name">${escapeHtml(b.fname||'N/A')} ${escapeHtml(b.lname||'')}</div>
-      <div class="bk-detail">📱 ${escapeHtml(b.phone||'N/A')}</div>
-      <div class="bk-detail">🏄 ${escapeHtml(b.gear||'N/A')} · ${escapeHtml(b.duration||'N/A')}</div>
-      <div class="bk-detail">📅 ${escapeHtml(b.datetime||'N/A')}</div>
-      <div class="bk-detail">👥 Group: ${escapeHtml(b.groupSize||'1')}${b.kidsCount && b.kidsCount!=='N/A' && Number(b.kidsCount)>0 ? ' ('+escapeHtml(b.kidsCount)+' kid(s) — kid-size life jacket)':''}</div>
-      ${b.notes && b.notes!=='N/A' ? '<div class="bk-detail">📝 '+escapeHtml(b.notes)+'</div>':''}
-      ${b.assignedDriverName && b.assignedDriverName!=='N/A' ? `<div class="bk-detail">🚚 Driver: ${escapeHtml(b.assignedDriverName)}</div>` : ''}
-      ${hasLoc ? `<div class="bk-detail">📍 Last location: <a href="${mapUrl}" target="_blank" style="color:var(--teal)">view on map</a> (${escapeHtml(b.driverLocAt)})</div>`:''}
-      ${status==='delivering' ? `<div class="bk-detail" style="color:#ff8a70">🛰️ Auto-sharing location every minute while this tab stays open</div>` : ''}
+      <div class="bk-detail">${escapeHtml(b.phone||'N/A')}</div>
+      <div class="bk-detail">${escapeHtml(b.gear||'N/A')} · ${escapeHtml(b.duration||'N/A')}</div>
+      <div class="bk-detail">${escapeHtml(b.datetime||'N/A')}</div>
+      <div class="bk-detail">Group: ${escapeHtml(b.groupSize||'1')}${b.kidsCount && b.kidsCount!=='N/A' && Number(b.kidsCount)>0 ? ' ('+escapeHtml(b.kidsCount)+' kid(s) — kid-size life jacket)':''}</div>
+      ${b.notes && b.notes!=='N/A' ? '<div class="bk-detail">'+escapeHtml(b.notes)+'</div>':''}
+      ${b.assignedDriverName && b.assignedDriverName!=='N/A' ? `<div class="bk-detail">Driver: ${escapeHtml(b.assignedDriverName)}</div>` : ''}
+      ${hasLoc ? `<div class="bk-detail">Last location: <a href="${mapUrl}" target="_blank" style="color:var(--teal)">view on map</a> (${escapeHtml(b.driverLocAt)})</div>`:''}
+      ${status==='delivering' ? `<div class="bk-detail" style="color:#ff8a70">Auto-sharing location every minute while this tab stays open</div>` : ''}
       <div class="bk-actions">
-        ${status==='pending'?`<button class="bk-btn confirm" data-ref="${refAttr}" onclick="dspSetStatus(this.dataset.ref,'confirmed')">✅ Confirm</button>`:''}
-        ${status==='confirmed'?`<button class="bk-btn" style="background:var(--coral);color:#fff" data-ref="${refAttr}" onclick="dspSetStatus(this.dataset.ref,'delivering')">🚚 Start Delivery</button>`:''}
-        ${status!=='done'?`<button class="bk-btn done-btn" data-ref="${refAttr}" onclick="dspSetStatus(this.dataset.ref,'done')">☑ Done</button>`:''}
-        ${status!=='done'?`<button class="bk-btn" style="background:#3a4a5c;color:#fff" data-ref="${refAttr}" onclick="dspShareLocation(this.dataset.ref)">📍 Share Location</button>`:''}
-        ${phone?`<a class="bk-btn wa" href="https://wa.me/${encodeURIComponent(phone)}" target="_blank">💬 Guest</a>`:''}
-        ${status==='done'&&phone?`<a class="bk-btn" style="background:var(--gold);color:var(--navy)" href="https://wa.me/${encodeURIComponent(phone)}?text=${feedbackMsg}" target="_blank">⭐ Ask Feedback</a>`:''}
-        ${status!=='done'?`<button class="bk-btn" style="background:#3a4a5c;color:#fff" data-ref="${refAttr}" onclick="notifyDelivery(this.dataset.ref)">🚚 ${b.assignedDriverName && b.assignedDriverName!=='N/A' ? 'Reassign' : 'Assign'} Driver</button>`:''}
-        <button class="bk-btn" style="background:transparent;color:var(--coral);border:1px solid var(--coral)" data-ref="${refAttr}" onclick="dspDeleteBooking(this.dataset.ref)">🗑 Delete</button>
+        ${status==='pending'?`<button class="bk-btn confirm" data-ref="${refAttr}" onclick="dspSetStatus(this.dataset.ref,'confirmed')">Confirm</button>`:''}
+        ${status==='confirmed'?`<button class="bk-btn" style="background:var(--coral);color:#fff" data-ref="${refAttr}" onclick="dspSetStatus(this.dataset.ref,'delivering')">Start Delivery</button>`:''}
+        ${status!=='done'?`<button class="bk-btn done-btn" data-ref="${refAttr}" onclick="dspSetStatus(this.dataset.ref,'done')">Done</button>`:''}
+        ${status!=='done'?`<button class="bk-btn" style="background:#3a4a5c;color:#fff" data-ref="${refAttr}" onclick="dspShareLocation(this.dataset.ref)">Share Location</button>`:''}
+        ${phone?`<a class="bk-btn wa" href="https://wa.me/${encodeURIComponent(phone)}" target="_blank">Guest</a>`:''}
+        ${status==='done'&&phone?`<a class="bk-btn" style="background:var(--gold);color:var(--navy)" href="https://wa.me/${encodeURIComponent(phone)}?text=${feedbackMsg}" target="_blank">Ask Feedback</a>`:''}
+        ${status!=='done'?`<button class="bk-btn" style="background:#3a4a5c;color:#fff" data-ref="${refAttr}" onclick="notifyDelivery(this.dataset.ref)">${b.assignedDriverName && b.assignedDriverName!=='N/A' ? 'Reassign' : 'Assign'} Driver</button>`:''}
+        <button class="bk-btn" style="background:transparent;color:var(--coral);border:1px solid var(--coral)" data-ref="${refAttr}" onclick="dspDeleteBooking(this.dataset.ref)">Delete</button>
       </div>
     </div>`;
   }).join('');
@@ -1667,7 +1674,7 @@ async function dspDeleteBooking(ref) {
     dispatchBookings = dispatchBookings.filter(b => b && b.ref !== ref);
     stopAutoTrackingAdmin(ref);
     renderDispatchAdmin();
-    addLog(`🗑 Deleted booking ${ref}`);
+    addLog(`Deleted booking ${ref}`);
     showToast('Booking deleted','ok');
   } catch (err) {
     showToast('Could not delete: '+err.message,'warn');
@@ -1686,7 +1693,7 @@ function closeDeletedBookings() {
 }
 async function fetchDeletedBookings() {
   const el = document.getElementById('deletedList');
-  el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">⏳ Loading…</div>';
+  el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Loading…</div>';
   try {
     const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
       action:'getDeletedBookings', token:APP_TOKEN, limit:50
@@ -1698,8 +1705,8 @@ async function fetchDeletedBookings() {
     renderDeletedBookings();
   } catch (err) {
     el.innerHTML = `<div style="text-align:center;padding:20px">
-      <div style="color:#ef4444;font-size:0.85rem;margin-bottom:10px">⚠️ ${escapeHtml(err.message)}</div>
-      <button onclick="fetchDeletedBookings()" style="background:var(--teal);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:700;cursor:pointer">Retry</button>
+      <div style="color:#ef4444;font-size:0.85rem;margin-bottom:10px">${escapeHtml(err.message)}</div>
+      <button onclick="fetchDeletedBookings()" style="background:var(--teal);color:var(--navy);border:none;padding:8px 16px;border-radius:8px;font-weight:700;cursor:pointer">Retry</button>
     </div>`;
   }
 }
@@ -1715,7 +1722,7 @@ function renderDeletedBookings() {
     return `<div style="background:var(--navy);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:8px">
       <div style="font-weight:700;font-size:0.85rem;color:var(--teal)">${ref}</div>
       <div style="font-size:0.82rem;margin:2px 0">${escapeHtml(b.fname||'')} ${escapeHtml(b.lname||'')}</div>
-      <div style="font-size:0.72rem;color:var(--muted)">🏄 ${escapeHtml(b.gear||'N/A')} · 📅 ${escapeHtml(b.datetime||'N/A')}</div>
+      <div style="font-size:0.72rem;color:var(--muted)">${escapeHtml(b.gear||'N/A')} · ${escapeHtml(b.datetime||'N/A')}</div>
       <div style="font-size:0.7rem;color:var(--muted);margin-bottom:8px">Deleted ${when}</div>
       <button data-idx="${idx}" onclick="restoreDeletedBooking(${idx})" style="width:100%;padding:8px;background:var(--teal);border:none;border-radius:8px;color:#fff;font-weight:700;font-size:0.78rem;cursor:pointer">↩ Restore</button>
     </div>`;
@@ -1735,7 +1742,7 @@ async function restoreDeletedBooking(idx) {
     deletedBookingsCache.splice(idx,1);
     renderDeletedBookings();
     addLog(`↩ Restored booking ${b.ref}`);
-    showToast('Booking restored ✅','ok');
+    showToast('Booking restored ','ok');
     fetchDispatchAdmin();
   } catch (err) {
     showToast('Could not restore: '+err.message,'warn');
@@ -1809,8 +1816,8 @@ async function dspSetStatus(ref, status) {
     bookingStates[ref] = status;
     localStorage.setItem('apr_bk_states', JSON.stringify(bookingStates));
     renderDispatchAdmin();
-    addLog(`📦 Delivery ${ref} → ${status}`);
-    showToast('Updated ✅','ok');
+    addLog(`Delivery ${ref} → ${status}`);
+    showToast('Updated ','ok');
   } catch (err) {
     showToast('Could not update: '+err.message,'warn');
   }
@@ -1828,7 +1835,7 @@ function dspShareLocation(ref) {
       const data = await res.json();
       if (!data || !data.ok) throw new Error((data && data.error) || 'Failed');
       await fetchDispatchAdmin();
-      showToast('Location shared ✅','ok');
+      showToast('Location shared ','ok');
     } catch (err) {
       showToast('Could not share location: '+err.message,'warn');
     }
@@ -1894,7 +1901,7 @@ function renderAvailabilityWarning() {
     });
   });
   if (!overs.length) { el.style.display='none'; return; }
-  el.innerHTML = '⚠️ <b>Possible overbooking</b> — ' + overs.map(escapeHtml).join(' · ');
+  el.innerHTML = '<b>Possible overbooking</b> — ' + overs.map(escapeHtml).join(' · ');
   el.style.display='block';
 }
 
@@ -1943,12 +1950,12 @@ function checkSafetyReady() {
 
 function completeSafetyCheck() {
   const ts = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-  safetyLog.unshift(`${ts} — Pre-dispatch safety check PASSED ✅`);
+  safetyLog.unshift(`${ts} — Pre-dispatch safety check PASSED `);
   const el = document.getElementById('safetyLog');
   if (el) el.innerHTML = safetyLog.map(e=>`<div style="padding:5px 0;border-bottom:1px solid var(--line)">${e}</div>`).join('');
-  addLog('🛡️ Safety check completed at '+ts);
+  addLog('Safety check completed at '+ts);
   renderSafety();
-  showToast('Dispatch cleared ✅','ok');
+  showToast('Dispatch cleared ','ok');
 }
 
 // ── TEAM (STAFF) — shared, persisted server-side via GAS/Sheets (not
@@ -2009,19 +2016,19 @@ function renderTeam() {
     const idAttr = escapeHtml(id).replace(/'/g,'&#39;');
     const commissionPct = (t && t.commissionPct) || 0;
     return `<div class="team-card">
-      ${avatarHtml(t.photoUrl, '🙂')}
+      ${avatarHtml(t.photoUrl, initials(name))}
       <div class="team-info">
         <div class="team-name">${escapeHtml(name)}</div>
         <div class="team-role">${escapeHtml(role)}</div>
       </div>
-      ${wa?`<a class="team-wa" href="https://wa.me/${encodeURIComponent(wa)}">💬 Chat</a>
-      <a class="team-wa" style="background:var(--gold);color:var(--navy)" href="${notifyLink(wa,'🔔 APR Alert: Please check the staff console for an update — '+name)}">🔔 Notify</a>`
+      ${wa?`<a class="team-wa" href="https://wa.me/${encodeURIComponent(wa)}">Chat</a>
+      <a class="team-wa" style="background:var(--gold);color:var(--navy)" href="${notifyLink(wa,'APR Alert: Please check the staff console for an update — '+name)}">Notify</a>`
       :'<span style="font-size:0.72rem;color:var(--muted)">No phone on file</span>'}
-      <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer" onclick="removeStaffMember('${idAttr}')">🗑️</button>
+      <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer" onclick="removeStaffMember('${idAttr}')">Remove</button>
       <div style="flex:1 1 100%;display:flex;align-items:center;gap:8px;margin-top:6px;padding-top:10px;border-top:1px solid var(--line)">
         <span style="font-size:0.72rem;color:var(--muted)">Commission %</span>
         <input type="number" min="0" max="100" step="0.5" value="${escapeHtml(commissionPct)}" id="commission-${idAttr}" style="width:70px;padding:6px 8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;font-size:0.8rem"/>
-        <button class="team-wa" style="background:var(--teal);border:none;cursor:pointer" onclick="saveStaffCommission('${idAttr}')">💾 Save</button>
+        <button class="team-wa" style="background:var(--teal);border:none;cursor:pointer" onclick="saveStaffCommission('${idAttr}')">Save</button>
       </div>
     </div>`;
   }).join('');
@@ -2045,8 +2052,8 @@ async function saveStaffCommission(id) {
   }
   const s = staffCache.find(x => x && x.id === id);
   if (s) s.commissionPct = pct;
-  addLog('👥 Commission updated: '+id+' → '+pct+'%');
-  showToast('Commission saved ✅','ok');
+  addLog('Commission updated: '+id+' → '+pct+'%');
+  showToast('Commission saved ','ok');
 }
 
 async function addStaffMember() {
@@ -2079,8 +2086,8 @@ async function addStaffMember() {
   document.getElementById('newStaffPhone').value='';
   document.getElementById('newStaffPhotoFile').value='';
   await fetchStaff();
-  addLog('👥 Staff added: '+nameCheck.value);
-  showToast('Staff added ✅','ok');
+  addLog('Staff added: '+nameCheck.value);
+  showToast('Staff added ','ok');
 }
 
 async function removeStaffMember(id) {
@@ -2097,14 +2104,14 @@ async function removeStaffMember(id) {
     return;
   }
   await fetchStaff();
-  addLog('👥 Staff removed');
+  addLog('Staff removed');
 }
 
 function notifyAllStaff() {
   const staff = staffCache.filter(t => t && t.phone);
   if (!staff.length) { showToast('No staff with a phone number to notify','warn'); return; }
-  staff.forEach((t,i) => setTimeout(()=>window.open(notifyLink(t.phone,'🔔 APR Alert: Please check the staff console for an update.'),'_blank'), i*400));
-  addLog('🔔 Notified all staff ('+staff.length+')');
+  staff.forEach((t,i) => setTimeout(()=>window.open(notifyLink(t.phone,'APR Alert: Please check the staff console for an update.'),'_blank'), i*400));
+  addLog('Notified all staff ('+staff.length+')');
 }
 
 // ── DRIVERS — shared, persisted server-side via GAS/Sheets (not localStorage) ──
@@ -2145,14 +2152,14 @@ async function reinstallWeatherTrigger() {
     const d = await res.json();
     if (d && d.ok) {
       msg.style.color = '#4ade80';
-      msg.textContent = '✅ Weather checks are on (' + (d.installed || 1) + ' trigger active). First reading arrives within the hour.';
+      msg.textContent = 'Weather checks are on (' + (d.installed || 1) + ' trigger active). First reading arrives within the hour.';
     } else {
       msg.style.color = '#f87171';
-      msg.textContent = '❌ ' + ((d && d.error) || 'Something went wrong — try again.');
+      msg.textContent = '' + ((d && d.error) || 'Something went wrong — try again.');
     }
   } catch (err) {
     msg.style.color = '#f87171';
-    msg.textContent = '❌ Could not reach the backend — check your connection and try again.';
+    msg.textContent = 'Could not reach the backend — check your connection and try again.';
   }
   btn.disabled = false;
 }
@@ -2187,12 +2194,12 @@ function renderLockdownState(lockedDown) {
   btn.dataset.lockedDown = lockedDown ? '1' : '0';
   if (lockedDown) {
     msg.style.color = '#f87171';
-    msg.textContent = '🚨 LOCKDOWN IS ON — the site is refusing bookings and admin access right now.';
-    btn.textContent = '✅ Turn Off Lockdown';
+    msg.textContent = 'LOCKDOWN IS ON — the site is refusing bookings and admin access right now.';
+    btn.textContent = 'Turn Off Lockdown';
   } else {
     msg.style.color = '#4ade80';
-    msg.textContent = '✅ Normal operation — lockdown is off.';
-    btn.textContent = '🚨 Turn On Lockdown';
+    msg.textContent = 'Normal operation — lockdown is off.';
+    btn.textContent = 'Turn On Lockdown';
   }
 }
 
@@ -2214,14 +2221,14 @@ async function toggleLockdown() {
     const d = await res.json();
     if (d && d.ok) {
       renderLockdownState(d.lockedDown);
-      showToast(d.lockedDown ? '🚨 Lockdown is ON' : '✅ Lockdown lifted');
+      showToast(d.lockedDown ? 'Lockdown is ON' : 'Lockdown lifted');
     } else {
       msg.style.color = '#f87171';
-      msg.textContent = '❌ ' + ((d && d.error) || 'Something went wrong — try again.');
+      msg.textContent = '' + ((d && d.error) || 'Something went wrong — try again.');
     }
   } catch (err) {
     msg.style.color = '#f87171';
-    msg.textContent = '❌ Could not reach the backend — check your connection and try again.';
+    msg.textContent = 'Could not reach the backend — check your connection and try again.';
   }
   btn.disabled = false;
 }
@@ -2242,14 +2249,14 @@ async function reinstallBackupTrigger() {
     const d = await res.json();
     if (d && d.ok) {
       msg.style.color = '#4ade80';
-      msg.textContent = '✅ Weekly backups are on (' + (d.installed || 1) + ' trigger active). First backup saved to "APR Backups" in Drive.';
+      msg.textContent = 'Weekly backups are on (' + (d.installed || 1) + ' trigger active). First backup saved to "APR Backups" in Drive.';
     } else {
       msg.style.color = '#f87171';
-      msg.textContent = '❌ ' + ((d && d.error) || 'Something went wrong — try again.');
+      msg.textContent = '' + ((d && d.error) || 'Something went wrong — try again.');
     }
   } catch (err) {
     msg.style.color = '#f87171';
-    msg.textContent = '❌ Could not reach the backend — check your connection and try again.';
+    msg.textContent = 'Could not reach the backend — check your connection and try again.';
   }
   btn.disabled = false;
 }
@@ -2258,21 +2265,21 @@ async function reinstallBackupTrigger() {
 // Same location + wind thresholds as the backend (Code.gs): Bequia,
 // caution ≥ 28 km/h (~15 kn), unsafe ≥ 37 km/h (~20 kn), thunderstorm = always unsafe.
 const WEATHER_CODE_MAP = {
-  0:['☀️','Clear'],1:['🌤️','Mostly clear'],2:['⛅','Partly cloudy'],3:['☁️','Overcast'],
-  45:['🌫️','Fog'],48:['🌫️','Fog'],
-  51:['🌦️','Light drizzle'],53:['🌦️','Drizzle'],55:['🌧️','Heavy drizzle'],
-  56:['🌧️','Freezing drizzle'],57:['🌧️','Freezing drizzle'],
-  61:['🌦️','Light rain'],63:['🌧️','Rain'],65:['🌧️','Heavy rain'],
-  66:['🌧️','Freezing rain'],67:['🌧️','Freezing rain'],
-  71:['🌨️','Light snow'],73:['🌨️','Snow'],75:['❄️','Heavy snow'],77:['🌨️','Snow grains'],
-  80:['🌦️','Rain showers'],81:['🌧️','Rain showers'],82:['⛈️','Violent showers'],
-  85:['🌨️','Snow showers'],86:['🌨️','Snow showers'],
-  95:['⛈️','Thunderstorm'],96:['⛈️','Thunderstorm (hail)'],99:['⛈️','Thunderstorm (hail)']
+  0:['','Clear'],1:['','Mostly clear'],2:['','Partly cloudy'],3:['','Overcast'],
+  45:['','Fog'],48:['','Fog'],
+  51:['','Light drizzle'],53:['','Drizzle'],55:['','Heavy drizzle'],
+  56:['','Freezing drizzle'],57:['','Freezing drizzle'],
+  61:['','Light rain'],63:['','Rain'],65:['','Heavy rain'],
+  66:['','Freezing rain'],67:['','Freezing rain'],
+  71:['','Light snow'],73:['','Snow'],75:['','Heavy snow'],77:['','Snow grains'],
+  80:['','Rain showers'],81:['','Rain showers'],82:['','Violent showers'],
+  85:['','Snow showers'],86:['','Snow showers'],
+  95:['','Thunderstorm'],96:['','Thunderstorm (hail)'],99:['','Thunderstorm (hail)']
 };
 const THUNDERSTORM_CODES = [95, 96, 99];
 function weatherConditionInfo(code) {
   const e = WEATHER_CODE_MAP[code];
-  return e ? {icon:e[0], label:e[1]} : {icon:'🌡️', label:'Conditions unknown'};
+  return e ? {icon:e[0], label:e[1]} : {icon:'', label:'Conditions unknown'};
 }
 async function fetchWeatherDirect() {
   try {
@@ -2339,21 +2346,21 @@ async function loadWeatherBanner() {
 
 function renderWeatherBanner(el, w) {
   const styles = {
-    safe: {bg:'#0d3b2e', color:'#4ade80', label:'✅ Safe'},
-    caution: {bg:'#3b2f0d', color:'#facc15', label:'⚠️ Caution'},
-    unsafe: {bg:'#3b0d0d', color:'#f87171', label:'⛔ Unsafe'}
+    safe: {bg:'#0d3b2e', color:'#4ade80', label:'Safe'},
+    caution: {bg:'#3b2f0d', color:'#facc15', label:'Caution'},
+    unsafe: {bg:'#3b0d0d', color:'#f87171', label:'Unsafe'}
   };
   el.style.display = 'block';
   el.style.cursor = 'pointer';
   el.title = 'Tap to re-check conditions';
-  el.onclick = () => { el.textContent = '🌦️ Checking conditions…'; loadWeatherBanner(); };
+  el.onclick = () => { el.textContent = 'Checking conditions…'; loadWeatherBanner(); };
   const s = w && w.status ? styles[w.status] : null;
   if (!s) {
     // Both sources failed — say so (instead of a missing banner) and keep
     // retrying quietly for a few minutes; a tap retries any time.
     el.style.background = '#1c2533';
     el.style.color = 'var(--ink)';
-    el.textContent = '🌦️ Weather check unavailable — tap to retry';
+    el.textContent = 'Weather check unavailable — tap to retry';
     if (++weatherRetries <= 6) setTimeout(loadWeatherBanner, 30000);
     return;
   }
@@ -2361,7 +2368,7 @@ function renderWeatherBanner(el, w) {
   el.style.background = s.bg;
   el.style.color = s.color;
   el.textContent = s.label +
-    (w.conditionLabel ? ` · ${w.conditionIcon || ''} ${w.conditionLabel}` : '') +
+    (w.conditionLabel ? ` · ${w.conditionLabel}` : '') +
     (w.windNowKmh ? ` · Wind ${Math.round(w.windNowKmh)} km/h` : '') +
     (w.gustNowKmh ? ` (gusts ${Math.round(w.gustNowKmh)})` : '') +
     (w.windMaxTodayKmh ? ` · Max today ${Math.round(w.windMaxTodayKmh)} km/h` : '') +
@@ -2381,12 +2388,12 @@ let inventoryCache = [];
 let invFilter = 'ALL';
 const LOW_STOCK_THRESHOLD = 3;
 const FLEET_CATEGORIES = [
-  {key:'paddle-board', label:'Paddle Boards', icon:'🏄'},
-  {key:'kayak', label:'Kayaks', icon:'🛶'},
-  {key:'snorkel-set', label:'Snorkel Sets', icon:'🤿'},
-  {key:'floater', label:'Floaters', icon:'🏊'},
-  {key:'life-jacket-adult', label:'Life Jackets — Adult', icon:'🦺'},
-  {key:'life-jacket-kid', label:'Life Jackets — Kid', icon:'🦺'}
+  {key:'paddle-board', label:'Paddle Boards', icon:'PB'},
+  {key:'kayak', label:'Kayaks', icon:'KY'},
+  {key:'snorkel-set', label:'Snorkel Sets', icon:'SN'},
+  {key:'floater', label:'Floaters', icon:'FL'},
+  {key:'life-jacket-adult', label:'Life Jackets — Adult', icon:'LJ'},
+  {key:'life-jacket-kid', label:'Life Jackets — Kid', icon:'LJ'}
 ];
 
 async function fetchInventory() {
@@ -2458,9 +2465,9 @@ function renderPartners(d) {
     : '<div style="font-size:0.8rem;color:var(--muted)">Nothing owed.</div>';
   const recent = (d.recent || []).slice(0, 8).map(r => `<div style="font-size:0.75rem;color:var(--muted)">${new Date(r.at).toLocaleDateString()} · ${escapeHtml(r.ref)} · ${escapeHtml(r.partner)} · $${r.fee}${r.paid ? ' · paid' : ''}</div>`).join('');
   el.innerHTML = `
-    <div style="font-size:0.78rem;color:var(--muted);margin-bottom:12px">When you confirm a booking in Telegram, the alert gets a <b>🏖️ Send to partner</b> button for that beach (opens WhatsApp with the hand-off message ready, you tap send) and a <b>✔️ Hand-off done</b> button that adds their fee below. Leave a beach blank if there's no partner there yet. Never put the lock code in here.</div>
+    <div style="font-size:0.78rem;color:var(--muted);margin-bottom:12px">When you confirm a booking in Telegram, the alert gets a <b>Send to partner</b> button for that beach (opens WhatsApp with the hand-off message ready, you tap send) and a <b>Hand-off done</b> button that adds their fee below. Leave a beach blank if there's no partner there yet. Never put the lock code in here.</div>
     ${rows}
-    <button class="stock-btn" onclick="savePartners()">💾 Save Partners</button>
+    <button class="stock-btn" onclick="savePartners()">Save Partners</button>
     <div style="font-weight:700;margin:16px 0 6px">Owed to partners</div>
     ${owed}
     ${recent ? `<div style="font-weight:700;margin:14px 0 4px;font-size:0.8rem">Latest hand-offs</div>${recent}` : ''}`;
@@ -2476,7 +2483,7 @@ async function savePartners() {
   }));
   try {
     await stockApi('setBeachPartners', { partners: list });
-    showToast('Partners saved ✅');
+    showToast('Partners saved ');
     fetchHandoffs();
   } catch (err) { showToast(err.message, 'warn'); }
 }
@@ -2497,10 +2504,10 @@ function renderStock() {
   const availNow = counted.reduce((s,i) => s + (Number(i.leftNow)||0), 0);
   const soldOut = items.filter(i => i.leftNow === 0).map(i => i.label);
   document.getElementById('stockKpis').innerHTML = `
-    <div class="kpi-card"><div class="kpi-label">✅ Available now</div><div class="kpi-val">${counted.length ? availNow : '—'}</div><div class="kpi-sub">${counted.length ? 'units ready to rent' : 'set counts below'}</div></div>
-    <div class="kpi-card gold"><div class="kpi-label">🏄 Out on rental</div><div class="kpi-val">${sum('outNow')}</div><div class="kpi-sub">booked for right now</div></div>
-    <div class="kpi-card ${sum('repair')?'coral':''}"><div class="kpi-label">🔧 In repair</div><div class="kpi-val">${sum('repair')}</div><div class="kpi-sub">not rentable</div></div>
-    <div class="kpi-card ${soldOut.length?'coral':''}"><div class="kpi-label">⛔ Sold out now</div><div class="kpi-val">${soldOut.length}</div><div class="kpi-sub">${soldOut.length ? escapeHtml(soldOut.join(', ')) : 'nothing missing'}</div></div>`;
+    <div class="kpi-card"><div class="kpi-label">Available now</div><div class="kpi-val">${counted.length ? availNow : '—'}</div><div class="kpi-sub">${counted.length ? 'units ready to rent' : 'set counts below'}</div></div>
+    <div class="kpi-card gold"><div class="kpi-label">Out on rental</div><div class="kpi-val">${sum('outNow')}</div><div class="kpi-sub">booked for right now</div></div>
+    <div class="kpi-card ${sum('repair')?'coral':''}"><div class="kpi-label">In repair</div><div class="kpi-val">${sum('repair')}</div><div class="kpi-sub">not rentable</div></div>
+    <div class="kpi-card ${soldOut.length?'coral':''}"><div class="kpi-label">Sold out now</div><div class="kpi-val">${soldOut.length}</div><div class="kpi-sub">${soldOut.length ? escapeHtml(soldOut.join(', ')) : 'nothing missing'}</div></div>`;
   document.getElementById('stockRows').innerHTML = items.map(i => {
     const left = i.leftNow;
     const cls = left === null ? '' : left === 0 ? 'zero' : left <= 1 ? 'low' : 'ok';
@@ -2527,7 +2534,7 @@ async function saveStockCounts() {
   });
   try {
     await stockApi('setStock', { items });
-    showToast('Stock saved ✅');
+    showToast('Stock saved ');
     fetchStockOverview();
   } catch (err) { showToast('Could not save: '+err.message, 'warn'); }
 }
@@ -2554,7 +2561,7 @@ function renderDeals() {
     return `<div class="deal-row">
       <div style="flex:1">
         <div style="font-weight:700">${d.pct}% off ${escapeHtml(label(d.gear))}${d.label ? ' · ' + escapeHtml(d.label) : ''}</div>
-        <div style="font-size:0.72rem;color:var(--muted)">${d.used} of ${d.cap} used · ${live ? '🟢 live' : '⚪ ended'}</div>
+        <div style="font-size:0.72rem;color:var(--muted)">${d.used} of ${d.cap} used · ${live ? '<span class="dot ok"></span>live' : '<span class="dot off"></span>ended'}</div>
         <div class="deal-bar"><span style="width:${Math.min(100, Math.round(d.used / d.cap * 100))}%"></span></div>
       </div>
       ${live ? `<button class="stock-btn ghost" style="width:auto;margin:0" onclick="endDealUI('${escapeHtml(d.id)}')">End</button>` : ''}
@@ -2571,7 +2578,7 @@ async function createDealUI() {
       label: document.getElementById('dealLabel').value
     });
     ['dealPct','dealCap','dealLabel'].forEach(id => document.getElementById(id).value = '');
-    showToast('Deal is live 🏷️');
+    showToast('Deal is live ');
     fetchStockOverview();
   } catch (err) { showToast('Could not start deal: '+err.message, 'warn'); }
 }
@@ -2590,16 +2597,16 @@ function renderAlarm() {
     const mins = tg.lastPoll ? Math.round((Date.now() - new Date(tg.lastPoll).getTime()) / 60000) : null;
     const pollOk = tg.pollOn && mins !== null && mins <= 5;
     const health = [
-      pollOk ? `🟢 Bot checked messages ${mins < 1 ? 'just now' : mins + ' min ago'}` : `🔴 Bot isn't reading messages${mins !== null ? ' (last ' + mins + ' min ago)' : ''} — reopen this page; if it stays red, tell Claude`,
-      tg.briefingOn ? '🟢 7am briefing on' : '🔴 7am briefing off',
-      tg.weatherOn ? '🟢 Weather checks on' : '🔴 Weather checks off'
+      pollOk ? `<span class="dot ok"></span>Bot checked messages ${mins < 1 ? 'just now' : mins + ' min ago'}` : `<span class="dot bad"></span>Bot isn't reading messages${mins !== null ? ' (last ' + mins + ' min ago)' : ''} — reopen this page; if it stays red, tell Claude`,
+      tg.briefingOn ? '<span class="dot ok"></span>7am briefing on' : '<span class="dot bad"></span>7am briefing off',
+      tg.weatherOn ? '<span class="dot ok"></span>Weather checks on' : '<span class="dot bad"></span>Weather checks off'
     ].join('<br>');
-    el.innerHTML = `<div style="font-weight:700;color:var(--teal);margin-bottom:6px">✅ Connected${tg.botName ? ' to @' + escapeHtml(tg.botName) : ''}</div>
+    el.innerHTML = `<div style="font-weight:700;color:var(--teal);margin-bottom:6px">Connected${tg.botName ? ' to @' + escapeHtml(tg.botName) : ''}</div>
       <div style="font-size:0.78rem;line-height:1.7;margin-bottom:10px">${health}</div>
-      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:10px">You get every new booking (with the guest's phone), plus 🚨 sold out, 🚨🚨 overbooked and deal finished. Urgent ones also go to your email.</div>
-      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:10px">📋 Booking alerts have <b>✅ Confirm / ❌ Decline</b> buttons (a tap takes up to a minute to apply). ☀️ A briefing arrives every morning around 7am — or send <b>/today</b> to the bot anytime. 📱 Log WhatsApp bookings by sending <b>/book</b> to the bot. ⭐ Reviews arrive instantly; 1–3 stars come as 🚨.</div>
-      <button class="stock-btn" onclick="alarmAction('testAlarm','Test alarm sent — check Telegram 🔔')">🔔 Send Test Alarm</button>
-      <button class="stock-btn" style="margin-top:8px" onclick="alarmAction('sendBriefing','Briefing sent — check Telegram ☀️')">☀️ Send Today's Briefing Now</button>
+      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:10px">You get every new booking (with the guest's phone), plus sold out, overbooked and deal finished. Urgent ones also go to your email.</div>
+      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:10px">Booking alerts have <b>Confirm / Decline</b> buttons (a tap takes up to a minute to apply). A briefing arrives every morning around 7am — or send <b>/today</b> to the bot anytime. Log WhatsApp bookings by sending <b>/book</b> to the bot. Reviews arrive instantly; 1–3 star reviews are marked urgent.</div>
+      <button class="stock-btn" onclick="alarmAction('testAlarm','Test alarm sent — check Telegram ')">Send Test Alarm</button>
+      <button class="stock-btn" style="margin-top:8px" onclick="alarmAction('sendBriefing','Briefing sent — check Telegram ')">Send Today's Briefing Now</button>
       <button class="stock-btn ghost" style="margin-top:8px" onclick="document.getElementById('tgSetup').style.display='block'">Change phone / bot</button>
       <div id="tgSetup" style="display:none;margin-top:12px">${telegramSetupHtml(tg)}</div>`;
   } else {
@@ -2616,9 +2623,9 @@ function telegramSetupHtml(tg) {
       <li>Come back here and tap <b>Connect</b>.</li>
     </ol>
     <input id="tgToken" type="password" autocomplete="off" placeholder="Paste bot token here" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:0.85rem;box-sizing:border-box;margin-bottom:8px">
-    <button class="stock-btn" onclick="saveTgToken()">💾 Save Bot Token</button>
+    <button class="stock-btn" onclick="saveTgToken()">Save Bot Token</button>
     ${tg.hasToken ? `<div style="font-size:0.75rem;color:var(--teal);margin:8px 0">Bot saved${tg.botName ? ': @' + escapeHtml(tg.botName) : ''} — press Start in your bot, then:</div>
-    <button class="stock-btn" onclick="alarmAction('connectTelegram','Connected ✅ — check Telegram')">🔗 Connect</button>` : ''}`;
+    <button class="stock-btn" onclick="alarmAction('connectTelegram','Connected — check Telegram')">Connect</button>` : ''}`;
 }
 
 // SMS alarms via Twilio — urgent alarms only (each text costs a few cents).
@@ -2635,11 +2642,11 @@ function renderSms() {
     ${field('twToken','Auth Token','password')}
     ${field('twFrom','Your Twilio number, e.g. +15615550100')}
     ${field('twTo','Your phone for alarms, e.g. +15619389675')}
-    <button class="stock-btn" onclick="saveSms()">💾 Save SMS Settings</button>
-    <div style="font-size:0.75rem;color:var(--muted);margin-top:8px">Only urgent alarms are texted: 🚨🚨 overbooked, 🚨 sold out, 🏷️ deal finished, and 1–3 ⭐ reviews.</div>`;
+    <button class="stock-btn" onclick="saveSms()">Save SMS Settings</button>
+    <div style="font-size:0.75rem;color:var(--muted);margin-top:8px">Only urgent alarms are texted: overbooked, sold out, deal finished, and 1–3 star reviews.</div>`;
   el.innerHTML = s.configured
-    ? `<div style="font-weight:700;color:var(--teal);margin-bottom:8px">✅ Texting urgent alarms to ${escapeHtml(s.toMasked)}</div>
-       <button class="stock-btn" onclick="alarmAction('testSms','Test text sent — check your phone 📱')">📱 Send Test Text</button>
+    ? `<div style="font-weight:700;color:var(--teal);margin-bottom:8px">Texting urgent alarms to ${escapeHtml(s.toMasked)}</div>
+       <button class="stock-btn" onclick="alarmAction('testSms','Test text sent — check your phone ')">Send Test Text</button>
        <button class="stock-btn ghost" style="margin-top:8px" onclick="document.getElementById('smsSetup').style.display='block'">Change SMS settings</button>
        <div id="smsSetup" style="display:none;margin-top:12px">${setup}</div>`
     : setup;
@@ -2657,11 +2664,11 @@ function renderCmb() {
     </ol>
     ${field('cmbPhone', 'Your WhatsApp number', 'tel', '1 784 496 3447')}
     ${field('cmbKey', 'apikey from CallMeBot', 'password')}
-    <button class="stock-btn" onclick="saveCmb()">💾 Save &amp; Send Test</button>
+    <button class="stock-btn" onclick="saveCmb()">Save &amp; Send Test</button>
     <div style="font-size:0.75rem;color:var(--muted);margin-top:8px">Each guest chat message arrives on your WhatsApp with a link — tap it to reply (asks for your PIN). Free service run by a third party: the guest's name and message pass through CallMeBot.</div>`;
   el.innerHTML = s.configured
-    ? `<div style="font-weight:700;color:var(--teal);margin-bottom:8px">✅ Guest chats are sent to WhatsApp ${escapeHtml(s.phoneMasked)}</div>
-       <button class="stock-btn" onclick="alarmAction('testCmb','Test sent — check WhatsApp 🟢')">🟢 Send Test Message</button>
+    ? `<div style="font-weight:700;color:var(--teal);margin-bottom:8px">Guest chats are sent to WhatsApp ${escapeHtml(s.phoneMasked)}</div>
+       <button class="stock-btn" onclick="alarmAction('testCmb','Test sent — check WhatsApp ')">Send Test Message</button>
        <button class="stock-btn ghost" style="margin-top:8px" onclick="document.getElementById('cmbSetup').style.display='block'">Change settings</button>
        <div id="cmbSetup" style="display:none;margin-top:12px">${setup}</div>`
     : setup;
@@ -2671,7 +2678,7 @@ async function saveCmb() {
   const v = id => document.getElementById(id).value.trim();
   try {
     await stockApi('setCmbConfig', { phone: v('cmbPhone'), apiKey: v('cmbKey') });
-    showToast('Connected ✅ — check WhatsApp for the test');
+    showToast('Connected — check WhatsApp for the test');
     fetchStockOverview();
   } catch (err) { showToast(err.message, 'warn'); }
 }
@@ -2690,15 +2697,15 @@ function renderWa() {
     ${field('waPhoneId', 'Phone Number ID (long number from API Setup)')}
     ${field('waTo', 'Your WhatsApp that receives chats', 'tel', '1 784 496 3447')}
     ${field('waSecret', s.repliesOn ? 'App secret (leave blank to keep the saved one)' : 'App secret (for replies)', 'password')}
-    <button class="stock-btn" onclick="saveWa()">💾 Save WhatsApp Settings</button>
+    <button class="stock-btn" onclick="saveWa()">Save WhatsApp Settings</button>
     <div style="font-size:0.75rem;color:var(--muted);margin-top:8px">Every guest chat message goes to your WhatsApp. Reply to it there and the guest sees your answer on the booking page.</div>`;
   el.innerHTML = s.configured
-    ? `<div style="font-weight:700;color:var(--teal);margin-bottom:6px">✅ Guest chats go to WhatsApp ${escapeHtml(s.toMasked)}</div>
+    ? `<div style="font-weight:700;color:var(--teal);margin-bottom:6px">Guest chats go to WhatsApp ${escapeHtml(s.toMasked)}</div>
        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:10px">
-         Replies from WhatsApp: ${s.repliesOn ? (s.lastHook ? '✅ working (last seen ' + escapeHtml(new Date(s.lastHook).toLocaleString()) + ')' : '⏳ waiting for the first message from Meta') : '❌ add the App secret below'}<br>
-         ${s.windowOpen ? '🟢 Free messages open (you messaged the bot in the last 24h)' : '🟡 Using the paid template — message the bot "hi" to open 24h of free messages'}
+         Replies from WhatsApp: ${s.repliesOn ? (s.lastHook ? 'working (last seen ' + escapeHtml(new Date(s.lastHook).toLocaleString()) + ')' : 'waiting for the first message from Meta') : 'add the App secret below'}<br>
+         ${s.windowOpen ? '<span class="dot ok"></span>Free messages open (you messaged the bot in the last 24h)' : '<span class="dot warn"></span>Using the paid template — message the bot "hi" to open 24h of free messages'}
        </div>
-       <button class="stock-btn" onclick="alarmAction('testWa','Test sent — check WhatsApp 🟢')">🟢 Send Test Message</button>
+       <button class="stock-btn" onclick="alarmAction('testWa','Test sent — check WhatsApp ')">Send Test Message</button>
        <button class="stock-btn ghost" style="margin-top:8px" onclick="document.getElementById('waSetup').style.display='block'">Change WhatsApp settings</button>
        <div id="waSetup" style="display:none;margin-top:12px">${setup}</div>`
     : setup;
@@ -2746,9 +2753,9 @@ function renderInventorySummary() {
       const available = items.filter(i => i.status === 'available').length;
       const lowStock = total < LOW_STOCK_THRESHOLD;
       return `<div class="kpi-card ${lowStock?'coral':(available===0&&total>0?'coral':'')}">
-        <div class="kpi-label">${cat.icon} ${cat.label}</div>
+        <div class="kpi-label">${cat.label}</div>
         <div class="kpi-val">${available}<span style="font-size:0.9rem;opacity:0.5">/${total}</span></div>
-        <div class="kpi-sub">${lowStock?'⚠️ low stock':'available'}</div>
+        <div class="kpi-sub">${lowStock?'low stock':'available'}</div>
       </div>`;
     }).join('');
   }
@@ -2781,8 +2788,8 @@ function renderInventoryList() {
             <div class="team-name">${escapeHtml(j.label)}</div>
             <div class="team-role">${escapeHtml(j.notes||'')} · ${maint?'Maintenance':(inUse?'In use':'Available')}</div>
           </div>
-          <button class="team-wa" style="background:${inUse?'var(--teal)':'var(--gold)'};color:var(--navy);border:none;cursor:pointer" onclick="toggleLJStatus('${idAttr}','${inUse?'available':'in-use'}')">${inUse?'✅ Return':'📤 Check out'}</button>
-          <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer" onclick="removeLifeJacket('${idAttr}')">🗑️</button>
+          <button class="team-wa" style="background:${inUse?'var(--teal)':'var(--gold)'};color:var(--navy);border:none;cursor:pointer" onclick="toggleLJStatus('${idAttr}','${inUse?'available':'in-use'}')">${inUse?'Return':'Check out'}</button>
+          <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer" onclick="removeLifeJacket('${idAttr}')">Remove</button>
         </div>`;
       }).join('');
   }).join('') || '<div style="text-align:center;padding:16px;color:var(--muted)">No equipment in this category yet.</div>';
@@ -2809,8 +2816,8 @@ async function restockInventory() {
     document.getElementById('restockNotes').value = '';
     document.getElementById('restockQty').value = '1';
     await fetchInventory();
-    addLog(`📦 Restocked ${data.added}× ${category}`);
-    showToast(`Added ${data.added} item(s) ✅`,'ok');
+    addLog(`Restocked ${data.added}× ${category}`);
+    showToast(`Added ${data.added} item(s) `,'ok');
   } catch (err) {
     showToast('Could not restock: '+err.message, 'warn');
   }
@@ -2835,7 +2842,7 @@ function startVoiceNotes() {
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
 
-  btn.textContent = '🔴';
+  btn.textContent = 'Listening…';
   recognition.onresult = (e) => {
     input.value = e.results[0][0].transcript;
   };
@@ -2843,7 +2850,7 @@ function startVoiceNotes() {
     showToast('Could not hear that — try again or type it', 'warn');
   };
   recognition.onend = () => {
-    btn.textContent = '🎤';
+    btn.innerHTML = MIC_ICON;
   };
   recognition.start();
 }
@@ -2877,7 +2884,7 @@ async function removeLifeJacket(id) {
     return;
   }
   await fetchInventory();
-  addLog('📦 Equipment removed');
+  addLog('Equipment removed');
 }
 
 // ── DELIVERY NOTIFICATION IDEMPOTENCY (ref -> ISO timestamp) ──
@@ -2899,6 +2906,11 @@ function driveThumbUrl(url) {
   return match ? `https://drive.google.com/thumbnail?id=${match[1]}&sz=w200` : '';
 }
 
+// Two-letter monogram for people without a photo (letters only, safe inside the onerror string).
+function initials(name) {
+  return String(name || '').replace(/[^\p{L}\s]/gu, '').trim().split(/\s+/).slice(0, 2).map(w => w.charAt(0).toUpperCase()).join('') || '?';
+}
+
 function avatarHtml(photoUrl, fallbackEmoji) {
   const thumb = driveThumbUrl(photoUrl);
   return thumb
@@ -2917,15 +2929,15 @@ function renderDrivers() {
     const id = (d && d.id) || '';
     const idAttr = escapeHtml(id).replace(/'/g,'&#39;');
     return `<div class="team-card">
-      ${avatarHtml(d.photoUrl, '🚚')}
+      ${avatarHtml(d.photoUrl, initials(name))}
       <div class="team-info">
         <div class="team-name">${escapeHtml(name)}</div>
         <div class="team-role">${escapeHtml(vehicle)}</div>
       </div>
-      ${wa?`<a class="team-wa" href="https://wa.me/${encodeURIComponent(wa)}">💬 Chat</a>
-      <a class="team-wa" style="background:var(--gold);color:var(--navy)" href="${notifyLink(wa,'🔔 APR Alert: Please check the staff console for an update — '+name)}">🔔 Notify</a>`
+      ${wa?`<a class="team-wa" href="https://wa.me/${encodeURIComponent(wa)}">Chat</a>
+      <a class="team-wa" style="background:var(--gold);color:var(--navy)" href="${notifyLink(wa,'APR Alert: Please check the staff console for an update — '+name)}">Notify</a>`
       :'<span style="font-size:0.72rem;color:var(--muted)">No phone on file</span>'}
-      <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer" onclick="removeDriver('${idAttr}')">🗑️</button>
+      <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer" onclick="removeDriver('${idAttr}')">Remove</button>
     </div>`;
   }).join('') : '<div style="text-align:center;padding:20px;color:var(--muted)">No drivers added yet</div>';
 }
@@ -2972,8 +2984,8 @@ async function addDriver() {
   document.getElementById('newDriverPhone').value='';
   document.getElementById('newDriverPhotoFile').value='';
   await fetchDrivers();
-  addLog('🚚 Driver added: '+nameCheck.value);
-  showToast('Driver added ✅','ok');
+  addLog('Driver added: '+nameCheck.value);
+  showToast('Driver added ','ok');
 }
 
 async function removeDriver(id) {
@@ -2990,7 +3002,7 @@ async function removeDriver(id) {
     return;
   }
   await fetchDrivers();
-  addLog('🚚 Driver removed');
+  addLog('Driver removed');
 }
 
 // ── DELIVERY NOTIFICATIONS ──
@@ -3062,7 +3074,7 @@ async function notifyDelivery(ref) {
   document.getElementById('deliveryLocation').value = '';
   const already = document.getElementById('deliveryAlreadySent');
   if (already) {
-    already.textContent = notified[ref] ? '⚠️ Already notified at ' + new Date(notified[ref]).toLocaleString() + ' — sending again will resend.' : '';
+    already.textContent = notified[ref] ? 'Already notified at ' + new Date(notified[ref]).toLocaleString() + ' — sending again will resend.' : '';
   }
   modal.dataset.ref = ref;
   populateDeliveryDriverSelect();
@@ -3103,7 +3115,7 @@ async function confirmDelivery() {
 
     const mapUrl = mapsLink(location);
     const msgLines = [
-      '🚚 New delivery — APR',
+      'New delivery — APR',
       'Ref: ' + nz(b.ref),
       'Guest: ' + nz(b.fname,'N/A') + ' ' + nz(b.lname,''),
       'Phone: ' + nz(b.phone),
@@ -3118,8 +3130,8 @@ async function confirmDelivery() {
     // double-click or accidental duplicate call is visible/guarded against.
     markNotified(ref);
     window.open(notifyLink(driver.phone, msg), '_blank');
-    addLog('🚚 Delivery notification sent to '+nz(driver.name)+' for '+nz(ref));
-    showToast('Driver notified ✅','ok');
+    addLog('Delivery notification sent to '+nz(driver.name)+' for '+nz(ref));
+    showToast('Driver notified ','ok');
     closeDeliveryModal();
 
     // Persist who's assigned so it shows on the Dispatch card. Best-effort —
@@ -3183,7 +3195,7 @@ async function syncQueue() {
   safeSetJSON('apr_queue', remaining);
   updateQueueCount();
   showToast(`Synced ${list.length-remaining.length} of ${list.length} queued bookings`,'ok');
-  addLog(`🔄 Synced ${list.length-remaining.length} queued bookings`);
+  addLog(`Synced ${list.length-remaining.length} queued bookings`);
 }
 
 function updateQueueCount() {
@@ -3215,8 +3227,8 @@ function exportCSV() {
   a.download = 'APR_Bookings_' + new Date().toISOString().slice(0,10) + '.csv';
   a.click();
   URL.revokeObjectURL(url);
-  showToast('CSV exported ✅', 'ok');
-  addLog('📥 Bookings exported to CSV');
+  showToast('CSV exported ', 'ok');
+  addLog('Bookings exported to CSV');
 }
 
 function exportInventoryCSV() {
@@ -3237,8 +3249,8 @@ function exportInventoryCSV() {
   a.download = 'APR_Inventory_' + new Date().toISOString().slice(0,10) + '.csv';
   a.click();
   URL.revokeObjectURL(url);
-  showToast('CSV exported ✅', 'ok');
-  addLog('📥 Inventory exported to CSV');
+  showToast('CSV exported ', 'ok');
+  addLog('Inventory exported to CSV');
 }
 
 // ── FEEDBACK ──
@@ -3269,7 +3281,7 @@ function renderFeedback(feedback) {
     return;
   }
   const avg = feedback.reduce((sum,f)=>sum+Number(f.rating||0),0) / feedback.length;
-  avgEl.textContent = '⭐ ' + avg.toFixed(1);
+  avgEl.textContent = avg.toFixed(1) + ' / 5';
   countEl.textContent = feedback.length + ' review' + (feedback.length===1?'':'s');
 
   // ── Rating distribution (1★–5★ counts) ──
@@ -3325,7 +3337,7 @@ function renderFeedback(feedback) {
   if (flagEl) {
     const flagged = feedback.filter(f => Number(f.rating) <= 2);
     if (!flagged.length) {
-      flagEl.innerHTML = '<div style="text-align:center;padding:14px;color:var(--muted);font-size:0.8rem">No low ratings — nothing to follow up on 🎉</div>';
+      flagEl.innerHTML = '<div style="text-align:center;padding:14px;color:var(--muted);font-size:0.8rem">No low ratings — nothing to follow up on </div>';
     } else {
       flagEl.innerHTML = flagged.map(f => {
         const stars = '★'.repeat(Number(f.rating)||0) + '☆'.repeat(5-(Number(f.rating)||0));
@@ -3345,7 +3357,7 @@ function renderFeedback(feedback) {
     return `<div class="card" style="margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
         <div style="color:var(--gold);font-size:1rem;letter-spacing:2px">${stars}</div>
-        <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer;padding:2px 8px;font-size:0.72rem" data-ref="${refAttr}" data-created="${createdAttr}" onclick="removeFeedback(this.dataset.ref,this.dataset.created)">🗑️</button>
+        <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer;padding:2px 8px;font-size:0.72rem" data-ref="${refAttr}" data-created="${createdAttr}" onclick="removeFeedback(this.dataset.ref,this.dataset.created)">Remove</button>
       </div>
       <div style="font-size:0.72rem;color:var(--muted);margin:4px 0">${escapeHtml(f.ref)} · ${escapeHtml(f.createdAt)}</div>
       ${f.comment ? `<div style="font-size:0.85rem;color:var(--ink)">${escapeHtml(f.comment)}</div>` : ''}
@@ -3380,7 +3392,7 @@ async function fetchCommissionReport() {
     return;
   }
   const el = document.getElementById('commissionContainer');
-  el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">⏳ Running report…</div>';
+  el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">Running report…</div>';
   try {
     const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
       action:'getCommissionReport', token:APP_TOKEN, startDate:startEl.value, endDate:endEl.value
@@ -3391,7 +3403,7 @@ async function fetchCommissionReport() {
     renderCommissionReport(data.report, data.unassignedTotal || 0);
   } catch (err) {
     el.innerHTML = `<div style="text-align:center;padding:30px">
-      <div style="color:#ef4444;font-size:0.9rem;margin-bottom:12px">⚠️ Could not load commission report</div>
+      <div style="color:#ef4444;font-size:0.9rem;margin-bottom:12px">Could not load commission report</div>
       <div style="color:var(--muted);font-size:0.78rem">${escapeHtml(err.message)}</div>
     </div>`;
   }
@@ -3415,7 +3427,7 @@ function renderCommissionReport(report, unassignedTotal) {
   el.innerHTML = `<div class="card" style="overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
       <thead>
-        <tr style="background:var(--teal);color:#fff">
+        <tr style="background:var(--teal);color:var(--navy)">
           <th style="padding:8px 10px;text-align:left">Staff</th>
           <th style="padding:8px 6px;text-align:center">Bookings</th>
           <th style="padding:8px 6px;text-align:center">Rate</th>
@@ -3461,7 +3473,7 @@ async function fetchCashFlow() {
     return;
   }
   const el = document.getElementById('cashflowSummary');
-  el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">⏳ Loading cash flow…</div>';
+  el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">Loading cash flow…</div>';
   try {
     const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
       action:'getCashFlowSummary', token:APP_TOKEN, startDate:startEl.value, endDate:endEl.value
@@ -3473,7 +3485,7 @@ async function fetchCashFlow() {
     renderCashFlowExpenseList(data.expenseRows || []);
   } catch (err) {
     el.innerHTML = `<div style="text-align:center;padding:30px">
-      <div style="color:#ef4444;font-size:0.9rem;margin-bottom:12px">⚠️ Could not load cash flow</div>
+      <div style="color:#ef4444;font-size:0.9rem;margin-bottom:12px">Could not load cash flow</div>
       <div style="color:var(--muted);font-size:0.78rem">${escapeHtml(err.message)}</div>
     </div>`;
   }
@@ -3499,7 +3511,7 @@ function renderCashFlowSummary(data) {
     </div>
   </div>
   <div class="card" style="margin-bottom:16px">
-    <h3 style="margin:0 0 6px;font-size:0.85rem">📈 Forecast</h3>
+    <h3 style="margin:0 0 6px;font-size:0.85rem">Forecast</h3>
     <p style="font-size:0.68rem;color:var(--muted);margin-bottom:10px">Simple projection based on the trailing 30-day average — not a guarantee.</p>
     <div style="display:flex;justify-content:space-around;text-align:center;flex-wrap:wrap;gap:10px">
       <div>
@@ -3535,7 +3547,7 @@ function renderCashFlowExpenseList(expenses) {
         <div style="font-size:0.85rem;font-weight:700">${escapeHtml(e.category)} — XCD ${Number(e.amount).toFixed(2)}</div>
         <div style="font-size:0.72rem;color:var(--muted)">${escapeHtml(e.date)}${e.note ? ' · ' + escapeHtml(e.note) : ''}</div>
       </div>
-      <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer;padding:2px 8px;font-size:0.72rem;flex-shrink:0" data-id="${idAttr}" onclick="removeExpense(this.dataset.id)">🗑️</button>
+      <button class="team-wa" style="background:var(--coral);border:none;cursor:pointer;padding:2px 8px;font-size:0.72rem;flex-shrink:0" data-id="${idAttr}" onclick="removeExpense(this.dataset.id)">Remove</button>
     </div>`;
   }).join('');
 }
@@ -3555,7 +3567,7 @@ async function submitExpense() {
     }),signal:AbortSignal.timeout(10000)});
     const data = await res.json();
     if (!data || !data.ok) { msg.style.color=var_coral(); msg.textContent = (data && data.error) || 'Could not add expense'; return; }
-    msg.style.color='#4ade80'; msg.textContent='✅ Expense logged';
+    msg.style.color='#4ade80'; msg.textContent='Expense logged';
     document.getElementById('expenseAmount').value = '';
     document.getElementById('expenseNote').value = '';
     setTimeout(()=>msg.textContent='',3000);
@@ -3601,7 +3613,7 @@ function renderMessages(messages) {
   listEl.innerHTML = messages.map(m => {
     return `<div class="card" style="margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-        <div style="font-size:0.8rem;font-weight:700;color:#fff">✉️ ${escapeHtml(m.to||'N/A')}</div>
+        <div style="font-size:0.8rem;font-weight:700;color:#fff">${escapeHtml(m.to||'N/A')}</div>
         <div style="font-size:0.68rem;color:var(--muted);white-space:nowrap">${escapeHtml(m.createdAt||'')}</div>
       </div>
       <div style="font-size:0.78rem;color:var(--ink);margin-top:4px">${escapeHtml(m.subject||'')}</div>
@@ -3624,8 +3636,8 @@ async function removeFeedback(ref, createdAt) {
     return;
   }
   await fetchFeedback();
-  addLog('⭐ Feedback removed: '+ref);
-  showToast('Feedback removed ✅','ok');
+  addLog('Feedback removed: '+ref);
+  showToast('Feedback removed ','ok');
 }
 
 // ── CUSTOMERS ── (derived server-side from BOOKINGS, grouped by phone)
@@ -3678,7 +3690,7 @@ function renderCustomers() {
     return `<div class="card" style="margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;cursor:pointer" data-key="${keyAttr}" onclick="toggleCustomer(this.dataset.key)">
         <div>
-          <div style="font-weight:700;font-size:0.9rem;color:#fff">${escapeHtml(c.name)} ${c.isRegular?'<span title="3+ bookings">⭐</span>':''} ${c.hasConflict?'<span title="Overlapping active bookings">⚠️</span>':''}</div>
+          <div style="font-weight:700;font-size:0.9rem;color:#fff">${escapeHtml(c.name)} ${c.isRegular?'<span class="tag">Regular</span>':''} ${c.hasConflict?'<span class="tag warn">Overlap</span>':''}</div>
           <div style="font-size:0.72rem;color:var(--muted)">${escapeHtml(c.phone)} · ${escapeHtml(c.email)}</div>
         </div>
         <div style="text-align:right">
@@ -3686,11 +3698,11 @@ function renderCustomers() {
           <div style="font-size:0.72rem;color:var(--muted)">XCD ${Number(c.totalSpent||0).toFixed(0)}</div>
         </div>
       </div>
-      ${c.hasConflict?'<div style="margin-top:6px;font-size:0.72rem;color:var(--coral)">⚠️ This guest has two active bookings with overlapping times — check before dispatching.</div>':''}
+      ${c.hasConflict?'<div style="margin-top:6px;font-size:0.72rem;color:var(--coral)">This guest has two active bookings with overlapping times — check before dispatching.</div>':''}
       <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-        ${phoneDigits?`<a class="team-wa" href="https://wa.me/${phoneDigits}" target="_blank" onclick="event.stopPropagation()">💬 Chat</a>`:''}
-        ${c.idPhotoUrl?`<button class="team-wa" style="background:var(--teal);border:none;cursor:pointer" data-idref="${escapeHtml(c.idPhotoRef)}" onclick="event.stopPropagation();viewIdPhoto(this.dataset.idref)">🪪 View ID</button>`:''}
-        ${c.signatureUrl?`<button class="team-wa" style="background:var(--teal);border:none;cursor:pointer" data-sigref="${escapeHtml(c.signatureRef)}" onclick="event.stopPropagation();viewSignature(this.dataset.sigref)">✍️ View Signature</button>`:''}
+        ${phoneDigits?`<a class="team-wa" href="https://wa.me/${phoneDigits}" target="_blank" onclick="event.stopPropagation()">Chat</a>`:''}
+        ${c.idPhotoUrl?`<button class="team-wa" style="background:var(--teal);border:none;cursor:pointer" data-idref="${escapeHtml(c.idPhotoRef)}" onclick="event.stopPropagation();viewIdPhoto(this.dataset.idref)">View ID</button>`:''}
+        ${c.signatureUrl?`<button class="team-wa" style="background:var(--teal);border:none;cursor:pointer" data-sigref="${escapeHtml(c.signatureRef)}" onclick="event.stopPropagation();viewSignature(this.dataset.sigref)">View Signature</button>`:''}
         <span style="font-size:0.68rem;padding:4px 8px;border-radius:12px;background:${c.waiverOnFile?'rgba(46,204,113,0.15);color:#2ecc71':'var(--line);color:var(--muted)'}">${c.waiverOnFile?'✓ Waiver on file':'No waiver on file'}</span>
       </div>
       ${expanded ? `<div style="margin-top:10px">${bookingsHtml}</div>` : `<div style="margin-top:6px;font-size:0.7rem;color:var(--muted)">Tap to ${expanded?'hide':'view'} booking history</div>`}
@@ -3706,7 +3718,8 @@ function toggleCustomer(key) {
 
 // ── SECTION NAVIGATION (full-screen sections + back button) ──
 const ATABS = ['home','today','bookings','dispatch','chats','customers','inventory','safety','team','drivers','feedback','commission','partners','cashflow','messages','settings','rates'];
-const ATAB_LABELS = {home:'Operations Dashboard',today:'📊 Today',bookings:'📋 Bookings',dispatch:'📦 Dispatch',chats:'💬 Guest Chats',customers:'🧾 Customers',inventory:'🏄 Fleet',safety:'🛡️ Safety',team:'👥 Team',drivers:'🚚 Drivers',feedback:'⭐ Feedback',commission:'💵 Commission',partners:'🤝 Partners',cashflow:'📈 Cash Flow',messages:'✉️ Messages',settings:'⚙️ Settings',rates:'💰 Rates'};
+const MIC_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>';
+const ATAB_LABELS = {home:'Operations Dashboard',today:'Today',bookings:'Bookings',dispatch:'Dispatch',chats:'Guest Chats',customers:'Customers',inventory:'Fleet',safety:'Safety',team:'Team',drivers:'Drivers',feedback:'Feedback',commission:'Commission',partners:'Partners',cashflow:'Cash Flow',messages:'Messages',settings:'Settings',rates:'Rates'};
 function switchATab(tab) {
   // Every section opens as a full page from the top — without this, the scroll
   // position from the previous section carries over and you land at the bottom.
@@ -3746,7 +3759,7 @@ function _partnerCodeOf(b) {
   return m ? m[1] : '';
 }
 function _sourceOf(b) {
-  if (_partnerCodeOf(b)) return '🤝 Partner links';
+  if (_partnerCodeOf(b)) return 'Partner links';
   const r = String((b && b.referral) || '').trim();
   return (!r || r === 'N/A') ? 'Not stated' : r;
 }
@@ -3768,7 +3781,7 @@ function _partnerRange() {
 
 async function fetchPartnerReport() {
   const el = document.getElementById('partnersContainer');
-  el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">⏳ Loading bookings…</div>';
+  el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">Loading bookings…</div>';
   try {
     const res = await fetch(BACKEND, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action: 'getBookings', token: APP_TOKEN, limit: 500 }), signal: AbortSignal.timeout(15000) });
@@ -3779,9 +3792,9 @@ async function fetchPartnerReport() {
     renderPartnerReport();
   } catch (err) {
     el.innerHTML = `<div style="text-align:center;padding:30px">
-      <div style="color:#ef4444;font-size:0.9rem;margin-bottom:12px">⚠️ Could not load bookings</div>
+      <div style="color:#ef4444;font-size:0.9rem;margin-bottom:12px">Could not load bookings</div>
       <div style="color:var(--muted);font-size:0.78rem">${escapeHtml(err.message)}</div>
-      <button class="refresh-btn" style="margin-top:12px" onclick="fetchPartnerReport()">🔄 Retry</button></div>`;
+      <button class="refresh-btn" style="margin-top:12px" onclick="fetchPartnerReport()">Retry</button></div>`;
   }
 }
 
@@ -3829,8 +3842,8 @@ function renderPartnerReport() {
         <div><div style="font-weight:800;font-size:1rem">XCD ${r.pipeline.toFixed(0)}</div><div style="color:var(--muted)">Upcoming</div></div>
       </div>
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-        <button class="bk-btn" style="flex:1 1 auto;padding:8px" onclick="showPartnerLink('${r.code}')">🔗 Link &amp; QR</button>
-        <button class="bk-btn" style="flex:1 1 auto;padding:8px" onclick="sharePartnerStatement('${r.code}')" ${r.bookings.length ? '' : 'disabled'}>📄 Send statement</button>
+        <button class="bk-btn" style="flex:1 1 auto;padding:8px" onclick="showPartnerLink('${r.code}')">Link &amp; QR</button>
+        <button class="bk-btn" style="flex:1 1 auto;padding:8px" onclick="sharePartnerStatement('${r.code}')" ${r.bookings.length ? '' : 'disabled'}>Send statement</button>
       </div>
     </div>`).join('')
     : `<div class="card" style="text-align:center;color:var(--muted);font-size:0.82rem;padding:20px">No partner bookings yet for ${escapeHtml(label)}.<br>Create a link above and hand it to a hotel front desk.</div>`;
@@ -3875,9 +3888,9 @@ function showPartnerLink(code) {
       <img src="${qr}" alt="QR code for ${escapeHtml(code)}" style="width:180px;height:180px;background:#fff;border-radius:8px;padding:4px"/>
       <div style="font-size:0.74rem;word-break:break-all;margin:8px 0;color:var(--ink)">${escapeHtml(url)}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
-        <button class="bk-btn" style="flex:0 0 auto;padding:8px 12px" onclick="copyText('${url}')">📋 Copy link</button>
-        <button class="bk-btn" style="flex:0 0 auto;padding:8px 12px" onclick="window.open('${qr.replace('320x320', '1000x1000')}','_blank','noopener')">⬇️ Print-size QR</button>
-        <button class="bk-btn" style="flex:0 0 auto;padding:8px 12px" onclick="window.open('https://wa.me/?text=${encodeURIComponent(waText).replace(/'/g, '%27')}','_blank','noopener')">💬 Send on WhatsApp</button>
+        <button class="bk-btn" style="flex:0 0 auto;padding:8px 12px" onclick="copyText('${url}')">Copy link</button>
+        <button class="bk-btn" style="flex:0 0 auto;padding:8px 12px" onclick="window.open('${qr.replace('320x320', '1000x1000')}','_blank','noopener')">Print-size QR</button>
+        <button class="bk-btn" style="flex:0 0 auto;padding:8px 12px" onclick="window.open('https://wa.me/?text=${encodeURIComponent(waText).replace(/'/g, '%27')}','_blank','noopener')">Send on WhatsApp</button>
       </div>
       ${inCfg ? '' : `<div style="font-size:0.68rem;color:var(--muted);margin-top:10px;text-align:left">Link works now. To show the hotel's name and count commission, add it to <strong>apr-config.js</strong> → partners:<br><code style="font-size:0.68rem">'${escapeHtml(code)}': { name: 'Hotel name', commissionPct: 10 },</code></div>`}
     </div>`;
@@ -3899,14 +3912,14 @@ function sharePartnerStatement(code) {
     .sort((a, b) => (_bkDate(a) || 0) - (_bkDate(b) || 0));
   const lines = bks.map(b => {
     const d = _bkDate(b);
-    const st = _bkStatus(b) === 'done' ? '✅' : '⏳';
+    const st = _bkStatus(b) === 'done' ? 'Done' : 'Pending';
     return `${st} ${d ? d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '—'} · ${b.ref} · ${b.fname || 'Guest'} · XCD ${Number(b.total || 0).toFixed(0)}`;
   });
   const done = bks.filter(b => _bkStatus(b) === 'done').reduce((s, b) => s + (Number(b.total) || 0), 0);
   const text = `Aquatic Paradise Rentals — partner statement\n${cfg.name || code} · ${label}\n\n${lines.join('\n')}\n\n` +
     `Bookings: ${bks.length}\nCompleted sales: XCD ${done.toFixed(2)}` +
     (pct ? `\nYour commission (${pct}%): XCD ${(done * pct / 100).toFixed(2)}` : '') +
-    `\n\n✅ completed · ⏳ upcoming\nThank you for sending guests our way! 🌊`;
+    `\n\ncompleted · upcoming\nThank you for sending guests our way! `;
   window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
 }
 
@@ -3956,7 +3969,7 @@ function renderChatsList() {
         <strong>${escapeHtml(c.name || 'Guest')}</strong>
         <span style="font-size:0.7rem;color:var(--muted);white-space:nowrap">${chatAgo(c.lastAt)}</span>
       </div>
-      <div style="font-size:0.8rem;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.lastFrom === 'guest' ? '❓ ' : '✅ You: '}${escapeHtml(c.lastText)}</div>
+      <div style="font-size:0.8rem;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.lastFrom === 'guest' ? 'Guest: ' : 'You: '}${escapeHtml(c.lastText)}</div>
     </div>`).join('');
 }
 
@@ -4043,13 +4056,13 @@ function showToast(msg, type='') {
 
 <!-- ═ RATES ═ -->
 <div class="asection" id="asec-rates">
-  <div class="asec-title">💰 Current Rates</div>
+  <div class="asec-title">Current Rates</div>
   <p style="font-size:0.78rem;color:var(--muted);margin-bottom:14px">All prices in XCD (Eastern Caribbean Dollars). USD ≈ XCD ÷ 2.7</p>
 
   <div class="card" style="overflow-x:auto;margin-bottom:18px">
     <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
       <thead>
-        <tr style="background:var(--teal);color:#fff">
+        <tr style="background:var(--teal);color:var(--navy)">
           <th style="padding:8px 10px;text-align:left">Gear</th>
           <th style="padding:8px 6px;text-align:center">1 hr</th>
           <th style="padding:8px 6px;text-align:center;color:var(--gold)">Full Day</th>
@@ -4058,38 +4071,38 @@ function showToast(msg, type='') {
         </tr>
       </thead>
       <tbody>
-        <tr style="border-bottom:1px solid var(--line)"><td style="padding:7px 10px">🏄 Paddle Board</td><td style="text-align:center">$20</td><td style="text-align:center;font-weight:700;color:var(--teal)">$50</td><td style="text-align:center">$90</td><td style="text-align:center;color:var(--gold);font-weight:700">$250</td></tr>
-        <tr style="border-bottom:1px solid var(--line);background:var(--bg)"><td style="padding:7px 10px">🚣 Kayak (Single)</td><td style="text-align:center">$30</td><td style="text-align:center;font-weight:700;color:var(--teal)">$60</td><td style="text-align:center">$100</td><td style="text-align:center;color:var(--gold);font-weight:700">$300</td></tr>
-        <tr style="border-bottom:1px solid var(--line)"><td style="padding:7px 10px">🚣 Kayak (Double)</td><td style="text-align:center">$45</td><td style="text-align:center;font-weight:700;color:var(--teal)">$90</td><td style="text-align:center">$160</td><td style="text-align:center;color:var(--gold);font-weight:700">$450</td></tr>
-        <tr style="border-bottom:1px solid var(--line);background:var(--bg)"><td style="padding:7px 10px">🤿 Snorkel Set</td><td style="text-align:center">$10</td><td style="text-align:center;font-weight:700;color:var(--teal)">$20</td><td style="text-align:center">$35</td><td style="text-align:center;color:var(--gold);font-weight:700">$90</td></tr>
-        <tr style="border-bottom:1px solid var(--line)"><td style="padding:7px 10px">🛟 Floating Tube</td><td style="text-align:center">$8</td><td style="text-align:center;font-weight:700;color:var(--teal)">$15</td><td style="text-align:center">$25</td><td style="text-align:center;color:var(--gold);font-weight:700">$60</td></tr>
-        <tr style="border-bottom:1px solid var(--line);background:var(--bg)"><td style="padding:7px 10px">🏊 Floating Lounge Chair</td><td style="text-align:center">$10</td><td style="text-align:center;font-weight:700;color:var(--teal)">$20</td><td style="text-align:center">$35</td><td style="text-align:center;color:var(--gold);font-weight:700">$90</td></tr>
-        <tr><td style="padding:7px 10px">🏓 Beach Paddle Games</td><td style="text-align:center">$8</td><td style="text-align:center;font-weight:700;color:var(--teal)">$15</td><td style="text-align:center">$25</td><td style="text-align:center;color:var(--gold);font-weight:700">$60</td></tr>
+        <tr style="border-bottom:1px solid var(--line)"><td style="padding:7px 10px">Paddle Board</td><td style="text-align:center">$20</td><td style="text-align:center;font-weight:700;color:var(--teal)">$50</td><td style="text-align:center">$90</td><td style="text-align:center;color:var(--gold);font-weight:700">$250</td></tr>
+        <tr style="border-bottom:1px solid var(--line);background:var(--bg)"><td style="padding:7px 10px">Kayak (Single)</td><td style="text-align:center">$30</td><td style="text-align:center;font-weight:700;color:var(--teal)">$60</td><td style="text-align:center">$100</td><td style="text-align:center;color:var(--gold);font-weight:700">$300</td></tr>
+        <tr style="border-bottom:1px solid var(--line)"><td style="padding:7px 10px">Kayak (Double)</td><td style="text-align:center">$45</td><td style="text-align:center;font-weight:700;color:var(--teal)">$90</td><td style="text-align:center">$160</td><td style="text-align:center;color:var(--gold);font-weight:700">$450</td></tr>
+        <tr style="border-bottom:1px solid var(--line);background:var(--bg)"><td style="padding:7px 10px">Snorkel Set</td><td style="text-align:center">$10</td><td style="text-align:center;font-weight:700;color:var(--teal)">$20</td><td style="text-align:center">$35</td><td style="text-align:center;color:var(--gold);font-weight:700">$90</td></tr>
+        <tr style="border-bottom:1px solid var(--line)"><td style="padding:7px 10px">Floating Tube</td><td style="text-align:center">$8</td><td style="text-align:center;font-weight:700;color:var(--teal)">$15</td><td style="text-align:center">$25</td><td style="text-align:center;color:var(--gold);font-weight:700">$60</td></tr>
+        <tr style="border-bottom:1px solid var(--line);background:var(--bg)"><td style="padding:7px 10px">Floating Lounge Chair</td><td style="text-align:center">$10</td><td style="text-align:center;font-weight:700;color:var(--teal)">$20</td><td style="text-align:center">$35</td><td style="text-align:center;color:var(--gold);font-weight:700">$90</td></tr>
+        <tr><td style="padding:7px 10px">Beach Paddle Games</td><td style="text-align:center">$8</td><td style="text-align:center;font-weight:700;color:var(--teal)">$15</td><td style="text-align:center">$25</td><td style="text-align:center;color:var(--gold);font-weight:700">$60</td></tr>
       </tbody>
     </table>
-    <p style="font-size:0.72rem;color:var(--teal);padding:8px 10px;margin:0">🆓 Life Jackets / PFDs included FREE with all rentals</p>
+    <p style="font-size:0.72rem;color:var(--teal);padding:8px 10px;margin:0">Life Jackets / PFDs included FREE with all rentals</p>
   </div>
 
-  <div class="asec-title" style="font-size:0.85rem;margin-bottom:10px">📦 Package Deals</div>
+  <div class="asec-title" style="font-size:0.85rem;margin-bottom:10px">Package Deals</div>
   <div style="display:flex;flex-direction:column;gap:10px">
     <div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px">
-      <div><div style="font-weight:700;font-size:0.9rem">Family Package 👨‍👩‍👧‍👦 <span style="font-size:0.65rem;background:var(--coral);color:#fff;padding:2px 7px;border-radius:10px;margin-left:4px">FULL DAY</span></div><div style="font-size:0.75rem;color:var(--muted);margin-top:3px">2× Paddle Boards + 1× Floater + Snorkel Gear</div></div>
+      <div><div style="font-weight:700;font-size:0.9rem">Family Package <span style="font-size:0.65rem;background:var(--coral);color:#fff;padding:2px 7px;border-radius:10px;margin-left:4px">FULL DAY</span></div><div style="font-size:0.75rem;color:var(--muted);margin-top:3px">2× Paddle Boards + 1× Floater + Snorkel Gear</div></div>
       <div style="font-weight:800;font-size:1rem;color:var(--teal);white-space:nowrap;margin-left:10px">XCD $150</div>
     </div>
     <div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px">
-      <div><div style="font-weight:700;font-size:0.9rem">Paddle Board + Snorkel Duo 🌊 <span style="font-size:0.65rem;background:var(--coral);color:#fff;padding:2px 7px;border-radius:10px;margin-left:4px">FULL DAY</span></div><div style="font-size:0.75rem;color:var(--muted);margin-top:3px">1× Paddle Board + 2× Snorkel Gear Sets</div></div>
+      <div><div style="font-weight:700;font-size:0.9rem">Paddle Board + Snorkel Duo <span style="font-size:0.65rem;background:var(--coral);color:#fff;padding:2px 7px;border-radius:10px;margin-left:4px">FULL DAY</span></div><div style="font-size:0.75rem;color:var(--muted);margin-top:3px">1× Paddle Board + 2× Snorkel Gear Sets</div></div>
       <div style="font-weight:800;font-size:1rem;color:var(--teal);white-space:nowrap;margin-left:10px">XCD $190</div>
     </div>
     <div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px">
-      <div><div style="font-weight:700;font-size:0.9rem">Combo for 2 💑 <span style="font-size:0.65rem;background:var(--coral);color:#fff;padding:2px 7px;border-radius:10px;margin-left:4px">FULL DAY</span></div><div style="font-size:0.75rem;color:var(--muted);margin-top:3px">1× Paddle Board + 2× Snorkel Gear Sets + Life Jackets</div></div>
+      <div><div style="font-weight:700;font-size:0.9rem">Combo for 2 <span style="font-size:0.65rem;background:var(--coral);color:#fff;padding:2px 7px;border-radius:10px;margin-left:4px">FULL DAY</span></div><div style="font-size:0.75rem;color:var(--muted);margin-top:3px">1× Paddle Board + 2× Snorkel Gear Sets + Life Jackets</div></div>
       <div style="font-weight:800;font-size:1rem;color:var(--teal);white-space:nowrap;margin-left:10px">XCD $220</div>
     </div>
     <div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px">
-      <div><div style="font-weight:700;font-size:0.9rem">Day Rental Combo ☀️ <span style="font-size:0.65rem;background:var(--coral);color:#fff;padding:2px 7px;border-radius:10px;margin-left:4px">FULL DAY</span></div><div style="font-size:0.75rem;color:var(--muted);margin-top:3px">1× Paddle Board + Full Snorkel Gear Set + Life Jacket</div></div>
+      <div><div style="font-weight:700;font-size:0.9rem">Day Rental Combo <span style="font-size:0.65rem;background:var(--coral);color:#fff;padding:2px 7px;border-radius:10px;margin-left:4px">FULL DAY</span></div><div style="font-size:0.75rem;color:var(--muted);margin-top:3px">1× Paddle Board + Full Snorkel Gear Set + Life Jacket</div></div>
       <div style="font-weight:800;font-size:1rem;color:var(--teal);white-space:nowrap;margin-left:10px">XCD $160</div>
     </div>
     <div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px">
-      <div><div style="font-weight:700;font-size:0.9rem">Premium Paddle + 2 Snorkel Sets 🌴 <span style="font-size:0.65rem;background:var(--coral);color:#fff;padding:2px 7px;border-radius:10px;margin-left:4px">FULL DAY</span></div><div style="font-size:0.75rem;color:var(--muted);margin-top:3px">Best snorkeling experience for two — full equipment</div></div>
+      <div><div style="font-weight:700;font-size:0.9rem">Premium Paddle + 2 Snorkel Sets <span style="font-size:0.65rem;background:var(--coral);color:#fff;padding:2px 7px;border-radius:10px;margin-left:4px">FULL DAY</span></div><div style="font-size:0.75rem;color:var(--muted);margin-top:3px">Best snorkeling experience for two — full equipment</div></div>
       <div style="font-weight:800;font-size:1rem;color:var(--teal);white-space:nowrap;margin-left:10px">XCD $270</div>
     </div>
   </div>
