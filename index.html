@@ -342,6 +342,75 @@ a:not([class]):not([style]){color:var(--teal)}
 .deposit-box .dep-fine{font-size:0.75rem;color:var(--muted);margin-top:10px;line-height:1.45}
 .partner-note{margin-top:-6px;margin-bottom:14px;padding:10px 12px;border-radius:10px;background:rgba(14,124,144,0.08);border:1px solid rgba(14,124,144,0.25);font-size:0.8rem;color:var(--teal-ink);font-weight:600}
 @media (prefers-color-scheme: dark){.partner-note{color:#7fd3e0}.dur-btn.selected,.chat-b.guest,.chat-send,.gear-check{color:#04222A}}
+
+/* ── HOME HERO (mockup layout, real content) ── */
+.top-links{display:none;margin-left:auto;gap:4px}
+.top-links a,header .top-links a{color:rgba(255,255,255,.82);text-decoration:none;font-size:.88rem;font-weight:500;padding:8px 12px;border-radius:6px;border-bottom:2px solid transparent}
+header .top-links a:hover,header .top-links a.active{color:#fff}
+.top-links a.active{color:#fff;border-bottom-color:var(--sea);border-radius:0}
+.top-wa{display:none;align-items:center;gap:8px;background:#157A41;color:#fff;text-decoration:none;font-weight:600;font-size:.88rem;padding:9px 16px;border-radius:999px;white-space:nowrap}
+.top-wa:hover{background:#11683A}
+@media (min-width:900px){
+  .header-inner{max-width:1160px}
+  .top-links{display:flex}
+  .top-wa{display:flex}
+  .top-links ~ .header-badge{display:none}
+  nav .nav-tabs{display:none}
+  nav{border-top:0}
+}
+.home-hero{max-width:1160px;margin:0 auto;padding:28px 16px 8px}
+.home-hero[hidden]{display:none}
+.home-hero-inner{display:grid;gap:22px;align-items:center}
+.home-hero-copy h2{font-family:var(--display);color:#fff;font-size:clamp(1.9rem,5vw,3.1rem);font-weight:600;line-height:1.08;letter-spacing:-.015em;max-width:16ch;text-wrap:balance;text-shadow:0 1px 14px rgba(0,0,0,.35)}
+.home-hero-copy > p{color:var(--on-photo-muted);font-size:1rem;line-height:1.55;max-width:46ch;margin-top:12px}
+.home-hero .perks{grid-template-columns:repeat(2,1fr);gap:10px;margin:22px 0 0;max-width:560px}
+.home-hero .perk{background:transparent;border:0;box-shadow:none;padding:0;text-align:left;display:grid;grid-template-columns:44px 1fr;column-gap:10px;align-items:center}
+.home-hero .perk-icon{grid-row:span 2;width:44px;height:44px;border-radius:50%;border:1.5px solid rgba(255,255,255,.7);color:#fff;align-items:center}
+.home-hero .perk-title{color:#fff;font-size:.82rem;margin:0;text-transform:uppercase;letter-spacing:.04em}
+.home-hero .perk-sub{color:var(--on-photo-muted);font-size:.78rem;margin:0}
+.home-hero .perk-sub a{color:var(--sand)}
+.home-hero .perk.off .perk-title{color:#FFB4AE}
+.hero-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+.hero-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:12px 22px;border-radius:999px;font-weight:700;font-size:.95rem;text-decoration:none;cursor:pointer;transition:background .15s,border-color .15s}
+.hero-btn-primary{background:var(--sand);color:#0B1E33}
+.hero-btn-primary:hover{background:#F3E6C8}
+.hero-btn-outline{border:1.5px solid rgba(255,255,255,.8);color:#fff}
+.hero-btn-outline:hover{background:rgba(255,255,255,.1)}
+.hero-btn-dark{background:var(--navy);color:#fff;min-height:44px;padding:10px 18px;font-size:.88rem}
+.hero-btn-dark:hover{background:var(--navy-2)}
+@media (prefers-color-scheme: dark){.hero-btn-dark{background:var(--sea);color:#04222A}.hero-btn-dark:hover{background:#6FD3DE}}
+.quick-book{background:var(--card);color:var(--ink);border-radius:14px;padding:20px;box-shadow:0 12px 32px rgba(0,0,0,.28);display:flex;flex-direction:column}
+.quick-book h3{font-family:var(--display);font-size:1.35rem;font-weight:600}
+.qb-sub{font-size:.82rem;color:var(--muted);margin:4px 0 12px}
+.quick-book label{font-size:.82rem;font-weight:600;margin:10px 0 5px}
+.quick-book input,.quick-book select{width:100%;min-height:44px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:.92rem;color:var(--ink);background:var(--card)}
+.quick-book input:focus,.quick-book select:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px rgba(14,124,144,.16)}
+.qb-btn{margin-top:16px;min-height:48px;border:0;border-radius:999px;background:var(--navy);color:#fff;font-weight:700;font-size:1rem;cursor:pointer}
+.qb-btn:hover{background:var(--navy-2)}
+.gear-tiles{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(150px,1fr);gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:26px 0 8px;scrollbar-width:thin}
+.gear-tile{scroll-snap-align:start;display:flex;flex-direction:column;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;padding:0;cursor:pointer;color:var(--ink);font:inherit;position:relative;transition:border-color .15s,box-shadow .15s}
+.gear-tile:hover{border-color:var(--teal);box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.gear-tile.off{opacity:.6;cursor:not-allowed}
+.gear-tile-photo{width:100%;aspect-ratio:4/3;object-fit:contain;background:#fff;display:block;padding:6px}
+.gear-tile-text{display:flex;flex-direction:column;gap:2px;padding:10px 40px 12px 12px}
+.gear-tile-text strong{font-size:.9rem}
+.gear-tile-text span{font-size:.78rem;color:var(--muted);white-space:nowrap}
+.gear-tile-go{position:absolute;right:10px;bottom:12px;width:26px;height:26px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center}
+@media (min-width:900px){
+  .home-hero{padding-top:56px}
+  .home-hero-inner{grid-template-columns:minmax(0,1.5fr) minmax(300px,380px);gap:48px}
+  .home-hero .perks{grid-template-columns:repeat(4,auto);gap:22px;max-width:none}
+  .home-hero .perk{grid-template-columns:1fr;text-align:center;justify-items:center;row-gap:6px}
+  .home-hero .perk-icon{grid-row:auto;width:52px;height:52px}
+  .gear-tiles{grid-auto-flow:row;grid-template-columns:repeat(7,1fr);overflow:visible;padding-top:40px}
+}
+@media (max-width:899px){.quick-book{display:none}.gear-tiles{padding-top:20px}}
+.reviews-card{display:flex;gap:14px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-top:28px}
+.reviews-icon{color:var(--amber);flex-shrink:0;margin-top:2px}
+.reviews-card h3{font-family:var(--display);font-size:1.15rem;font-weight:600}
+.reviews-card p{font-size:.88rem;color:var(--muted);line-height:1.5;margin:4px 0 12px}
+.reviews-actions{display:flex;flex-wrap:wrap;align-items:center;gap:14px}
+.reviews-link{color:var(--teal);font-weight:600;font-size:.88rem}
 </style>
 </head>
 <body>
@@ -354,6 +423,13 @@ a:not([class]):not([style]){color:var(--teal)}
       <h1>Aquatic Paradise Rentals</h1>
       <p>Bequia · St. Vincent &amp; the Grenadines</p>
     </div>
+    <nav class="top-links" aria-label="Main">
+      <a class="tl active" href="#" data-tab="book" onclick="switchTab('book');return false" data-i18n="nav_book">Book</a>
+      <a class="tl" href="#" data-tab="rates" onclick="switchTab('rates');return false" data-i18n="nav_rates">Rates</a>
+      <a class="tl" href="#reviews" onclick="switchTab('book');setTimeout(()=>document.getElementById('reviews')?.scrollIntoView({behavior:'smooth'}),30);return false">Reviews</a>
+      <a class="tl" href="#" data-tab="info" onclick="switchTab('info');return false" data-i18n="nav_info">Info</a>
+    </nav>
+    <a class="top-wa" href="https://wa.me/17844963447?text=Hi%20APR!%20I'd%20like%20to%20book%20some%20gear." aria-label="WhatsApp us on +1 784 496 3447"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg><span>(784) 496-3447</span></a>
     <div class="header-badge">Est. 2024</div>
     <div style="position:relative;margin-left:8px">
       <button id="langToggleBtn" onclick="toggleLangPanel()" title="Language" aria-label="Language" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:0.85rem;font-weight:600;padding:6px 10px;border-radius:20px;cursor:pointer;display:flex;align-items:center"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></button>
@@ -372,9 +448,9 @@ a:not([class]):not([style]){color:var(--teal)}
   </div>
   <nav>
     <div class="nav-tabs">
-      <div class="nav-tab active" role="button" tabindex="0" onclick="switchTab('book')" data-i18n="nav_book">Book</div>
-      <div class="nav-tab" role="button" tabindex="0" onclick="switchTab('rates')" data-i18n="nav_rates">Rates</div>
-      <div class="nav-tab" role="button" tabindex="0" onclick="switchTab('info')" data-i18n="nav_info">Info</div>
+      <div class="nav-tab active" role="button" tabindex="0" data-tab="book" onclick="switchTab('book')" data-i18n="nav_book">Book</div>
+      <div class="nav-tab" role="button" tabindex="0" data-tab="rates" onclick="switchTab('rates')" data-i18n="nav_rates">Rates</div>
+      <div class="nav-tab" role="button" tabindex="0" data-tab="info" onclick="switchTab('info')" data-i18n="nav_info">Info</div>
     </div>
   </nav>
 </header>
@@ -385,18 +461,44 @@ a:not([class]):not([style]){color:var(--teal)}
 
 <div id="weatherBanner" style="display:none;padding:10px 16px;text-align:center;font-size:0.82rem;font-weight:700"></div>
 
+<!-- HOME HERO (Book tab only): headline, perks, quick-book card, gear tiles -->
+<section class="home-hero" id="homeHero" aria-labelledby="heroTitle">
+  <div class="home-hero-inner">
+    <div class="home-hero-copy">
+      <h2 id="heroTitle" data-i18n="hero_title">Paddle board, kayak &amp; snorkel rentals in Bequia</h2>
+      <p data-i18n="hero_desc">Paddle boards, kayaks, snorkelling &amp; more — Princess Margaret Beach, Lower Bay &amp; Friendship Bay.</p>
+      <!-- Perks from the printed price chart. Delivery/Tours can be switched off
+           by staff in dispatch.html (Equipment & Services) — see renderPerks(). -->
+      <div class="perks" id="perks"></div>
+      <div class="hero-actions">
+        <a class="hero-btn hero-btn-primary" href="#step-gear" onclick="document.getElementById('step-gear').scrollIntoView({behavior:'smooth'});return false">Book now <svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <a class="hero-btn hero-btn-outline" href="https://wa.me/17844963447?text=Hi%20APR!%20I%20have%20a%20question." target="_blank" rel="noopener"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg> Ask on WhatsApp</a>
+      </div>
+    </div>
+    <form class="quick-book" id="quickBook" onsubmit="quickBook(event)" aria-labelledby="qbTitle">
+      <h3 id="qbTitle">Book your rental</h3>
+      <p class="qb-sub">Free delivery to your beach. We confirm on WhatsApp.</p>
+      <label for="qbDate">Date &amp; time</label>
+      <input type="datetime-local" id="qbDate"/>
+      <label for="qbBeach">Beach</label>
+      <select id="qbBeach">
+        <option value="">Choose your beach</option>
+        <option>Princess Margaret Beach</option>
+        <option>Lower Bay</option>
+        <option>Friendship Bay</option>
+      </select>
+      <label for="qbGear">Gear</label>
+      <select id="qbGear"><option value="">Choose gear</option></select>
+      <button type="submit" class="qb-btn">Book now</button>
+    </form>
+  </div>
+  <div class="gear-tiles" id="gearTiles" aria-label="Our gear"></div>
+</section>
+
 <main>
 <!-- ========== BOOK SECTION ========== -->
 <div class="section active" id="sec-book">
 
-  <div class="hero-card">
-    <h2 data-i18n="hero_title">Paddle board, kayak &amp; snorkel rentals in Bequia</h2>
-    <p data-i18n="hero_desc">Paddle boards, kayaks, snorkelling &amp; more — Princess Margaret Beach, Lower Bay &amp; Friendship Bay.</p>
-  </div>
-
-  <!-- Perks from the printed price chart. Delivery/Tours can be switched off
-       by staff in dispatch.html (Equipment & Services) — see renderPerks(). -->
-  <div class="perks" id="perks"></div>
 
 
   <!-- STEP 1: GEAR -->
@@ -571,6 +673,18 @@ a:not([class]):not([style]){color:var(--teal)}
       Message Us on WhatsApp
     </a>
   </div>
+
+  <section class="reviews-card" id="reviews" aria-labelledby="reviewsTitle">
+    <span class="reviews-icon"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"/></svg></span>
+    <div>
+      <h3 id="reviewsTitle">Guest reviews</h3>
+      <p>Read what guests say about us on Google, or leave a review after your rental.</p>
+      <div class="reviews-actions">
+        <a class="hero-btn hero-btn-dark" href="https://maps.app.goo.gl/6D6GsDmnhGfuNrLP8" target="_blank" rel="noopener">Read our Google reviews</a>
+        <a class="reviews-link" href="https://maps.app.goo.gl/6D6GsDmnhGfuNrLP8" target="_blank" rel="noopener">Leave a review</a>
+      </div>
+    </div>
+  </section>
 
 </div>
 
@@ -1424,10 +1538,12 @@ function renderPerks() {
   const el = document.getElementById('perks');
   if (!el) return;
   const tourLink = 'https://wa.me/17844963447?text=' + encodeURIComponent("Hi APR, I'd like to ask about a guided tour.");
+  const groupLink = 'https://wa.me/17844963447?text=' + encodeURIComponent("Hi APR, I'd like to ask about a group discount.");
   const perks = [
     { icon:'<svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h2l2 3 2-3h2l3 4v13a1 1 0 0 1-1 1h-5V11H10v10H5a1 1 0 0 1-1-1V7z"/></svg>', title:'Life Jackets Included', sub:'All rentals' },
-    { icon:'<svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>', title:'Free Delivery', sub:'To any beach in Bequia', key:'DELIVERY' },
+    { icon:'<svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>', title:'Free Delivery', sub:'To your beach in Bequia', key:'DELIVERY' },
     { icon:'<svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l2 3h14l2-3H3zM12 3v11M12 4l6 8h-6"/></svg>', title:'Guided Tours', sub:`From our safety boat · <a href="${tourLink}" target="_blank" rel="noopener">Ask us</a>`, key:'TOURS' },
+    { icon:'<svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.2a6.5 6.5 0 0 1 3.5 5.8"/></svg>', title:'Group Discounts', sub:`<a href="${groupLink}" target="_blank" rel="noopener">Ask on WhatsApp</a>` },
   ];
   el.innerHTML = perks.map(p => {
     const off = p.key && isOff(p.key);
@@ -1579,6 +1695,7 @@ async function loadWeatherBanner() {
 
 // ── RENDER GEAR ──
 function renderGear() {
+  renderGearTiles();
   const soldOut = g => itemLeft(g.id) === 0;
   const regularGear = GEAR.filter(g => !g.isPackage && !g.comingSoon && !isOff(g.id) && !soldOut(g));
   const offGear = GEAR.filter(g => !g.isPackage && !g.comingSoon && (isOff(g.id) || soldOut(g)));
@@ -1903,6 +2020,7 @@ function newBooking() {
   document.getElementById('sigModeDrawn').style.display='block';
   document.getElementById('sigModeTyped').style.display='none';
   renderGear(); renderPackages(); renderDurations(); updateSummary();
+  { const d = document.getElementById('datetime'), q = document.getElementById('qbDate'); if (d && q && !q.value) q.value = d.value; }
   window.scrollTo(0,0);
 }
 
@@ -2341,9 +2459,53 @@ function switchTab(tab) {
   ['book','rates','info'].forEach(t => {
     document.getElementById('sec-'+t)?.classList.toggle('active', t===tab);
   });
-  document.querySelectorAll('.nav-tab').forEach((el,i) => {
-    el.classList.toggle('active', ['book','rates','info'][i] === tab);
+  document.querySelectorAll('[data-tab]').forEach(el => {
+    el.classList.toggle('active', el.dataset.tab === tab);
   });
+  const hero = document.getElementById('homeHero');
+  if (hero) hero.hidden = tab !== 'book';
+}
+
+// ── HOME HERO: gear tiles + quick-book card ──
+// Both read GEAR, so names, photos and prices always match the booking form.
+function renderGearTiles() {
+  const el = document.getElementById('gearTiles');
+  if (!el) return;
+  const list = GEAR.filter(g => !g.isPackage && !g.comingSoon);
+  el.innerHTML = list.map(g => {
+    const off = isOff(g.id) || itemLeft(g.id) === 0;
+    return `<button type="button" class="gear-tile${off ? ' off' : ''}" ${off ? 'disabled' : ''} onclick="pickGear('${g.id}')" aria-label="Add ${g.name}, from XCD ${g.price60} per hour">
+      ${gearPhotoTag(g, 'gear-tile-photo', 400)}
+      <span class="gear-tile-text"><strong>${g.name}</strong><span>${off ? 'Not available right now' : 'from XCD ' + g.price60 + '/hr'}</span></span>
+      <span class="gear-tile-go" aria-hidden="true"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+    </button>`;
+  }).join('');
+  const qd = document.getElementById('qbDate'), fd = document.getElementById('datetime');
+  if (qd && fd && !qd.value && fd.value) qd.value = fd.value;
+  const qb = document.getElementById('qbGear');
+  if (qb && qb.options.length <= 1) {
+    list.forEach(g => qb.add(new Option(`${g.name} · from XCD ${g.price60}/hr`, g.id)));
+  }
+}
+
+// Add one of an item (if none picked yet) and jump to the gear step.
+function pickGear(id) {
+  if (!selectedGear[id]) changeQty(id, 1);
+  document.getElementById('gc-'+id)?.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+// Quick-book card fills the real form fields, then hands over to it.
+function quickBook(e) {
+  e.preventDefault();
+  const setVal = (id, v) => {
+    const f = document.getElementById(id);
+    if (f && v) { f.value = v; f.dispatchEvent(new Event('input', {bubbles:true})); f.dispatchEvent(new Event('change', {bubbles:true})); }
+  };
+  setVal('datetime', document.getElementById('qbDate').value);
+  setVal('beach', document.getElementById('qbBeach').value);
+  const gear = document.getElementById('qbGear').value;
+  if (gear) { pickGear(gear); return; }
+  document.getElementById('step-gear').scrollIntoView({behavior:'smooth'});
 }
 
 // ── HELP DESK WIDGET ── (rule-based FAQ + WhatsApp handoff — no AI, no
