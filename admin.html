@@ -21,11 +21,13 @@
 body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh}
 /* Bequia photo behind the console — blurred and darkened so cards and numbers stay readable. */
 body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:none;
-  background:linear-gradient(rgba(11,18,32,.6),rgba(11,18,32,.82)),url('img/admin-bg.jpg') center/cover no-repeat;
+  background:linear-gradient(rgba(11,18,32,.6),rgba(11,18,32,.82)),url('img/admin-bg.webp') center/cover no-repeat;
   filter:blur(6px)}
 
 /* ── PIN GATE ── */
-#pinGate{position:fixed;inset:0;background:rgba(11,18,32,.45);display:flex;align-items:center;justify-content:center;z-index:1000;flex-direction:column;gap:0}
+#pinGate{position:fixed;inset:0;background:linear-gradient(rgba(11,18,32,.15),rgba(11,18,32,.55)),url('img/admin-bg.webp') center/cover no-repeat;display:flex;align-items:center;justify-content:center;z-index:1000;flex-direction:column;gap:0}
+/* Wide screens: logo picture on the left, PIN box on the right, so the box never covers the logo. */
+@media (min-aspect-ratio: 3/2) and (min-width: 900px){#pinGate{background:linear-gradient(90deg,rgba(11,18,32,0) 0,rgba(11,18,32,0) calc(100vh - 80px),#0B1E33 100vh),url('img/admin-bg.webp') left center/auto 100% no-repeat,#0B1E33;padding-left:100vh}}
 .pin-card{background:var(--surface);border-radius:14px;padding:36px 32px;width:90%;max-width:360px;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,.4);border:1px solid var(--line)}
 .pin-logo{width:64px;height:64px;border-radius:12px;border:1px solid var(--line);margin:0 auto 18px;object-fit:cover}
 .pin-card h2{font-size:1.2rem;font-weight:800;color:var(--ink);margin-bottom:4px}
