@@ -1929,6 +1929,8 @@ function _saveBookDraft(id) {
 // ── 7AM DAILY BRIEFING (also on demand: send "/today" to the bot) ──
 function dailyBriefing() {
   try { _sendBriefing(); } catch (err) { _logError('dailyBriefing', err); }
+  _purgeOldChats(); // privacy: chats older than CHAT_KEEP_DAYS
+  _purgeOldIdPhotos(); // privacy: ID photos 30 days after the rental
 }
 
 function _sendBriefing() {
@@ -2769,16 +2771,24 @@ function doPost(e) {
       if (!_rateLimitOk('chat', CHAT_RATE_MAX_PER_MINUTE)) return _json({ ok: false, error: 'Busy' });
       return _json(waWebhook(payload));
     }
-    if (payload.action === 'chatSend' || payload.action === 'chatFetch') {
+    if (payload.action === 'chatSend' || payload.action === 'chatFetch' || payload.action === 'chatDelete') {
       // Public guest chat. Own rate bucket so open chat windows polling for
       // replies can never use up the budget real bookings need.
       if (!_rateLimitOk('chat', CHAT_RATE_MAX_PER_MINUTE)) return _json({ ok: false, error: 'Busy — try again in a minute.' });
+      if (payload.action === 'chatDelete') return _json(chatDelete(payload));
       return _json(payload.action === 'chatSend' ? chatSend(payload) : chatFetch(payload));
     }
     if (!_rateLimitOk('api', API_RATE_LIMIT_MAX_PER_MINUTE)) {
       return _json({ ok: false, error: 'Too many requests — please wait a minute.' });
     }
 
+    if (['staffGetChats', 'staffGetChatThread', 'staffChatReply'].indexOf(payload.action) !== -1) {
+      // Staff PIN (Dispatch console) — threads without guest phone numbers.
+      if (!_dispatchAuthOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      if (payload.action === 'staffGetChats') return _json(staffGetChats());
+      if (payload.action === 'staffGetChatThread') return _json(staffGetChatThread(payload));
+      return _json(staffChatReply(payload));
+    }
     if (['getChats', 'getChatThread', 'chatReplyAdmin'].indexOf(payload.action) !== -1) {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       if (payload.action === 'getChats') return _json(getChats());
@@ -4178,7 +4188,175 @@ function _chatAppend(convo, from, name, contact, text) {
 
 // What the guest's page gets back — never the contact details.
 function _chatPublic(msgs) {
-  return msgs.slice(-80).map(function (m) { return { from: m.from, name: m.from === 'team' ? m.name : '', text: m.text, at: m.at }; });
+  return msgs.slice(-80).map(function (m) { return { from: m.from, name: m.from === 'guest' ? '' : m.name, text: m.text, at: m.at }; });
+}
+
+// ── CHAT: INSTANT ANSWERS ──
+// Common guest questions get an answer straight away, labelled "Automatic
+// answer" in the chat. Facts come from rules.html, the booking page and
+// PRICES — update the text here when prices or policies change. Each topic is
+// answered once per conversation; anything unmatched waits for the team.
+var CHAT_AUTO_TOPICS = [
+  { id: 'prices', label: 'prices',
+    re: /\b(price|prices|pricing|cost|costs|how much|rates?|charge|fee|cheap|xcd|ec\$|usd)\b/i,
+    text: 'Our rates (XCD) — hour / full day / weekend / week:\n' +
+      '• Paddle board: 20 / 50 / 90 / 250\n• Single kayak: 30 / 60 / 100 / 300\n• Double kayak: 45 / 90 / 160 / 450\n' +
+      '• Snorkel set: 10 / 20 / 35 / 90\n• Floating tube: 8 / 15 / 25 / 60\n• Floating lounge chair: 10 / 20 / 35 / 90\n' +
+      '• Beach paddle games: 8 / 15 / 25 / 60\nPackages and any live deals are on the Rates tab of the booking page.' },
+  { id: 'hours', label: 'hours & location',
+    re: /\b(hours?|open|opening|close|closing|when are you|where are you|where (do|can) i find|location|located|address|find you)\b/i,
+    text: 'We\'re open 8AM–6PM every day. Our base is Princess Margaret Beach (Admiralty Bay), and we also bring gear to Lower Bay and Friendship Bay.' },
+  { id: 'delivery', label: 'delivery',
+    re: /\b(deliver|delivery|drop ?off|bring (it|them|the)|villa|hotel|boat|yacht|pick ?up|collect)\b/i,
+    text: 'Delivery to Princess Margaret Beach, Lower Bay and Friendship Bay is free. For a villa, hotel or boat, tell us where and when and the team will confirm here.' },
+  { id: 'kids', label: 'kids & life jackets',
+    re: /\b(kids?|child|children|toddler|baby|son|daughter|family|age|old enough|\d+\s*-?\s*(?:years?|yrs?)(?:\s*old)?|life ?jackets?|pfd|vest)\b/i,
+    text: 'Life jackets are included for everyone, with kid sizes available, and must be worn on the water. Children are welcome when a paying adult is with them and responsible for them.' },
+  { id: 'beginner', label: 'beginners',
+    re: /\b(beginner|first time|never (done|tried|paddled)|easy|hard|difficult|learn|lesson|teach|instruct\w*|experience)\b/i,
+    text: 'Beginners are very welcome. Every rental starts with a quick hands-on demo, and mornings are usually the calmest water. There\'s also a step-by-step board guide: aquaticparadiserental.vacations/gear-guide.html' },
+  { id: 'swim', label: 'swimming',
+    re: /\b(swim|swimmer|can'?t swim|non.?swimmer|safe|safety|dangerous)\b/i,
+    text: 'Everyone on the water needs to be comfortable swimming in open water (or have a guardian confirm this for them) and must wear the life jacket we provide. Gear stays inside the safe swim area unless our staff say otherwise.' },
+  { id: 'book', label: 'booking',
+    re: /\b(book|booking|reserve|reservation|availab\w*|in stock|today|tomorrow|tonight|this (morning|afternoon|weekend))\b/i,
+    text: 'You can book in a minute on the booking page (Book Now): pick gear, time and beach, and you\'ll get a booking reference. The team confirms on WhatsApp. If something is sold out at that time, the booking page shows it.' },
+  { id: 'payment', label: 'payment & deposit',
+    re: /\b(pay|payment|paying|card|credit|debit|cash|bank|transfer|paypal|deposit)\b/i,
+    text: 'A 25% deposit confirms a booking and is non-refundable. The rest is paid at the start of the rental: cash (XCD or USD), bank transfer (Bank of St. Vincent & the Grenadines) or card arranged on WhatsApp. We send bank details privately on WhatsApp, never in public.' },
+  { id: 'cancel', label: 'cancellation & weather',
+    re: /\b(cancel\w*|refund\w*|reschedul\w*|change my|weather|rain\w*|wind\w*|storm\w*|rough)\b/i,
+    text: 'If the sea is unsafe at your rental time, you choose a free rebooking or a full refund of anything paid. If you cancel within 2 hours of your start time, a 50% charge may apply, and the 25% deposit is non-refundable. No refunds for returning gear early.' },
+  { id: 'tours', label: 'tours',
+    re: /\b(tour|tours|guide|guided|excursion|trip)\b/i,
+    text: 'Yes, we arrange guided tours. Tell us the day, how many people and what you\'d like to see, and the team will reply here with times and the price.' },
+  { id: 'damage', label: 'damage',
+    re: /\b(damage\w*|broke|broken|lost|lose|insurance|scratch\w*)\b/i,
+    text: 'Normal wear is fine. Loss or damage beyond normal wear is the renter\'s responsibility, so tell staff straight away if anything goes wrong — please don\'t try to repair gear yourself.' }
+];
+
+function _chatAutoAnswer(text, earlier) {
+  var done = {};
+  // Each topic once per conversation: skip any whose answer text is already in the thread.
+  (earlier || []).forEach(function (m) { if (m.from === 'auto') CHAT_AUTO_TOPICS.forEach(function (t) { if (m.text.indexOf(t.text.slice(0, 40)) !== -1) done[t.id] = true; }); });
+  var hits = CHAT_AUTO_TOPICS.filter(function (t) { return t.re.test(text) && !done[t.id]; }).slice(0, 2);
+  if (!hits.length) return null;
+  var body = hits.map(function (t) { return t.text; }).join('\n\n');
+  return { text: body + '\n\nA team member will also see your message and follow up if needed.', topics: hits.map(function (t) { return t.label; }) };
+}
+
+// ── CHAT: GUEST CAN DELETE THEIR CONVERSATION (right to erasure) ──
+function chatDelete(p) {
+  try {
+    var convo = p && p.convo;
+    if (!_chatValidId(convo)) return { ok: false, error: 'Chat expired — reload the page.' };
+    var n = _chatDeleteRows(function (c) { return c === convo; });
+    CacheService.getScriptCache().remove('chat_' + convo);
+    if (n) _tgSend('🗑️ A guest deleted their chat (Chat #' + convo.slice(0, 6) + ', ' + n + ' messages).');
+    return { ok: true, deleted: n };
+  } catch (err) {
+    return _fail('chatDelete', err);
+  }
+}
+
+// Removes CHAT rows matching test(convo, row); bottom-up so row numbers stay valid.
+function _chatDeleteRows(test) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var sh = _chatSheet(), rows = sh.getDataRange().getValues(), n = 0;
+    for (var i = rows.length - 1; i >= 1; i--) {
+      if (test(String(rows[i][0]), rows[i])) { sh.deleteRow(i + 1); n++; }
+    }
+    return n;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ID photos are deleted 30 days after the rental ends (privacy.html promises this).
+// The Drive file goes to Drive's trash (Google empties it after 30 more days)
+// and the booking keeps a note instead of the link. Runs from dailyBriefing.
+var ID_PHOTO_KEEP_DAYS = 30;
+function _purgeOldIdPhotos() {
+  try {
+    var sh = _sheet(), data = sh.getDataRange().getValues();
+    var head = data[0] || [];
+    var urlIdx = head.indexOf('idPhotoUrl'), dtIdx = head.indexOf('datetime'), durIdx = head.indexOf('duration');
+    if (urlIdx === -1 || dtIdx === -1) return 0;
+    var cutoff = Date.now() - ID_PHOTO_KEEP_DAYS * 86400000, n = 0;
+    for (var i = 1; i < data.length; i++) {
+      var url = String(data[i][urlIdx] || '');
+      var id = (url.match(/\/d\/([\w-]{20,})/) || url.match(/[?&]id=([\w-]{20,})/) || [])[1];
+      if (!id) continue;
+      var w = _bookingWindow(data[i][dtIdx], durIdx === -1 ? '' : data[i][durIdx]);
+      if (!w || w.end > cutoff) continue;
+      try { DriveApp.getFileById(id).setTrashed(true); }
+      catch (err) { _logError('_purgeOldIdPhotos.file', err); } // already gone — still clear the link
+      sh.getRange(i + 1, urlIdx + 1).setValue('deleted after ' + ID_PHOTO_KEEP_DAYS + ' days');
+      n++;
+    }
+    return n;
+  } catch (err) {
+    _logError('_purgeOldIdPhotos', err);
+    return 0;
+  }
+}
+
+// Chats are kept 180 days after their last message (privacy.html says so). Runs from dailyBriefing.
+var CHAT_KEEP_DAYS = 180;
+function _purgeOldChats() {
+  try {
+    var cutoff = Date.now() - CHAT_KEEP_DAYS * 86400000;
+    var old = {};
+    _chatSummaries(0).forEach(function (s) { if (new Date(s.lastAt).getTime() < cutoff) old[s.convo] = true; });
+    if (!Object.keys(old).length) return 0;
+    return _chatDeleteRows(function (c) { return old[c]; });
+  } catch (err) {
+    _logError('_purgeOldChats', err);
+    return 0;
+  }
+}
+
+// ── CHAT: STAFF (Dispatch console, staff PIN) ──
+// Same threads as Admin → Chats, minus guest phone numbers. Replies are signed
+// with the first name the staff member typed in the console.
+function staffGetChats() {
+  try {
+    return { ok: true, chats: _chatSummaries(Date.now() - 30 * 86400000).slice(0, 50).map(function (s) {
+      return { convo: s.convo, tag: s.tag, name: s.name || 'Guest', lastText: s.lastText, lastFrom: s.lastFrom, lastAt: s.lastAt, count: s.count };
+    }) };
+  } catch (err) {
+    return _fail('staffGetChats', err);
+  }
+}
+
+function staffGetChatThread(p) {
+  try {
+    if (!_chatValidId(p && p.convo)) return { ok: false, error: 'Unknown chat' };
+    return { ok: true, messages: _chatThread(p.convo).map(function (m) {
+      return { from: m.from, name: m.name, text: m.text, at: m.at };
+    }) };
+  } catch (err) {
+    return _fail('staffGetChatThread', err);
+  }
+}
+
+function staffChatReply(p) {
+  try {
+    var convo = p && p.convo;
+    var text = String((p && p.text) || '').trim();
+    var who = String((p && p.staffName) || '').replace(/[^\p{L}\s'-]/gu, '').trim().split(/\s+/)[0].slice(0, 20);
+    if (!_chatValidId(convo)) return { ok: false, error: 'Unknown chat' };
+    if (!who) return { ok: false, error: 'Add your first name first' };
+    if (!text || text.length > CHAT_MAX_LEN) return { ok: false, error: 'Message must be 1-' + CHAT_MAX_LEN + ' characters' };
+    if (!_chatThread(convo).length) return { ok: false, error: 'Unknown chat' };
+    var msgs = _chatAppend(convo, 'team', who + ' · Aquatic Paradise', '', text);
+    _tgSend('💬 ' + who + ' (staff) replied in Chat #' + convo.slice(0, 6) + ':\n' + text.slice(0, 300));
+    return { ok: true, messages: msgs.map(function (m) { return { from: m.from, name: m.name, text: m.text, at: m.at }; }) };
+  } catch (err) {
+    return _fail('staffChatReply', err);
+  }
 }
 
 function chatSend(p) {
@@ -4193,12 +4371,18 @@ function chatSend(p) {
     if (!name) return { ok: false, error: 'Please add your name.' };
     if (!_rateLimitOk('chat_' + convo, 8)) return { ok: false, error: 'Slow down a little — try again in a minute.' };
 
-    var isNew = _chatThread(convo).length === 0;
+    var before = _chatThread(convo);
+    var isNew = before.length === 0;
     var msgs = _chatAppend(convo, 'guest', name, contact, text);
+
+    // Instant answer for common questions; the team still gets the alert.
+    var auto = _chatAutoAnswer(text, before);
+    if (auto) msgs = _chatAppend(convo, 'auto', 'Automatic answer', '', auto.text);
 
     var tag = convo.slice(0, 6);
     var alert = (isNew ? '💬 NEW GUEST CHAT' : '💬 Guest chat') + ' · Chat #' + tag + '\n' +
       'From: ' + name + (contact ? ' · ' + contact : '') + '\n\n' + text +
+      (auto ? '\n\n🤖 Auto-answered: ' + auto.topics.join(', ') + ' — follow up if needed.' : '') +
       '\n\n↩️ Swipe this message → Reply to answer in their chat.';
     var wa = _waLink(contact, 'Hi ' + name.split(' ')[0] + ', this is Aquatic Paradise Rentals — following up on your chat.');
     var notified = wa ? _tgSendButtons(alert, { inline_keyboard: [[{ text: '💬 WhatsApp guest', url: wa }]] }) : _tgSend(alert);

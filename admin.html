@@ -1428,7 +1428,7 @@ function renderBookings() {
         ${state!=='done'?`<button class="bk-btn done-btn" data-ref="${refAttr}" onclick="setBkState(this.dataset.ref,'done')">Done</button>`:''}
         ${phone?`<a class="bk-btn wa" href="https://wa.me/${encodeURIComponent(phone)}?text=${waMsg}" target="_blank">WhatsApp</a>`:''}
         <button class="bk-btn" data-ref="${refAttr}" onclick="notifyDelivery(this.dataset.ref)">Notify Driver</button>
-        ${b.idPhotoUrl && b.idPhotoUrl!=='N/A'?`<button class="bk-btn" data-ref="${refAttr}" onclick="viewIdPhoto(this.dataset.ref)">View ID</button>`:''}
+        ${b.idPhotoUrl && /^https?:/.test(b.idPhotoUrl)?`<button class="bk-btn" data-ref="${refAttr}" onclick="viewIdPhoto(this.dataset.ref)">View ID</button>`:''}
         ${b.signatureUrl && b.signatureUrl!=='N/A'?`<button class="bk-btn" data-ref="${refAttr}" onclick="viewSignature(this.dataset.ref)">View Signature</button>`:''}
       </div>
       <div style="flex:1 1 100%;display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
@@ -4015,9 +4015,10 @@ async function fetchChatThread(convo) {
 function renderChatThread(msgs) {
   const el = document.getElementById('chatThreadMsgs');
   el.innerHTML = msgs.map(m => {
-    const team = m.from === 'team';
-    return `<div style="align-self:${team ? 'flex-end' : 'flex-start'};max-width:85%;padding:8px 11px;border-radius:12px;font-size:0.85rem;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;background:${team ? 'var(--teal)' : 'var(--bg)'};color:${team ? '#fff' : 'var(--ink)'};border:1px solid ${team ? 'transparent' : 'var(--line)'}">`
-      + `<div style="font-size:0.66rem;font-weight:700;opacity:0.8;margin-bottom:2px">${escapeHtml(team ? m.name : (m.name || 'Guest'))}</div>`
+    // 'auto' = instant answer the chat gave by itself (Code.gs _chatAutoAnswer).
+    const auto = m.from === 'auto', team = m.from === 'team' || auto;
+    return `<div style="align-self:${team ? 'flex-end' : 'flex-start'};max-width:85%;padding:8px 11px;border-radius:12px;font-size:0.85rem;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;background:${auto ? 'var(--surface)' : team ? 'var(--teal)' : 'var(--bg)'};color:${team && !auto ? 'var(--navy)' : 'var(--ink)'};border:1px ${auto ? 'dashed' : 'solid'} ${team && !auto ? 'transparent' : 'var(--line)'}">`
+      + `<div style="font-size:0.66rem;font-weight:700;opacity:0.8;margin-bottom:2px">${escapeHtml(auto ? 'Automatic answer' : team ? m.name : (m.name || 'Guest'))}</div>`
       + escapeHtml(m.text)
       + `<div style="font-size:0.63rem;opacity:0.7;margin-top:3px">${chatAgo(m.at)}</div></div>`;
   }).join('');

@@ -67,6 +67,16 @@ header p{font-size:0.72rem;color:var(--muted);margin-top:2px}
 .svc-chip{padding:6px 10px;border-radius:20px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:0.72rem;cursor:pointer}
 .svc-chip.picked{border-color:var(--coral);color:var(--coral)}
 .svc-input{width:100%;padding:9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:0.8rem;margin-bottom:8px}
+.chat-row{display:block;width:100%;text-align:left;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;color:var(--ink);cursor:pointer}
+.chat-row b{font-size:0.86rem}
+.chat-row .when{float:right;font-size:0.7rem;color:var(--muted)}
+.chat-row .last{display:block;font-size:0.76rem;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-row.waiting{border-color:var(--gold)}
+.chat-thread{display:flex;flex-direction:column;gap:6px;max-height:55vh;overflow-y:auto}
+.cmsg{max-width:85%;padding:8px 11px;border-radius:10px;font-size:0.85rem;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);border:1px solid var(--line)}
+.cmsg.team{align-self:flex-end;background:var(--teal);color:var(--navy);border-color:transparent}
+.cmsg.auto{align-self:flex-end;border-style:dashed}
+.cmsg small{display:block;font-size:0.66rem;font-weight:700;opacity:0.8;margin-bottom:2px}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--line);color:var(--ink);padding:10px 18px;border-radius:8px;font-size:0.8rem;z-index:999;display:none}
 </style>
 </head>
@@ -105,6 +115,21 @@ header p{font-size:0.72rem;color:var(--muted);margin-top:2px}
       <div class="svc-body">
         <div class="svc-help">Turn something off when it can't be used (boat maintenance, weather, all booked out…). Guests see "Not available at the moment" with your reason on the booking page right away.</div>
         <div id="svcList"></div>
+      </div>
+    </details>
+    <details class="svc-panel" id="chatPanel" ontoggle="if(this.open)fetchStaffChats()">
+      <summary>Guest Chats <span class="svc-count" id="chatCount">—</span></summary>
+      <div class="svc-body">
+        <div class="svc-help">Messages from the website chat. Your reply appears in the guest's chat signed with your first name. Guest phone numbers aren't shown here.</div>
+        <label class="svc-help" for="staffName" style="display:block;margin-bottom:4px">Your first name</label>
+        <input class="svc-input" id="staffName" maxlength="20" autocomplete="given-name" placeholder="e.g. Kevin" onchange="saveStaffName(this.value)"/>
+        <div id="chatList"></div>
+        <div id="chatThread" style="display:none">
+          <button class="svc-chip" onclick="closeStaffThread()" style="margin-bottom:10px">← All chats</button>
+          <div id="chatThreadMsgs" class="chat-thread"></div>
+          <textarea class="svc-input" id="chatReply" rows="2" maxlength="1000" placeholder="Reply to the guest…" style="resize:vertical;margin-top:10px"></textarea>
+          <button class="btn confirm" id="chatReplyBtn" onclick="sendStaffReply()" style="width:100%">Send reply</button>
+        </div>
       </div>
     </details>
     <button class="refresh" onclick="fetchDispatch()">🔄 Refresh</button>
@@ -162,6 +187,8 @@ async function checkPin() {
     document.getElementById('app').style.display='block';
     fetchDispatch();
     fetchServiceStatus();
+    fetchStaffChats();
+    setInterval(() => { if (!document.hidden) { fetchStaffChats(); if (openConvo) fetchStaffThread(openConvo); } }, 30000);
     startDispatchPolling();
   } else {
     showToast('Wrong PIN');
@@ -426,6 +453,84 @@ async function setStatus(ref, status) {
   }
 }
 
+
+// ── GUEST CHATS (Code.gs staffGetChats / staffGetChatThread / staffChatReply) ──
+let openConvo = null;
+const STAFF_NAME_KEY = "apr_staff_name";
+try { document.getElementById("staffName").value = localStorage.getItem(STAFF_NAME_KEY) || ""; } catch (e) {}
+function saveStaffName(v) { try { localStorage.setItem(STAFF_NAME_KEY, v.trim()); } catch (e) {} }
+async function chatApi(body) {
+  const res = await fetch(BACKEND, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(Object.assign({ token: STAFF_TOKEN }, body)), signal: AbortSignal.timeout(15000) });
+  return res.json();
+}
+function ago(iso) {
+  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (isNaN(m)) return "";
+  return m < 1 ? "now" : m < 60 ? m + "m" : m < 1440 ? Math.round(m / 60) + "h" : Math.round(m / 1440) + "d";
+}
+async function fetchStaffChats() {
+  try {
+    const d = await chatApi({ action: "staffGetChats" });
+    if (!d || !d.ok) return;
+    const chats = d.chats || [];
+    const waiting = chats.filter(c => c.lastFrom === "guest").length;
+    const cnt = document.getElementById("chatCount");
+    cnt.textContent = waiting ? waiting + " waiting" : chats.length ? "All answered" : "None";
+    cnt.classList.toggle("warn", !!waiting);
+    document.getElementById("chatList").innerHTML = chats.length ? chats.map(c =>
+      `<button class="chat-row${c.lastFrom === "guest" ? " waiting" : ""}" data-convo="${escapeHtml(c.convo)}" onclick="openStaffThread(this.dataset.convo)">
+        <span class="when">${ago(c.lastAt)}</span><b>${escapeHtml(c.name)}</b>
+        <span class="last">${c.lastFrom === "guest" ? "" : c.lastFrom === "auto" ? "Auto: " : "Team: "}${escapeHtml(c.lastText)}</span></button>`).join("")
+      : "<div class=\"svc-help\">No guest chats in the last 30 days.</div>";
+  } catch (e) { /* offline — next refresh */ }
+}
+function openStaffThread(convo) {
+  openConvo = convo;
+  document.getElementById("chatList").style.display = "none";
+  document.getElementById("chatThread").style.display = "block";
+  document.getElementById("chatThreadMsgs").innerHTML = "<div class=\"svc-help\">Loading…</div>";
+  fetchStaffThread(convo);
+}
+function closeStaffThread() {
+  openConvo = null;
+  document.getElementById("chatThread").style.display = "none";
+  document.getElementById("chatList").style.display = "block";
+  fetchStaffChats();
+}
+async function fetchStaffThread(convo) {
+  try {
+    const d = await chatApi({ action: "staffGetChatThread", convo });
+    if (d && d.ok && openConvo === convo) renderStaffThread(d.messages || []);
+  } catch (e) {}
+}
+function renderStaffThread(msgs) {
+  const el = document.getElementById("chatThreadMsgs");
+  el.innerHTML = msgs.map(m => {
+    const cls = m.from === "guest" ? "" : m.from === "auto" ? " auto" : " team";
+    const who = m.from === "auto" ? "Automatic answer" : m.name || "Guest";
+    return `<div class="cmsg${cls}"><small>${escapeHtml(who)} · ${ago(m.at)}</small>${escapeHtml(m.text)}</div>`;
+  }).join("");
+  el.scrollTop = el.scrollHeight;
+}
+async function sendStaffReply() {
+  const name = document.getElementById("staffName").value.trim();
+  const input = document.getElementById("chatReply");
+  const text = input.value.trim();
+  if (!name) { showToast("Add your first name first"); document.getElementById("staffName").focus(); return; }
+  if (!text || !openConvo) return;
+  saveStaffName(name);
+  const btn = document.getElementById("chatReplyBtn");
+  btn.disabled = true;
+  try {
+    const d = await chatApi({ action: "staffChatReply", convo: openConvo, text, staffName: name });
+    if (!d || !d.ok) throw new Error((d && d.error) || "Not sent");
+    input.value = "";
+    renderStaffThread(d.messages || []);
+    showToast("Sent to the guest");
+  } catch (err) { showToast(err.message || "Not sent — check your connection"); }
+  finally { btn.disabled = false; }
+}
 </script>
 </body>
 </html>
