@@ -47,7 +47,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png"/>
 <link rel="apple-touch-icon" href="/icons/icon-180.png"/>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('fonts/fonts.css');
 :root {
   --navy: #0B1E33;
   --navy-2: #13294B;
@@ -415,6 +415,29 @@ header .top-links a:hover,header .top-links a.active{color:#fff}
 .reviews-card p{font-size:.88rem;color:var(--muted);line-height:1.5;margin:4px 0 12px}
 .reviews-actions{display:flex;flex-wrap:wrap;align-items:center;gap:14px}
 .reviews-link{color:var(--teal);font-weight:600;font-size:.88rem}
+
+/* ── Chat room ── */
+.help-panel{width:min(390px,calc(100vw - 32px));max-height:min(640px,calc(100vh - 150px));z-index:70}
+.help-header{gap:10px;justify-content:flex-start}
+.chat-avatar{width:36px;height:36px;border-radius:50%;background:#fff;flex-shrink:0;object-fit:cover}
+.chat-head-text{flex:1;min-width:0}
+.chat-head-text span{display:flex;align-items:center;gap:6px}
+.chat-dot{width:8px;height:8px;border-radius:50%;background:#34D399;flex-shrink:0}
+.chat-dot.off{background:#F0A93B}
+.chat-clear{margin-left:auto}
+.chat-b.auto{background:#FFF8E8;border-color:#F1DDB0;color:#2B2112}
+.chat-b.auto .chat-who{color:#8A5A00}
+.chat-b.auto strong{font-weight:600}
+.chat-action{display:block;margin-top:8px;background:var(--navy);color:#fff;border:0;border-radius:8px;padding:8px 12px;font:inherit;font-size:.8rem;font-weight:600;cursor:pointer}
+.chat-chips-h{font-size:.75rem;font-weight:600;color:var(--muted);margin:12px 0 2px}
+.chat-privacy{font-size:.75rem;color:var(--muted);line-height:1.45;padding:0 14px 10px;background:var(--card)}
+.chat-privacy a{color:var(--teal)}
+.chat-privacy[hidden]{display:none}
+@media (prefers-color-scheme: dark){.chat-b.auto{background:#2A2414;border-color:#4A3C1C;color:#F3E9D2}.chat-b.auto .chat-who{color:#F0C46A}.chat-action{background:var(--sea);color:#04222A}}
+@media (max-width:600px){
+  .help-panel{inset:0;width:100%;max-height:none;height:100dvh;border-radius:0;border:0;z-index:300}
+  .help-panel .chat-bar textarea{font-size:16px}
+}
 </style>
 </head>
 <body>
@@ -899,12 +922,14 @@ header .top-links a:hover,header .top-links a.active{color:#fff}
 
 <!-- HELP DESK WIDGET -->
 <button class="help-fab" id="helpFab" onclick="toggleHelp()" title="Chat with us" aria-label="Chat with us"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg><span class="fab-badge" id="chatBadge" hidden></span></button>
-<div class="help-panel" id="helpPanel">
+<div class="help-panel" id="helpPanel" role="dialog" aria-modal="false" aria-labelledby="chatTitle">
   <div class="help-header">
-    <div>
-      <h3>Chat with our team</h3>
-      <span id="chatStatusLine">Real people on the beach · usually reply in minutes</span>
+    <img class="chat-avatar" src="logo.jpg" alt="" width="36" height="36">
+    <div class="chat-head-text">
+      <h3 id="chatTitle">Aquatic Paradise</h3>
+      <span id="chatStatusLine"><span class="chat-dot" aria-hidden="true"></span>Real people on the beach · usually reply in minutes</span>
     </div>
+    <button class="help-close chat-clear" id="chatClearBtn" onclick="clearChat()" aria-label="Clear this chat" title="Clear this chat"><svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg></button>
     <button class="help-close" onclick="toggleHelp()" aria-label="Close"><svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
   </div>
   <div class="help-tabs">
@@ -913,9 +938,10 @@ header .top-links a:hover,header .top-links a.active{color:#fff}
   </div>
   <div class="help-body" id="helpBody"></div>
   <div class="chat-bar" id="chatBar">
-    <textarea id="chatInput" placeholder="Type your message…" maxlength="1000" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+    <textarea id="chatInput" aria-label="Your message" placeholder="Ask about gear, prices, delivery…" maxlength="1000" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
     <button class="chat-send" id="chatSendBtn" onclick="sendChat()">Send</button>
   </div>
+  <p class="chat-privacy" id="chatPrivacy">Automatic answers come from our price list and rules. Your name, number and messages are kept so our team can reply. <a href="privacy.html#chat" target="_blank" rel="noopener">Privacy notice</a></p>
   <div class="help-footer">
     <a class="help-wa-btn" href="https://wa.me/17844963447?text=Hi%20APR!%20I%20have%20a%20question.">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
@@ -2544,6 +2570,11 @@ function showHelpView(view) {
   document.getElementById('helpTabChat').classList.toggle('on', view === 'chat');
   document.getElementById('helpTabAnswers').classList.toggle('on', view === 'answers');
   document.getElementById('chatBar').classList.toggle('on', view === 'chat');
+  document.getElementById('chatPrivacy').hidden = view !== 'chat';
+  const line = document.getElementById('chatStatusLine');
+  if (line) line.innerHTML = chatOpenNow()
+    ? '<span class="chat-dot" aria-hidden="true"></span>Team on the beach now · usually replies in minutes'
+    : '<span class="chat-dot off" aria-hidden="true"></span>Back at 8 AM · leave a message';
   document.querySelector('#helpPanel .help-footer').style.display = view === 'chat' ? 'none' : '';
   if (view === 'chat') { renderChat(); markChatSeen(); pollChat(); }
   else showHelpMenu();
@@ -2597,16 +2628,29 @@ function renderChat() {
       <span><strong>Message us on WhatsApp</strong><small>Fastest reply — opens your WhatsApp</small></span>
       <span class="chat-wa-arrow">›</span>
     </a>
-    <div class="chat-or">or chat here — no app needed</div>`;
+    <div class="chat-or">or chat here — no app needed · <a href="chat.html">open full chat</a></div>`;
   html += '<div class="chat-log">';
   html += `<div class="chat-b team"><span class="chat-who">Aquatic Paradise</span>Hi! Ask us anything: gear, prices, delivery to your villa or boat. A real person answers right here.</div>`;
   if (!chatOpenNow()) html += `<div class="chat-note">We're off the water now (open 8AM–6PM). Leave a message and we'll reply first thing.</div>`;
-  msgs.forEach((m, i) => {
+  const timeline = msgs.map((m, i) => ({ ...m, idx: i })).concat((chatState.auto || []).map(m => ({ ...m, idx: -1 })))
+    .sort((a, b) => (Date.parse(a.at) || 0) - (Date.parse(b.at) || 0));
+  timeline.forEach(m => {
+    const i = m.idx;
+    if (m.from === 'auto') {
+      const faq = CHAT_FAQ.find(f => f.id === m.faq);
+      if (!faq) return;
+      html += `<div class="chat-b team auto"><span class="chat-who">Automatic answer</span>${faq.a()}${faq.action ? `<button class="chat-action" onclick="${faq.action.fn}">${faq.action.label}</button>` : ''}<span class="chat-meta">${chatTime(m.at)}</span></div>`;
+      return;
+    }
+    if (m.local) {
+      html += `<div class="chat-b guest">${esc(m.text)}<span class="chat-meta">${chatTime(m.at)}</span></div>`;
+      return;
+    }
     if (m.failed) {
       html += `<div class="chat-b guest failed" onclick="retryChat(${i})">${esc(m.text)}<span class="chat-meta">Not sent. Tap to retry</span></div>`;
     } else {
-      const who = m.from === 'team' ? `<span class="chat-who">${esc(m.name || 'Aquatic Paradise')}</span>` : '';
-      html += `<div class="chat-b ${m.from === 'team' ? 'team' : 'guest'}">${who}${esc(m.text)}<span class="chat-meta">${m.pending ? 'Sending…' : chatTime(m.at)}</span></div>`;
+      const who = m.from === 'team' || m.from === 'auto' ? `<span class="chat-who">${esc(m.from === 'auto' ? 'Automatic answer' : (m.name || 'Aquatic Paradise'))}</span>` : '';
+      html += `<div class="chat-b ${m.from === 'guest' ? 'guest' : 'team'}">${who}${esc(m.text)}<span class="chat-meta">${m.pending ? 'Sending…' : chatTime(m.at)}</span></div>`;
     }
   });
   const sent = msgs.filter(m => m.from === 'guest' && !m.failed && !m.pending).length;
@@ -2622,12 +2666,90 @@ function renderChat() {
       <input class="help-input" id="chatContact" maxlength="40" type="tel" placeholder="So we can reach you if you leave" autocomplete="tel" style="margin-bottom:0"/>
     </div>`;
   }
-  if (!msgs.length) {
-    html += `<div class="chat-chips">` + ['Is gear available today?', 'Can you deliver to my villa?', 'Where do I find you?', 'Do you have kids\' life jackets?']
-      .map(q => `<button class="chat-chip" onclick="chatPrefill(this.textContent)">${esc(q)}</button>`).join('') + `</div>`;
+  const asked = new Set((chatState.auto || []).map(m => m.faq).filter(Boolean));
+  const chips = CHAT_CHIPS.filter(id => !asked.has(id)).map(id => CHAT_FAQ.find(f => f.id === id));
+  if (chips.length) {
+    html += `<p class="chat-chips-h">Common questions, answered instantly</p><div class="chat-chips">` +
+      chips.map(f => `<button class="chat-chip" onclick="askFaq('${f.id}')">${esc(f.q)}</button>`).join('') + `</div>`;
   }
   body.innerHTML = html;
-  body.scrollTop = msgs.length ? body.scrollHeight : 0;
+  body.scrollTop = (msgs.length || (chatState.auto || []).length) ? body.scrollHeight : 0;
+}
+
+// ── AUTOMATIC ANSWERS ── Instant replies to the questions guests ask most.
+// Every answer uses facts already published on this site (GEAR prices,
+// rules.html, the cancellation and weather policy). Anything else waits for
+// a real person. Answers stay on the guest's device (chatState.auto).
+const CHAT_FAQ = [
+  { id:'prices', q:'How much does it cost?', keys:/\b(price|prices|cost|how much|rate|rates|xcd|usd|\$|cheap|expensive)\b/i,
+    a:() => 'Here are our rental prices (XCD):<br>' + GEAR.filter(g => !g.isPackage && !g.comingSoon).map(g =>
+      `<strong>${g.name}</strong>: ${g.price60}/hr · ${g.priceFD}/day${g.priceWE ? ' · ' + g.priceWE + '/weekend' : ''}${g.priceWK ? ' · ' + g.priceWK + '/week' : ''}`).join('<br>') +
+      '<br>USD is about XCD ÷ 2.7. Life jackets are free with every rental.',
+    action:{ label:'See all prices and packages', fn:"toggleHelp();switchTab('rates')" } },
+  { id:'available', q:'Is gear available today?', keys:/\b(available|availability|today|tomorrow|free now|left|in stock|book (for|on))\b/i,
+    a:() => 'Pick your date, time and gear in the booking form and it shows what is still free for that time. Send your request and we confirm on WhatsApp.',
+    action:{ label:'Check a date', fn:"toggleHelp();switchTab('book');document.getElementById('step-gear').scrollIntoView({behavior:'smooth'})" } },
+  { id:'where', q:'Where do I find you?', keys:/\b(where|location|located|find you|address|beach|beaches|deliver|delivery|villa|boat|yacht|pick ?up|drop ?off)\b/i,
+    a:() => 'We deliver free to <strong>Princess Margaret Beach</strong> (our main base, Admiralty Bay), <strong>Lower Bay</strong> and <strong>Friendship Bay</strong>. Choose your beach when you book. Staying at a villa or on a boat? Tell us where and we will tell you what we can do.' },
+  { id:'hours', q:'What are your hours?', keys:/\b(hours|open|close|closing|opening|what time|when do you)\b/i,
+    a:() => 'We are open every day from 8 AM to 6 PM. Messages sent after hours are answered first thing in the morning.' },
+  { id:'beginner', q:'Do I need experience?', keys:/\b(beginner|first time|never|experience|learn|lesson|easy|hard|difficult|teach)\b/i,
+    a:() => 'No experience needed. Every guest gets a safety briefing, and our step-by-step gear guide shows how to set up. You do need to be comfortable swimming in open water, or have a guardian with you who confirms this.',
+    action:{ label:'Open the gear guide', fn:"window.open('gear-guide.html','_blank')" } },
+  { id:'kids', q:'Can kids rent?', keys:/\b(kid|kids|child|children|son|daughter|family|age|old|minor|minors|baby|toddler)\b/i,
+    a:() => 'Yes. Children are welcome with a paying adult who is responsible for them. A life jacket is mandatory on the water, and we have them in all sizes, including kids\' sizes.' },
+  { id:'lifejacket', q:'Are life jackets included?', keys:/\b(life ?jackets?|pfd|vest|vests|safety|safe)\b/i,
+    a:() => 'Yes. Life jackets are included free with every rental, in all sizes, and must be worn on the water. A safety whistle comes with each rental too.' },
+  { id:'weather', q:'What if the weather is bad?', keys:/\b(weather|rain|raining|wind|windy|storm|waves|rough|choppy|sea conditions)\b/i,
+    a:() => 'We check wind and sea conditions every day. If it is unsafe at your rental time, you choose: free rebooking or a full refund of anything paid.' },
+  { id:'cancel', q:'Can I cancel or change?', keys:/\b(cancel|cancellation|refund|change|reschedule|move my booking)\b/i,
+    a:() => 'You can cancel free of charge up to 2 hours before your start time. Just message us. Cancellations within 2 hours of the start may carry a 50% charge, and there are no refunds for early returns.' },
+  { id:'pay', q:'How do I pay?', keys:/\b(pay|payment|cash|card|credit|bank|transfer|deposit|paypal)\b/i,
+    a:() => 'Payment is due when your rental starts: cash (XCD or USD), bank transfer to Bank of St. Vincent & the Grenadines, or card arranged on WhatsApp. To lock in a slot early, ask us for the bank transfer details for a deposit.' },
+  { id:'bring', q:'What should I bring?', keys:/\b(bring|wear|clothes|shoes|sunscreen|towel|need to have)\b/i,
+    a:() => 'Swimwear, sunscreen, a hat and drinking water. Leave anything you do not want wet on the beach. Please keep the gear in the shade when you are not using it: the sun can overheat inflatable boards.' },
+  { id:'tours', q:'Do you do guided tours?', keys:/\b(tour|tours|guide|guided|trip|excursion|snorkel spot|where to snorkel)\b/i,
+    a:() => 'Yes, we run guided tours from our safety boat. Tell us your group size and day and we will send the details.' },
+  { id:'group', q:'Do you give group discounts?', keys:/\b(group|groups|discount|deal|deals|party|wedding|team|crew)\b/i,
+    a:() => 'Yes, we offer group discounts. Tell us how many people, what gear and which day, and we will send you a price.' },
+  { id:'waiver', q:'Do I need to sign anything?', keys:/\b(waiver|sign|signature|id|passport|license|licence|document|documents)\b/i,
+    a:() => 'You sign our rental agreement on your phone while booking, so there is no paperwork at the beach. Adding an ID photo is optional.',
+    action:{ label:'Read the rules', fn:"window.open('rules.html','_blank')" } },
+  { id:'damage', q:'What if something breaks?', keys:/\b(damage|damaged|broke|broken|break|lost|lose|puncture|leak)\b/i,
+    a:() => 'Tell our staff straight away and do not try to repair it yourself. Renters are responsible for loss or damage beyond normal wear and tear.' },
+];
+const CHAT_CHIPS = ['prices', 'available', 'where', 'beginner', 'kids', 'weather', 'cancel', 'pay'];
+
+// Most specific topics first, so "weather today" is about weather, not availability.
+const CHAT_MATCH_ORDER = ['weather', 'cancel', 'damage', 'pay', 'prices', 'kids', 'lifejacket', 'beginner', 'waiver', 'group', 'tours', 'hours', 'bring', 'where', 'available'];
+function chatFaqFor(text) {
+  for (const id of CHAT_MATCH_ORDER) { const f = CHAT_FAQ.find(x => x.id === id); if (f && f.keys.test(text)) return f; }
+  return null;
+}
+
+function chatAutoAnswer(faq, at) {
+  chatState.auto = (chatState.auto || []).concat({ from:'auto', faq: faq.id, at: new Date(Date.parse(at) + 1).toISOString() });
+  saveChat();
+}
+
+// A tap on a common question answers it on the spot. It is not sent to the team.
+function askFaq(id) {
+  const faq = CHAT_FAQ.find(f => f.id === id);
+  if (!faq) return;
+  const at = new Date().toISOString();
+  chatState.auto = (chatState.auto || []).concat({ from:'guest', local:true, text: faq.q, at });
+  chatAutoAnswer(faq, at);
+  renderChat();
+}
+
+function clearChat() {
+  if (!(chatState.msgs || []).length && !(chatState.auto || []).length) return;
+  if (!confirm('Clear this chat from this phone? To delete our copy too, ask us in a message first.')) return;
+  clearTimeout(chatTimer);
+  chatState = {};
+  try { localStorage.removeItem(CHAT_KEY); } catch (e) {}
+  renderChat();
+  updateChatBadge();
 }
 
 function chatPrefill(text) {
@@ -2646,7 +2768,7 @@ function applyChatMessages(serverMsgs) {
   else updateChatBadge();
 }
 
-function teamReplyCount() { return (chatState.msgs || []).filter(m => m.from === 'team').length; }
+function teamReplyCount() { return (chatState.msgs || []).filter(m => m.from === 'team' || m.from === 'auto').length; }
 
 function markChatSeen() {
   chatState.seenTeam = teamReplyCount();
