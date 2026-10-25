@@ -1435,6 +1435,136 @@ function _tgSendButtons(text, keyboard) {
   return !!(res && res.ok);
 }
 
+// ── BEACH DEPOT: hand-offs by a partner bar at each beach (OPERATIONS.md §11) ──
+// One partner per beach, saved in Admin → Fleet. When a booking is confirmed
+// in Telegram, the alert gets a "Send to <partner>" WhatsApp button (the owner
+// taps send, so the partner needs no setup) and a "Hand-off done" button that
+// logs the fee owed to the HANDOFFS sheet. Beach is read from the booking notes
+// ("🏖️ Beach: X —", written by index.html). Lock codes never go in messages.
+var BEACHES = ['Princess Margaret Beach', 'Lower Bay', 'Friendship Bay'];
+var PARTNERS_PROP = 'beach_partners';
+var HANDOFFS_SHEET_NAME = 'HANDOFFS';
+
+function getBeachPartners() {
+  var saved = _readJsonProp(PARTNERS_PROP, {});
+  return BEACHES.map(function (beach) {
+    var p = saved[beach] || {};
+    return { beach: beach, name: p.name || '', phone: p.phone || '', fee: Number(p.fee) || 0 };
+  });
+}
+
+function setBeachPartners(p) {
+  try {
+    var list = (p && p.partners) || [];
+    var out = {};
+    for (var i = 0; i < list.length; i++) {
+      var row = list[i] || {};
+      if (BEACHES.indexOf(row.beach) === -1) continue;
+      var name = String(row.name || '').trim().slice(0, 40);
+      var phone = String(row.phone || '').replace(/\D/g, '');
+      if (phone.length === 10) phone = '1' + phone;
+      var fee = Number(row.fee) || 0;
+      if (!name && !phone) continue; // blank row = no partner at that beach
+      if (!name) return { ok: false, error: row.beach + ': add the partner\'s name' };
+      if (!/^\d{11,15}$/.test(phone)) return { ok: false, error: row.beach + ': WhatsApp number needs the country code, e.g. 1 784 456 1234' };
+      if (fee < 0 || fee > 200) return { ok: false, error: row.beach + ': fee looks wrong' };
+      out[row.beach] = { name: name, phone: phone, fee: fee };
+    }
+    PropertiesService.getScriptProperties().setProperty(PARTNERS_PROP, JSON.stringify(out));
+    return { ok: true, partners: getBeachPartners() };
+  } catch (err) {
+    return _fail('setBeachPartners', err);
+  }
+}
+
+function _beachOf(b) {
+  var m = String((b && b.notes) || '').match(/Beach:\s*([^—\n]+)/);
+  return m ? m[1].trim() : '';
+}
+
+function _partnerFor(b) {
+  var beach = _beachOf(b);
+  if (!beach) return null;
+  var p = getBeachPartners().filter(function (x) { return x.beach === beach && x.phone; })[0];
+  return p || null;
+}
+
+// Button rows for a confirmed booking: send to partner + log the hand-off.
+function _partnerRows(ref, b) {
+  var p = _partnerFor(b);
+  if (!p) return [];
+  var guest = String(b.fname || '').trim() + (b.lname ? ' ' + String(b.lname).trim().charAt(0) + '.' : '');
+  var when = String(b.datetime || '').replace('T', ' ');
+  var text = 'Hi ' + p.name + ', Aquatic Paradise hand-off at ' + p.beach + ':\n' +
+    'Guest: ' + (guest || 'guest') + (b.groupSize ? ' (' + b.groupSize + ' people)' : '') + '\n' +
+    'Gear: ' + (b.gear || '') + '\n' +
+    'When: ' + when + (b.duration ? ', ' + b.duration : '') + '\n' +
+    'Booking: ' + ref + '\n' +
+    'Please unlock the cage, hand over, relock. Same again on return. Thank you!';
+  return [
+    [{ text: '🏖️ Send to ' + p.name, url: _waLink(p.phone, text) }],
+    [{ text: '✔️ Hand-off done (' + p.name + ' $' + p.fee + ')', callback_data: 'h|' + ref }]
+  ];
+}
+
+function _handoffSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(HANDOFFS_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(HANDOFFS_SHEET_NAME);
+    sh.appendRow(['loggedAt', 'ref', 'beach', 'partner', 'fee', 'paidAt']);
+    sh.getRange('1:1').setFontWeight('bold');
+  }
+  return sh;
+}
+
+// Logs one hand-off per booking (a second tap is ignored).
+function _logHandoff(ref, b) {
+  var p = _partnerFor(b);
+  if (!p) return { ok: false, error: 'No partner set for this beach' };
+  var sh = _handoffSheet(), rows = sh.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) if (String(rows[i][1]) === String(ref)) return { ok: false, error: 'Already logged' };
+  sh.appendRow([new Date(), ref, p.beach, p.name, p.fee, '']);
+  return { ok: true, partner: p };
+}
+
+// Admin: unpaid totals per partner + the latest hand-offs.
+function getHandoffs() {
+  try {
+    var rows = _handoffSheet().getDataRange().getValues().slice(1);
+    var owed = {};
+    rows.forEach(function (r) {
+      if (r[5]) return;
+      var k = String(r[3]);
+      owed[k] = owed[k] || { partner: k, count: 0, total: 0 };
+      owed[k].count++;
+      owed[k].total += Number(r[4]) || 0;
+    });
+    var recent = rows.slice(-20).reverse().map(function (r) {
+      return { at: r[0] instanceof Date ? r[0].toISOString() : String(r[0]), ref: String(r[1]), beach: String(r[2]),
+        partner: String(r[3]), fee: Number(r[4]) || 0, paid: !!r[5] };
+    });
+    return { ok: true, partners: getBeachPartners(), owed: Object.keys(owed).map(function (k) { return owed[k]; }), recent: recent };
+  } catch (err) {
+    return _fail('getHandoffs', err);
+  }
+}
+
+// Admin: mark every unpaid hand-off for one partner as paid.
+function markHandoffsPaid(p) {
+  try {
+    var who = String((p && p.partner) || '');
+    if (!who) return { ok: false, error: 'Pick a partner' };
+    var sh = _handoffSheet(), rows = sh.getDataRange().getValues(), n = 0, now = new Date();
+    for (var i = 1; i < rows.length; i++) {
+      if (String(rows[i][3]) === who && !rows[i][5]) { sh.getRange(i + 1, 6).setValue(now); n++; }
+    }
+    return { ok: true, marked: n };
+  } catch (err) {
+    return _fail('markHandoffsPaid', err);
+  }
+}
+
 function _findBooking(ref) {
   var data = _sheet().getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
@@ -1529,8 +1659,9 @@ function _handleTgTap(cb, ownerChat) {
     answer('Saved ✅');
     var waS = _waLink(saved.booking.phone, 'Hi ' + saved.booking.name.split(' ')[0] + ', your Aquatic Paradise booking ' + saved.ref +
       ' is confirmed ✅ ' + saved.booking.gear + ', ' + saved.booking.datetime.replace('T', ' ') + '. See you soon!');
+    var rowsS = (waS ? [[{ text: '💬 Send guest confirmation', url: waS }]] : []).concat(_partnerRows(saved.ref, _findBooking(saved.ref) || {}));
     edit('✅ SAVED as ' + saved.ref + ' (confirmed) — now in admin, Dispatch and stock',
-      waS ? { inline_keyboard: [[{ text: '💬 Send guest confirmation', url: waS }]] } : null);
+      rowsS.length ? { inline_keyboard: rowsS } : null);
     return;
   }
   if (action === 'n') {
@@ -1556,7 +1687,17 @@ function _handleTgTap(cb, ownerChat) {
     if (!r.ok) { answer('Could not confirm'); return; }
     answer('Confirmed ✅');
     var waC = _waLink(b.phone, 'Hi ' + guest + ', your Aquatic Paradise booking ' + ref + ' is confirmed ✅ See you soon!');
-    edit('✅ CONFIRMED', waC ? { inline_keyboard: [[{ text: '💬 Tell guest it\'s confirmed', url: waC }]] } : null);
+    var rowsC = (waC ? [[{ text: '💬 Tell guest it\'s confirmed', url: waC }]] : []).concat(_partnerRows(ref, b));
+    edit('✅ CONFIRMED', rowsC.length ? { inline_keyboard: rowsC } : null);
+  } else if (action === 'h') {
+    var h = _logHandoff(ref, b);
+    if (!h.ok) { answer(h.error); return; }
+    answer('Logged: ' + h.partner.name + ' $' + h.partner.fee);
+    // Keep the WhatsApp buttons, drop the "Hand-off done" one.
+    var kept = ((msg.reply_markup && msg.reply_markup.inline_keyboard) || []).filter(function (row) {
+      return !(row[0] && /^h\|/.test(String(row[0].callback_data || '')));
+    });
+    edit('✅ CONFIRMED · ✔️ hand-off logged for ' + h.partner.name + ' ($' + h.partner.fee + ')', { inline_keyboard: kept });
   } else if (action === 'x') {
     answer('Tap "Yes, decline" to confirm');
     edit('Decline this booking?', { inline_keyboard: [[{ text: '🗑️ Yes, decline', callback_data: 'X|' + ref }, { text: '← Back', callback_data: 'b|' + ref }]] });
@@ -1608,6 +1749,7 @@ var BOOK_HELP = 'To log a WhatsApp booking, send one line like:\n' +
   'Gear: paddle board, kayak, snorkel, tube, lounge chair, paddle games — or a package (family, duo, combo for 2, day combo, premium).\n' +
   'When: today / tomorrow / sat / 27/9, plus a time like 10am.\n' +
   'Length: 1 hour, full day, weekend, week.\n' +
+  'Beach (optional): pmb, lower bay, friendship.\n' +
   'I\'ll show you what I understood — nothing is saved until you tap ✅ Save.';
 
 // Price-list total for a booking's gear text, or null if anything in it
@@ -1643,7 +1785,15 @@ function _parseBookText(raw) {
   var isWhen = function (s) {
     return /\b(today|tonight|tomorrow|tmrw?|mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)[a-z]*\b|\d{1,2}\s*[:.]?\s*\d{0,2}\s*(am|pm)\b|\b\d{1,2}:\d{2}\b|\b\d{1,2}[\/\-]\d{1,2}\b|\b(hour|hr|full\s*day|all\s*day|weekend|week|days?)\b/i.test(s);
   };
+  var beach = '';
   segs.forEach(function (s) {
+    // Beach names first, so "Lower Bay" is never read as the guest's name.
+    var bm = s.match(/\b(princess\s*margaret|pmb|lower\s*bay|friendship(\s*bay)?)\b/i);
+    if (bm && !beach) {
+      var w = bm[1].toLowerCase();
+      beach = /^l/.test(w) ? 'Lower Bay' : /^f/.test(w) ? 'Friendship Bay' : 'Princess Margaret Beach';
+      if (s.replace(bm[0], '').replace(/\b(beach|at|@)\b/gi, '').trim() === '') return;
+    }
     for (var i = 0; i < BOOK_PACKAGE_WORDS.length; i++) {
       if (BOOK_PACKAGE_WORDS[i][0].test(s) && /pack|package|combo|duo|premium|family/i.test(s)) { pkg = BOOK_PACKAGE_WORDS[i][1]; return; }
     }
@@ -1708,7 +1858,7 @@ function _parseBookText(raw) {
   var datetime = dateObj.getFullYear() + '-' + pad(dateObj.getMonth() + 1) + '-' + pad(dateObj.getDate()) + 'T' + pad(hh) + ':' + pad(mm);
 
   // Name
-  var name = String(nameSeg || '').replace(/[^\p{L}\s'.-]/gu, '').replace(/\s+/g, ' ').trim();
+  var name = String(nameSeg || '').replace(/\b(at\s+)?(princess\s*margaret|pmb|lower\s*bay|friendship(\s*bay)?)(\s*beach)?\b/gi, '').replace(/[^\p{L}\s'.-]/gu, '').replace(/\s+/g, ' ').trim();
   if (!name) { name = 'WhatsApp Guest'; warn.push('No guest name found'); }
   if (!phone) warn.push('No phone number found');
 
@@ -1724,7 +1874,8 @@ function _parseBookText(raw) {
       total += (price || 0) * gear[k];
     });
   }
-  return { gear: gearText, duration: duration, datetime: datetime, name: name, phone: phone, total: total, warn: warn };
+  if (!beach) warn.push('No beach given — no partner hand-off button (add e.g. "lower bay")');
+  return { gear: gearText, duration: duration, datetime: datetime, name: name, phone: phone, total: total, beach: beach, warn: warn };
 }
 
 function _startBookDraft(msgText) {
@@ -1737,6 +1888,7 @@ function _startBookDraft(msgText) {
   var lines = ['📝 WhatsApp booking — check this:', '',
     'Gear: ' + b.gear, 'When: ' + b.datetime.replace('T', ' ') + ' (' + b.duration + ')',
     'Guest: ' + b.name + (b.phone ? ' · ' + b.phone : ''), 'Total: XCD ' + b.total];
+  if (b.beach) lines.splice(4, 0, 'Beach: ' + b.beach);
   try {
     var w = _bookingWindow(b.datetime, b.duration);
     var avail = _availabilityFor(w.start, w.end);
@@ -1766,7 +1918,7 @@ function _saveBookDraft(id) {
     ref: ref, fname: nameParts[0], lname: nameParts.slice(1).join(' ') || '(WhatsApp)',
     phone: b.phone || 'N/A', email: '', datetime: b.datetime, groupSize: '', gear: b.gear,
     duration: b.duration, total: b.total, referral: 'WhatsApp',
-    notes: '📱 Booked via WhatsApp (logged from Telegram) — waiver NOT signed yet, get it at handover',
+    notes: (b.beach ? '🏖️ Beach: ' + b.beach + ' — ' : '') + '📱 Booked via WhatsApp (logged from Telegram) — waiver NOT signed yet, get it at handover',
     waiverAccepted: false, waiverTimestamp: '', source: 'WhatsApp'
   });
   if (!res || !res.ok) return { ok: false, error: (res && res.error) || 'Save failed' };
@@ -2707,9 +2859,12 @@ function doPost(e) {
     if (payload.action === 'getAvailability') {
       return _json(getAvailability(payload));
     }
-    if (['getStockOverview', 'setStock', 'createDeal', 'endDeal', 'setTelegramToken', 'connectTelegram', 'testAlarm', 'sendBriefing', 'setSmsConfig', 'testSms', 'setWaConfig', 'testWa', 'setCmbConfig', 'testCmb'].indexOf(payload.action) !== -1) {
-      // Owner-only: stock counts, deals and the alarm phone.
+    if (['getStockOverview', 'setStock', 'createDeal', 'endDeal', 'setTelegramToken', 'connectTelegram', 'testAlarm', 'sendBriefing', 'setSmsConfig', 'testSms', 'setWaConfig', 'testWa', 'setCmbConfig', 'testCmb', 'getHandoffs', 'setBeachPartners', 'markHandoffsPaid'].indexOf(payload.action) !== -1) {
+      // Owner-only: stock counts, deals, the alarm phone and beach partners.
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      if (payload.action === 'getHandoffs') return _json(getHandoffs());
+      if (payload.action === 'setBeachPartners') return _json(setBeachPartners(payload));
+      if (payload.action === 'markHandoffsPaid') return _json(markHandoffsPaid(payload));
       if (payload.action === 'getStockOverview') return _json(getStockOverview());
       if (payload.action === 'setStock') return _json(setStock(payload));
       if (payload.action === 'createDeal') return _json(createDeal(payload));

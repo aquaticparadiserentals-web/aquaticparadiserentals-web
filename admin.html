@@ -434,6 +434,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   <div class="sec-title">🔔 Alarms to Your Phone (Telegram)</div>
   <div class="card" id="tgCard">Loading…</div>
 
+  <div class="sec-title">🏖️ Beach Partners (gear cage hand-offs)</div>
+  <div class="card" id="partnerCard">Loading…</div>
+
   <div class="sec-title">📱 Text-Message Alarms (works with no internet)</div>
   <div class="card" id="smsCard">Loading…</div>
 
@@ -2421,6 +2424,64 @@ async function fetchStockOverview() {
   renderSms();
   renderWa();
   renderCmb();
+  fetchHandoffs();
+}
+
+// Beach Depot partners (Code.gs getHandoffs/setBeachPartners/markHandoffsPaid).
+async function fetchHandoffs() {
+  const el = document.getElementById('partnerCard');
+  try { renderPartners(await stockApi('getHandoffs')); }
+  catch (err) { el.textContent = 'Could not load partners: ' + err.message; }
+}
+
+function renderPartners(d) {
+  const el = document.getElementById('partnerCard');
+  const inp = (id, ph, val, type, w) => `<input id="${id}" type="${type||'text'}" autocomplete="off" placeholder="${ph}" value="${escapeHtml(String(val||''))}" style="width:${w||'100%'};padding:9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:0.85rem;box-sizing:border-box;margin-bottom:6px">`;
+  const rows = (d.partners || []).map((p, i) => `
+    <div style="margin-bottom:12px">
+      <div style="font-weight:700;font-size:0.82rem;margin-bottom:4px">${escapeHtml(p.beach)}</div>
+      ${inp('bpName'+i, 'Partner, e.g. Jack\'s Beach Bar', p.name)}
+      <div style="display:flex;gap:6px">
+        ${inp('bpPhone'+i, 'Their WhatsApp, e.g. 1 784 456 1234', p.phone, 'tel', '70%')}
+        ${inp('bpFee'+i, 'Fee $', p.fee || '', 'number', '30%')}
+      </div>
+    </div>`).join('');
+  const owed = (d.owed || []).length
+    ? d.owed.map(o => `<div class="deal-row"><div style="flex:1"><b>${escapeHtml(o.partner)}</b> · ${o.count} hand-off${o.count===1?'':'s'} · <b>XCD ${o.total}</b> owed</div>
+        <button class="stock-btn ghost" style="width:auto;margin:0" data-partner="${escapeHtml(o.partner)}" onclick="payPartner(this.dataset.partner, ${o.total})">Mark paid</button></div>`).join('')
+    : '<div style="font-size:0.8rem;color:var(--muted)">Nothing owed.</div>';
+  const recent = (d.recent || []).slice(0, 8).map(r => `<div style="font-size:0.75rem;color:var(--muted)">${new Date(r.at).toLocaleDateString()} · ${escapeHtml(r.ref)} · ${escapeHtml(r.partner)} · $${r.fee}${r.paid ? ' · paid' : ''}</div>`).join('');
+  el.innerHTML = `
+    <div style="font-size:0.78rem;color:var(--muted);margin-bottom:12px">When you confirm a booking in Telegram, the alert gets a <b>🏖️ Send to partner</b> button for that beach (opens WhatsApp with the hand-off message ready, you tap send) and a <b>✔️ Hand-off done</b> button that adds their fee below. Leave a beach blank if there's no partner there yet. Never put the lock code in here.</div>
+    ${rows}
+    <button class="stock-btn" onclick="savePartners()">💾 Save Partners</button>
+    <div style="font-weight:700;margin:16px 0 6px">Owed to partners</div>
+    ${owed}
+    ${recent ? `<div style="font-weight:700;margin:14px 0 4px;font-size:0.8rem">Latest hand-offs</div>${recent}` : ''}`;
+  el._partners = d.partners || [];
+}
+
+async function savePartners() {
+  const list = (document.getElementById('partnerCard')._partners || []).map((p, i) => ({
+    beach: p.beach,
+    name: document.getElementById('bpName'+i).value.trim(),
+    phone: document.getElementById('bpPhone'+i).value.trim(),
+    fee: Number(document.getElementById('bpFee'+i).value) || 0
+  }));
+  try {
+    await stockApi('setBeachPartners', { partners: list });
+    showToast('Partners saved ✅');
+    fetchHandoffs();
+  } catch (err) { showToast(err.message, 'warn'); }
+}
+
+async function payPartner(partner, total) {
+  if (!confirm('Mark XCD ' + total + ' as paid to ' + partner + '?')) return;
+  try {
+    await stockApi('markHandoffsPaid', { partner });
+    showToast('Marked paid');
+    fetchHandoffs();
+  } catch (err) { showToast(err.message, 'warn'); }
 }
 
 function renderStock() {
