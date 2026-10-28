@@ -4369,7 +4369,7 @@ function _chatPublic(msgs) {
 // answered once per conversation; anything unmatched waits for the team.
 var CHAT_AUTO_TOPICS = [
   { id: 'prices', label: 'prices',
-    re: /\b(price|prices|pricing|cost|costs|how much|rates?|charge|fee|cheap|xcd|ec\$|usd)\b/i,
+    re: /\b(price|prices|pricing|cost|costs|how much|rates?|charge|fees?|cheap\w*|expensive|afford\w*|xcd|ec\$|usd)\b/i,
     text: 'Our rates (XCD) — hour / full day / weekend / week:\n' +
       '• Paddle board: 20 / 50 / 90 / 250\n• Single kayak: 30 / 60 / 100 / 300\n• Double kayak: 45 / 90 / 160 / 450\n' +
       '• Snorkel set: 10 / 20 / 35 / 90\n• Floating tube: 8 / 15 / 25 / 60\n• Floating lounge chair: 10 / 20 / 35 / 90\n' +
@@ -4381,10 +4381,10 @@ var CHAT_AUTO_TOPICS = [
     re: /\b(deliver|delivery|drop ?off|bring (it|them|the)|villa|hotel|boat|yacht|pick ?up|collect)\b/i,
     text: 'Delivery to Princess Margaret Beach, Lower Bay and Friendship Bay is free. For a villa, hotel or boat, tell us where and when and the team will confirm here.' },
   { id: 'kids', label: 'kids & life jackets',
-    re: /\b(kids?|child|children|toddler|baby|son|daughter|family|age|old enough|\d+\s*-?\s*(?:years?|yrs?)(?:\s*old)?|life ?jackets?|pfd|vest)\b/i,
+    re: /\b(kids?|child|children|toddler|baby|son|daughter|family|age|old enough|\d+\s*-?\s*(?:years?|yrs?)(?:\s*old)?|life ?jackets?|pfds?|vests?)\b/i,
     text: 'Life jackets are included for everyone, with kid sizes available, and must be worn on the water. Children are welcome when a paying adult is with them and responsible for them.' },
   { id: 'beginner', label: 'beginners',
-    re: /\b(beginner|first time|never (done|tried|paddled)|easy|hard|difficult|learn|lesson|teach|instruct\w*|experience)\b/i,
+    re: /\b(beginners?|first time|never (done|tried|paddled|paddleboarded|kayaked|been)|novice|easy|hard|difficult|learn\w*|lessons?|teach\w*|instruct\w*|experience\w*)\b/i,
     text: 'Beginners are very welcome. Every rental starts with a quick hands-on demo, and mornings are usually the calmest water. There\'s also a step-by-step board guide: aquaticparadiserental.vacations/gear-guide.html' },
   { id: 'swim', label: 'swimming',
     re: /\b(swim|swimmer|can'?t swim|non.?swimmer|safe|safety|dangerous)\b/i,
@@ -4399,10 +4399,10 @@ var CHAT_AUTO_TOPICS = [
     re: /\b(cancel\w*|refund\w*|reschedul\w*|change my|weather|rain\w*|wind\w*|storm\w*|rough)\b/i,
     text: 'You can cancel free of charge up to 2 hours before your start time, and any deposit is refunded in full. Cancelling within 2 hours of the start may carry a 50% charge. If the sea is unsafe at your rental time, you choose a free rebooking or a full refund of anything paid. No refunds for returning gear early.' },
   { id: 'tours', label: 'tours',
-    re: /\b(tour|tours|guide|guided|excursion|trip)\b/i,
+    re: /\b(tours?|guides?|guided|excursions?|trips?)\b/i,
     text: 'Yes, we arrange guided tours. Tell us the day, how many people and what you\'d like to see, and the team will reply here with times and the price.' },
   { id: 'damage', label: 'damage',
-    re: /\b(damage\w*|broke|broken|lost|lose|insurance|scratch\w*)\b/i,
+    re: /\b(damage\w*|break\w*|broke|broken|lost|lose|insurance|scratch\w*)\b/i,
     text: 'Normal wear is fine. Loss or damage beyond normal wear is the renter\'s responsibility, so tell staff straight away if anything goes wrong — please don\'t try to repair gear yourself.' }
 ];
 
