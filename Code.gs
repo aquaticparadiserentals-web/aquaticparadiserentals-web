@@ -4390,7 +4390,9 @@ var CHAT_AUTO_TOPICS = [
     re: /\b(swim|swimmer|can'?t swim|non.?swimmer|safe|safety|dangerous)\b/i,
     text: 'Everyone on the water needs to be comfortable swimming in open water (or have a guardian confirm this for them) and must wear the life jacket we provide. Gear stays inside the safe swim area unless our staff say otherwise.' },
   { id: 'book', label: 'booking',
-    re: /\b(book|booking|reserve|reservation|availab\w*|in stock|today|tomorrow|tonight|this (morning|afternoon|weekend))\b/i,
+    // Not "my booking ..." (an existing booking goes to the team) and not bare
+    // "today/tomorrow" (that's usually about weather or a meeting time).
+    re: /\b(book|(make|new|a) booking|booking (work|process)|how (do|can) (i|we) book|reserve|reservation|availab\w*|in stock|sold out)\b/i,
     text: 'You can book in a minute on the booking page (Book Now): pick gear, time and beach, and you\'ll get a booking reference. The team confirms on WhatsApp. If something is sold out at that time, the booking page shows it.' },
   { id: 'payment', label: 'payment & deposit',
     re: /\b(pay|payment|paying|card|credit|debit|cash|bank|transfer|paypal|deposit)\b/i,
