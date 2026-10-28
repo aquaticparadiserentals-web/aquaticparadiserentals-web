@@ -943,28 +943,32 @@ function SignaturePad({
   signed,
   onSign,
   width = "100%",
-  height = 130
+  height = 130,
+  padRef
 }) {
-  const ref = useRef(null);
+  const ownRef = useRef(null);
+  const ref = padRef || ownRef; // parent passes padRef to read the drawn image
   const drawing = useRef(false);
   const last = useRef(null);
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
     const ctx = c.getContext("2d");
-    ctx.scale(2, 2);
+    ctx.setTransform(1, 0, 0, 1, 0, 0); // draw in canvas pixels; pos() maps into them
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.strokeStyle = theme.ink;
-    ctx.lineWidth = 1.8;
+    ctx.lineWidth = 3.6;
   }, [theme.ink]);
+  // Map the pointer into canvas pixels. The phone frame is CSS-scaled to fit
+  // the screen, so on-screen size != the canvas's 600px backing width.
   function pos(e) {
     const c = ref.current;
     const r = c.getBoundingClientRect();
     const p = e.touches ? e.touches[0] : e;
     return {
-      x: p.clientX - r.left,
-      y: p.clientY - r.top
+      x: (p.clientX - r.left) * (c.width / r.width),
+      y: (p.clientY - r.top) * (c.height / r.height)
     };
   }
   function start(e) {
@@ -1033,22 +1037,26 @@ function SignaturePad({
       paddingBottom: 4,
       pointerEvents: "none"
     }
-  }, "Sign here"), /*#__PURE__*/React.createElement("button", {
+  }, "Sign here"), signed && /*#__PURE__*/React.createElement("button", {
+    type: "button",
     onClick: clear,
+    "aria-label": "Clear the signature and sign again",
     style: {
       position: "absolute",
-      top: 8,
-      right: 10,
-      background: "transparent",
-      border: "none",
-      color: theme.inkFaint,
+      top: 6,
+      right: 6,
+      minHeight: 34,
+      padding: "6px 12px",
+      background: theme.paper,
+      border: `1.5px solid ${theme.danger || "#B42318"}`,
+      borderRadius: 8,
+      color: theme.danger || "#B42318",
       fontFamily: tFont.ui,
-      fontSize: 11,
-      letterSpacing: 1,
-      textTransform: "uppercase",
+      fontSize: 11.5,
+      fontWeight: 600,
       cursor: "pointer"
     }
-  }, "Clear"));
+  }, "Clear & sign again"));
 }
 
 // ── Small primitives ─────────────────────────────────────────────────────
@@ -2987,6 +2995,54 @@ function ScreenWaiver({
   const isDark = t.name === "Midnight";
   const j = job ?? window.APR_DATA.todayDispatches[0];
   const [signed, setSigned] = uSw(false);
+  const [saving, setSaving] = uSw(false);
+  const [saveErr, setSaveErr] = uSw("");
+  const sigRef = React.useRef(null);
+  const signedAt = React.useMemo(() => new Date().toLocaleString("en-GB", {
+    weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+  }), []);
+  // Upload the drawn signature to the booking's file (Drive + BOOKINGS sheet)
+  // before moving on, so the in-person waiver is actually on record.
+  function saveAndContinue() {
+    if (saving) return;
+    const c = sigRef.current;
+    if (!j.ref || !c || typeof apiCall !== "function") {
+      setSaveErr("Can't save: this job has no booking reference.");
+      return;
+    }
+    // The pad draws in the theme's ink (near-white in the dark theme) on a
+    // transparent canvas. Save it as dark ink on white so the signature is
+    // readable in admin and in the Drive file whatever theme staff use.
+    const ink = document.createElement("canvas");
+    ink.width = c.width; ink.height = c.height;
+    const ictx = ink.getContext("2d");
+    ictx.drawImage(c, 0, 0);
+    ictx.globalCompositeOperation = "source-in";
+    ictx.fillStyle = "#101828";
+    ictx.fillRect(0, 0, ink.width, ink.height);
+    const out = document.createElement("canvas");
+    out.width = c.width; out.height = c.height;
+    const octx = out.getContext("2d");
+    octx.fillStyle = "#ffffff";
+    octx.fillRect(0, 0, out.width, out.height);
+    octx.drawImage(ink, 0, 0);
+    const dataUrl = out.toDataURL("image/png");
+    setSaving(true);
+    setSaveErr("");
+    apiCall({
+      action: "saveFieldSignature",
+      token: TOKEN,
+      ref: j.ref,
+      signatureBase64: dataUrl.slice(dataUrl.indexOf(",") + 1)
+    }).then(res => {
+      setSaving(false);
+      if (res && res.ok) go("deliver");
+      else setSaveErr("Signature not saved: " + (res && res.error || "try again"));
+    }).catch(() => {
+      setSaving(false);
+      setSaveErr("No signal — signature not saved. Tap again to retry.");
+    });
+  }
   const [acks, setAcks] = uSw({
     pfd: false,
     brief: false,
@@ -3199,11 +3255,17 @@ function ScreenWaiver({
       color: t.inkFaint,
       letterSpacing: 1
     }
-  }, "Thu 14 May 2026 \xB7 08:54")), /*#__PURE__*/React.createElement(SignaturePad, {
+  }, signedAt)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      margin: "0 -12px" // use most of the phone width for the signature
+    }
+  }, /*#__PURE__*/React.createElement(SignaturePad, {
     theme: t,
     signed: signed,
-    onSign: setSigned
-  }), /*#__PURE__*/React.createElement("div", {
+    onSign: s => { setSigned(s); setSaveErr(""); },
+    padRef: sigRef,
+    height: 180
+  })),/*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 8,
       display: "flex",
@@ -3221,10 +3283,19 @@ function ScreenWaiver({
     theme: t,
     color: signed && acks.pfd && acks.brief ? t.gold : t.inkFaint,
     ink: isDark ? t.bg : "#fff",
-    onClick: () => signed && acks.pfd && acks.brief && go("deliver")
-  }, signed && acks.pfd && acks.brief ? "Capture delivery proof" : "Sign & acknowledge to continue", /*#__PURE__*/React.createElement(Icons.arrowR, {
+    onClick: () => signed && acks.pfd && acks.brief && saveAndContinue()
+  }, saving ? "Saving signature…" : signed && acks.pfd && acks.brief ? "Capture delivery proof" : "Sign & acknowledge to continue", /*#__PURE__*/React.createElement(Icons.arrowR, {
     size: 14
-  }))), /*#__PURE__*/React.createElement(TabBar, {
+  })), saveErr ? /*#__PURE__*/React.createElement("div", {
+    role: "alert",
+    style: {
+      marginTop: 8,
+      fontFamily: tFont.ui,
+      fontSize: 11.5,
+      color: t.danger || "#B42318",
+      textAlign: "center"
+    }
+  }, saveErr) : null),/*#__PURE__*/React.createElement(TabBar, {
     theme: t,
     current: "job",
     go: go

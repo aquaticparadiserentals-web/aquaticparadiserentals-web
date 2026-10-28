@@ -66,7 +66,13 @@ var FIELDS = ['ref','fname','lname','phone','email','datetime','groupSize',
   // Added 2026-09-14: which driver is actually running this delivery, set
   // via assignDriver() when admin picks one in the Notify Driver modal —
   // distinct from staffId/staffName above, which is commission attribution.
-  'assignedDriverId','assignedDriverName'];
+  'assignedDriverId','assignedDriverName',
+  // Added 2026-10-28: in-person waiver signature captured on the staff field
+  // app at handover (saveFieldSignature). Appended at the end, same reason.
+  'fieldSignatureUrl',
+  // Added 2026-10-28: the guest's typed-name signature (when they chose
+  // "type your name" instead of drawing). Used to live only inside notes.
+  'typedSignature'];
 // 'delivering' sits between confirmed and done — a driver sets it when they
 // actually leave with the gear, which is also what starts auto-GPS sharing
 // in dispatch.html (see updateDriverLocation).
@@ -406,6 +412,11 @@ function _validateBookingPayload(p) {
         if (typeof p.signatureMimeType !== 'string' || !/^image\/(png|jpeg|jpg|webp)$/i.test(p.signatureMimeType)) {
           return { valid: false, error: 'Unsupported signature image format' };
         }
+      }
+    }
+    if (p.typedSignature !== undefined && p.typedSignature !== null) {
+      if (typeof p.typedSignature !== 'string' || p.typedSignature.length > 200) {
+        return { valid: false, error: 'Invalid typed signature' };
       }
     }
 
@@ -2837,6 +2848,11 @@ function doPost(e) {
       if (!_dispatchAuthOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       return _json(updateStatus(payload));
     }
+    if (payload.action === 'saveFieldSignature') {
+      // Staff field app: guest signs the waiver in person at handover.
+      if (!_dispatchAuthOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      return _json(saveFieldSignature(payload));
+    }
     if (payload.action === 'deleteBooking') {
       // Admin-only — this is an irreversible row delete (guest PII, deposit
       // data, everything), a different trust level than update_status.
@@ -3173,16 +3189,20 @@ function saveBooking(p) {
     // another booking between this request's appendRow() and this point,
     // which would otherwise write this guest's signature onto the wrong
     // (someone else's) row.
-    if (signatureUrl) {
+    // The typed-name signature goes into its own column the same way.
+    var typedSignature = typeof p.typedSignature === 'string' ? p.typedSignature.replace(/\s+/g, ' ').trim().slice(0, 200) : '';
+    if (signatureUrl || typedSignature) {
       try {
         var freshData = sh.getDataRange().getValues();
         var freshHdr = freshData[0] || [];
         var freshRefIdx = freshHdr.indexOf('ref');
         var sigColIdx = freshHdr.indexOf('signatureUrl');
-        if (freshRefIdx !== -1 && sigColIdx !== -1) {
+        var typedColIdx = freshHdr.indexOf('typedSignature');
+        if (freshRefIdx !== -1) {
           for (var sigRow = freshData.length - 1; sigRow >= 1; sigRow--) {
             if (String(freshData[sigRow][freshRefIdx]) === String(p.ref)) {
-              sh.getRange(sigRow + 1, sigColIdx + 1).setValue(signatureUrl);
+              if (signatureUrl && sigColIdx !== -1) sh.getRange(sigRow + 1, sigColIdx + 1).setValue(signatureUrl);
+              if (typedSignature && typedColIdx !== -1) sh.getRange(sigRow + 1, typedColIdx + 1).setValue(_safe(typedSignature, ''));
               break;
             }
           }
@@ -3278,7 +3298,8 @@ function getCustomers(limit) {
         ref: obj.ref, datetime: obj.datetime, duration: obj.duration, gear: obj.gear,
         total: obj.total, status: obj.status || 'pending',
         idPhotoUrl: obj.idPhotoUrl || '', waiverAccepted: obj.waiverAccepted || '',
-        signatureUrl: obj.signatureUrl || ''
+        signatureUrl: obj.signatureUrl || '',
+        typedSignature: obj.typedSignature || ''
       });
     }
 
@@ -3296,6 +3317,10 @@ function getCustomers(limit) {
       var signatureUrl = '', signatureRef = '';
       for (var k = bookings.length - 1; k >= 0; k--) {
         if (bookings[k].signatureUrl) { signatureUrl = bookings[k].signatureUrl; signatureRef = bookings[k].ref; break; }
+      }
+      var typedSignature = '';
+      for (var ts = bookings.length - 1; ts >= 0; ts--) {
+        if (bookings[ts].typedSignature) { typedSignature = String(bookings[ts].typedSignature); break; }
       }
       var waiverOnFile = bookings.some(function (b) {
         return b.waiverAccepted === true || String(b.waiverAccepted).toLowerCase() === 'true';
@@ -3329,6 +3354,7 @@ function getCustomers(limit) {
         idPhotoRef: idPhotoRef,
         signatureUrl: signatureUrl,
         signatureRef: signatureRef,
+        typedSignature: typedSignature,
         waiverOnFile: waiverOnFile,
         isRegular: bookings.length >= 3,
         hasConflict: hasConflict,
@@ -3421,7 +3447,8 @@ function getSignature(p) {
     var data = sh.getDataRange().getValues();
     var header = data[0] || [];
     var refIdx = header.indexOf('ref');
-    var urlIdx = header.indexOf('signatureUrl');
+    // which: 'field' = the one signed on the staff phone at handover.
+    var urlIdx = header.indexOf(p.which === 'field' ? 'fieldSignatureUrl' : 'signatureUrl');
     if (refIdx === -1 || urlIdx === -1) return { ok: false, error: 'Sheet not initialized' };
 
     var signatureUrl = '';
@@ -3442,6 +3469,40 @@ function getSignature(p) {
     };
   } catch (err) {
     return _fail('getSignature', err);
+  }
+}
+
+// Staff field app — saves the waiver signature the guest draws at handover to
+// the private signatures Drive folder (via _saveSignature) and links it on the
+// booking row as fieldSignatureUrl. If the guest never drew one online (typed
+// their name instead), it also fills signatureUrl so admin's existing
+// "View Signature" button shows it. Never overwrites an online signature.
+function saveFieldSignature(p) {
+  try {
+    if (!p || typeof p.ref !== 'string' || !p.ref.trim()) return { ok: false, error: 'Invalid ref' };
+    if (typeof p.signatureBase64 !== 'string' || !p.signatureBase64) return { ok: false, error: 'No signature' };
+    if (p.signatureBase64.length > MAX_SIGNATURE_BASE64_LEN) return { ok: false, error: 'Signature image is too large' };
+
+    var sh = _sheet();
+    var data = sh.getDataRange().getValues();
+    var header = data[0] || [];
+    var refIdx = header.indexOf('ref');
+    var fieldIdx = header.indexOf('fieldSignatureUrl');
+    var sigIdx = header.indexOf('signatureUrl');
+    if (refIdx === -1 || fieldIdx === -1) return { ok: false, error: 'Sheet not initialized' };
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][refIdx]) === String(p.ref)) {
+        var url = _saveSignature({ ref: p.ref, signatureBase64: p.signatureBase64, signatureMimeType: 'image/png' });
+        if (!url) return { ok: false, error: 'Could not save the signature file' };
+        sh.getRange(i + 1, fieldIdx + 1).setValue(url);
+        if (sigIdx !== -1 && !String(data[i][sigIdx] || '').trim()) sh.getRange(i + 1, sigIdx + 1).setValue(url);
+        return { ok: true, url: url };
+      }
+    }
+    return { ok: false, error: 'Booking not found' };
+  } catch (err) {
+    return _fail('saveFieldSignature', err);
   }
 }
 

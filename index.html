@@ -206,9 +206,10 @@ a:not([class]):not([style]){color:var(--teal)}
 .waiver-check{display:flex;align-items:flex-start;gap:10px;cursor:pointer}
 .waiver-check input{width:20px;height:20px;margin-top:1px;accent-color:var(--teal);flex-shrink:0}
 .waiver-check span{font-size:0.82rem;color:var(--ink);font-weight:500;line-height:1.4}
-.sig-pad-wrap{border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--card)}
-.sig-pad-wrap canvas{display:block;width:100%;height:150px;touch-action:none;cursor:crosshair}
-.sig-clear-btn{padding:6px 14px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;font-size:0.75rem;font-weight:500;cursor:pointer}
+.sig-pad-wrap{border:1.5px dashed var(--line);border-radius:8px;overflow:hidden;background:#fff;margin:0 -12px}
+.sig-pad-wrap canvas{display:block;width:100%;height:200px;touch-action:none;cursor:crosshair}
+@media (min-width:600px){.sig-pad-wrap canvas{height:220px}}
+.sig-clear-btn{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:8px 16px;background:var(--card);color:var(--coral);border:1.5px solid var(--coral);border-radius:8px;font-size:0.85rem;font-weight:600;cursor:pointer}
 .sig-clear-btn:hover{background:var(--light)}
 .sig-mode-link{font-size:0.75rem;color:var(--teal);font-weight:500;text-decoration:none;cursor:pointer}
 
@@ -683,7 +684,7 @@ header .top-links a:hover,header .top-links a.active{color:#fff}
         <label style="display:block;font-size:0.78rem;font-weight:700;color:var(--ink);margin-bottom:6px"><span data-i18n="sig_below">Sign below</span> <span style="color:var(--coral)">*</span></label>
         <div class="sig-pad-wrap"><canvas id="waiverSigCanvas"></canvas></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:10px;flex-wrap:wrap">
-          <button type="button" class="sig-clear-btn" onclick="clearWaiverSignature()" data-i18n="btn_clear">Clear</button>
+          <button type="button" class="sig-clear-btn" onclick="clearWaiverSignature()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span data-i18n="btn_clear">Clear &amp; sign again</span></button>
           <a href="#" class="sig-mode-link" onclick="toggleSignatureMode(event)" data-i18n="sig_prefer_type">Prefer to type your name instead? →</a>
         </div>
         <p style="font-size:0.76rem;color:var(--muted);margin-top:5px;line-height:1.45" data-i18n="sig_draw_hint">Draw your signature above with your finger, stylus, or mouse — this is your legal signature on the agreement (adults booking for minors sign on their behalf).</p>
@@ -1007,7 +1008,7 @@ const TRANSLATIONS = {
     id_upload_hint:"Driver's license, passport, or national ID. This helps us verify your rental agreement — you can also show ID in person at pickup if you'd rather skip this step.",
     step5_title:'6 · Safety Waiver', waiver_h3:'Liability &amp; Safety Agreement',
     waiver_agree:'I have read, understood, and agree to the Liability Waiver and Safety Agreement above. I confirm all information provided is accurate.',
-    sig_below:'Sign below', btn_clear:'Clear', sig_prefer_type:'Prefer to type your name instead? →',
+    sig_below:'Sign below', btn_clear:'Clear & sign again', sig_prefer_type:'Prefer to type your name instead? →',
     sig_draw_hint:'Draw your signature above with your finger, stylus, or mouse — this is your legal signature on the agreement (adults booking for minors sign on their behalf).',
     sig_type_label:'Sign by typing your full legal name', ph_sig_name:'e.g. Sarah Anne Mitchell',
     sig_type_hint:'Your typed name acts as your signature on this agreement (adults booking for minors sign on their behalf).',
@@ -1051,7 +1052,7 @@ const TRANSLATIONS = {
     id_upload_hint:"Permis de conduire, passeport ou carte d'identité nationale. Cela nous aide à vérifier votre contrat de location — vous pouvez aussi présenter une pièce d'identité en personne au retrait si vous préférez ignorer cette étape.",
     step5_title:'6 · Décharge de sécurité', waiver_h3:'Accord de responsabilité et de sécurité',
     waiver_agree:"J'ai lu, compris et j'accepte la décharge de responsabilité et l'accord de sécurité ci-dessus. Je confirme que toutes les informations fournies sont exactes.",
-    sig_below:'Signez ci-dessous', btn_clear:'Effacer', sig_prefer_type:'Vous préférez taper votre nom ? →',
+    sig_below:'Signez ci-dessous', btn_clear:'Effacer et resigner', sig_prefer_type:'Vous préférez taper votre nom ? →',
     sig_draw_hint:"Dessinez votre signature ci-dessus avec votre doigt, un stylet ou une souris — il s'agit de votre signature légale sur l'accord (les adultes réservant pour des mineurs signent en leur nom).",
     sig_type_label:'Signez en tapant votre nom légal complet', ph_sig_name:'ex. Sarah Anne Mitchell',
     sig_type_hint:"Votre nom tapé fait office de signature sur cet accord (les adultes réservant pour des mineurs signent en leur nom).",
@@ -1095,7 +1096,7 @@ const TRANSLATIONS = {
     id_upload_hint:'Körkort, pass eller nationellt ID. Detta hjälper oss att verifiera ditt hyresavtal — du kan även visa ID personligen vid upphämtning om du hellre hoppar över detta steg.',
     step5_title:'6 · Säkerhetsavtal', waiver_h3:'Ansvarsfriskrivning och säkerhetsavtal',
     waiver_agree:'Jag har läst, förstått och godkänner ansvarsfriskrivningen och säkerhetsavtalet ovan. Jag bekräftar att all lämnad information är korrekt.',
-    sig_below:'Signera nedan', btn_clear:'Rensa', sig_prefer_type:'Vill du hellre skriva ditt namn? →',
+    sig_below:'Signera nedan', btn_clear:'Rensa och signera igen', sig_prefer_type:'Vill du hellre skriva ditt namn? →',
     sig_draw_hint:'Rita din signatur ovan med fingret, en penna eller musen — detta är din juridiska signatur på avtalet (vuxna som bokar för minderåriga signerar å deras vägnar).',
     sig_type_label:'Signera genom att skriva ditt fullständiga juridiska namn', ph_sig_name:'t.ex. Sarah Anne Mitchell',
     sig_type_hint:'Ditt skrivna namn fungerar som din signatur på detta avtal (vuxna som bokar för minderåriga signerar å deras vägnar).',
@@ -1139,7 +1140,7 @@ const TRANSLATIONS = {
     id_upload_hint:'Licencia de conducir, pasaporte o identificación nacional. Esto nos ayuda a verificar tu contrato de alquiler — también puedes mostrar tu identificación en persona al recoger el equipo si prefieres omitir este paso.',
     step5_title:'6 · Exención de responsabilidad', waiver_h3:'Acuerdo de responsabilidad y seguridad',
     waiver_agree:'He leído, entendido y acepto la exención de responsabilidad y el acuerdo de seguridad anteriores. Confirmo que toda la información proporcionada es precisa.',
-    sig_below:'Firma abajo', btn_clear:'Borrar', sig_prefer_type:'¿Prefieres escribir tu nombre? →',
+    sig_below:'Firma abajo', btn_clear:'Borrar y firmar de nuevo', sig_prefer_type:'¿Prefieres escribir tu nombre? →',
     sig_draw_hint:'Dibuja tu firma arriba con el dedo, un lápiz óptico o el ratón — esta es tu firma legal en el acuerdo (los adultos que reserven para menores firman en su nombre).',
     sig_type_label:'Firma escribiendo tu nombre legal completo', ph_sig_name:'ej. Sarah Anne Mitchell',
     sig_type_hint:'Tu nombre escrito actúa como tu firma en este acuerdo (los adultos que reserven para menores firman en su nombre).',
@@ -1183,7 +1184,7 @@ const TRANSLATIONS = {
     id_upload_hint:"Führerschein, Reisepass oder Personalausweis. Das hilft uns, deinen Mietvertrag zu überprüfen — du kannst deinen Ausweis bei der Abholung auch persönlich zeigen, wenn du diesen Schritt lieber überspringen möchtest.",
     step5_title:'6 · Haftungsausschluss', waiver_h3:'Haftungs- und Sicherheitsvereinbarung',
     waiver_agree:'Ich habe die obige Haftungsfreistellung und Sicherheitsvereinbarung gelesen, verstanden und stimme ihr zu. Ich bestätige, dass alle angegebenen Informationen korrekt sind.',
-    sig_below:'Unten unterschreiben', btn_clear:'Löschen', sig_prefer_type:'Lieber deinen Namen eintippen? →',
+    sig_below:'Unten unterschreiben', btn_clear:'Löschen und neu unterschreiben', sig_prefer_type:'Lieber deinen Namen eintippen? →',
     sig_draw_hint:'Zeichne deine Unterschrift oben mit dem Finger, einem Stift oder der Maus — dies ist deine rechtsgültige Unterschrift für die Vereinbarung (Erwachsene, die für Minderjährige buchen, unterschreiben in deren Namen).',
     sig_type_label:'Unterschreibe, indem du deinen vollständigen rechtlichen Namen eintippst', ph_sig_name:'z. B. Sarah Anne Mitchell',
     sig_type_hint:'Dein eingetippter Name gilt als Unterschrift für diese Vereinbarung (Erwachsene, die für Minderjährige buchen, unterschreiben in deren Namen).',
@@ -1227,7 +1228,7 @@ const TRANSLATIONS = {
     id_upload_hint:"Patente di guida, passaporto o carta d'identità. Questo ci aiuta a verificare il tuo contratto di noleggio — puoi anche mostrare il documento di persona al ritiro se preferisci saltare questo passaggio.",
     step5_title:'6 · Liberatoria di sicurezza', waiver_h3:'Accordo di responsabilità e sicurezza',
     waiver_agree:"Ho letto, compreso e accetto la liberatoria di responsabilità e l'accordo di sicurezza sopra riportati. Confermo che tutte le informazioni fornite sono accurate.",
-    sig_below:'Firma qui sotto', btn_clear:'Cancella', sig_prefer_type:'Preferisci digitare il tuo nome? →',
+    sig_below:'Firma qui sotto', btn_clear:'Cancella e firma di nuovo', sig_prefer_type:'Preferisci digitare il tuo nome? →',
     sig_draw_hint:"Disegna la tua firma sopra con il dito, una penna touch o il mouse — questa è la tua firma legale sull'accordo (gli adulti che prenotano per minori firmano per loro conto).",
     sig_type_label:'Firma digitando il tuo nome legale completo', ph_sig_name:'es. Sarah Anne Mitchell',
     sig_type_hint:'Il tuo nome digitato funge da firma su questo accordo (gli adulti che prenotano per minori firmano per loro conto).',
@@ -1271,7 +1272,7 @@ const TRANSLATIONS = {
     id_upload_hint:"Carteira de motorista, passaporte ou identidade nacional. Isso nos ajuda a verificar seu contrato de aluguel — você também pode mostrar o documento pessoalmente na retirada, se preferir pular esta etapa.",
     step5_title:'6 · Termo de responsabilidade', waiver_h3:'Acordo de responsabilidade e segurança',
     waiver_agree:'Li, entendi e concordo com o termo de responsabilidade e o acordo de segurança acima. Confirmo que todas as informações fornecidas são precisas.',
-    sig_below:'Assine abaixo', btn_clear:'Limpar', sig_prefer_type:'Prefere digitar seu nome? →',
+    sig_below:'Assine abaixo', btn_clear:'Limpar e assinar de novo', sig_prefer_type:'Prefere digitar seu nome? →',
     sig_draw_hint:'Desenhe sua assinatura acima com o dedo, uma caneta ou o mouse — esta é sua assinatura legal no acordo (adultos que reservam para menores assinam em nome deles).',
     sig_type_label:'Assine digitando seu nome legal completo', ph_sig_name:'ex. Sarah Anne Mitchell',
     sig_type_hint:'Seu nome digitado funciona como sua assinatura neste acordo (adultos que reservam para menores assinam em nome deles).',
@@ -1315,7 +1316,7 @@ const TRANSLATIONS = {
     id_upload_hint:"Rijbewijs, paspoort of identiteitskaart. Dit helpt ons je huurovereenkomst te verifiëren — je kunt je ID ook persoonlijk tonen bij het ophalen als je deze stap liever overslaat.",
     step5_title:'6 · Vrijwaringsverklaring', waiver_h3:'Aansprakelijkheids- en veiligheidsovereenkomst',
     waiver_agree:'Ik heb de bovenstaande vrijwaringsverklaring en veiligheidsovereenkomst gelezen, begrepen en ga ermee akkoord. Ik bevestig dat alle verstrekte informatie juist is.',
-    sig_below:'Onderteken hieronder', btn_clear:'Wissen', sig_prefer_type:'Liever je naam typen? →',
+    sig_below:'Onderteken hieronder', btn_clear:'Wissen en opnieuw tekenen', sig_prefer_type:'Liever je naam typen? →',
     sig_draw_hint:'Teken je handtekening hierboven met je vinger, een stylus of muis — dit is je wettelijke handtekening op de overeenkomst (volwassenen die voor minderjarigen boeken, tekenen namens hen).',
     sig_type_label:'Onderteken door je volledige wettelijke naam te typen', ph_sig_name:'bijv. Sarah Anne Mitchell',
     sig_type_hint:'Je getypte naam geldt als handtekening op deze overeenkomst (volwassenen die voor minderjarigen boeken, tekenen namens hen).',
@@ -1475,7 +1476,7 @@ function driveThumbUrl(url, size) {
 // rate-limited. Items without a bundled copy use the admin → Photos upload,
 // then the logo — never an emoji. New admin uploads for bundled items need the
 // file in img/gear/ replaced to show.
-const LOCAL_GEAR_PHOTOS = { SUP:1, KAY:1, KAY2:1, SNK:1, FLT:1 };
+const LOCAL_GEAR_PHOTOS = { SUP:1, KAY:1, KAY2:1, SNK:1, FLT:1, FLC:1, BPG:1 };
 // Full-size look at a piece of gear before renting it.
 function viewGear(id) {
   const g = GEAR.find(x => x.id === id);
@@ -2159,7 +2160,11 @@ function mountSignaturePad(canvas, opts) {
 
   function resize() {
     const rect = canvas.getBoundingClientRect();
+    // Hidden (details step / typed mode is display:none): sizing now would make
+    // a 1x1 canvas that can't show strokes and saves a blank PNG. Wait until shown.
+    if (!rect.width || !rect.height) return;
     const dpr = window.devicePixelRatio || 1;
+    if (canvas.width === Math.round(rect.width * dpr) && canvas.height === Math.round(rect.height * dpr)) return;
     const prevData = hasInk ? canvas.toDataURL() : null;
     canvas.width = Math.max(1, Math.round(rect.width * dpr));
     canvas.height = Math.max(1, Math.round(rect.height * dpr));
@@ -2182,6 +2187,7 @@ function mountSignaturePad(canvas, opts) {
   }
 
   function start(e) {
+    resize(); // fallback for browsers without ResizeObserver
     drawing = true;
     last = posFromEvent(e);
     if (canvas.setPointerCapture && e.pointerId != null) {
@@ -2208,6 +2214,8 @@ function mountSignaturePad(canvas, opts) {
   window.addEventListener('pointerup', end);
   canvas.addEventListener('pointerleave', end);
   window.addEventListener('resize', resize);
+  // The pad mounts while its step is hidden, so also resize when it appears.
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
   resize();
 
   return {
@@ -2221,7 +2229,14 @@ function mountSignaturePad(canvas, opts) {
     isEmpty() { return !hasInk; },
     getBase64() {
       if (!hasInk) return null;
-      const dataUrl = canvas.toDataURL('image/png');
+      // Flatten onto white so the saved file reads the same in Drive and admin.
+      const out = document.createElement('canvas');
+      out.width = canvas.width; out.height = canvas.height;
+      const octx = out.getContext('2d');
+      octx.fillStyle = '#ffffff';
+      octx.fillRect(0, 0, out.width, out.height);
+      octx.drawImage(canvas, 0, 0);
+      const dataUrl = out.toDataURL('image/png');
       const commaIdx = dataUrl.indexOf(',');
       return commaIdx === -1 ? null : dataUrl.slice(commaIdx + 1);
     }
@@ -2445,6 +2460,9 @@ async function submitBooking() {
     currency: 'XCD',
     waiverAccepted: true,
     waiverTimestamp: new Date().toISOString(),
+    // Own column on the booking (typedSignature); still echoed in notes above
+    // so older staff screens that only show notes keep seeing it.
+    typedSignature: waiverSig || undefined,
     source: 'PWA',
   };
 

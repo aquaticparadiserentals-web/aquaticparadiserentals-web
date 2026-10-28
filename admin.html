@@ -1424,6 +1424,20 @@ function renderBookings() {
     const phone = String(b.phone||'').replace(/\D/g,'');
     const hasLoc = b.driverLat && b.driverLat!=='N/A' && b.driverLng && b.driverLng!=='N/A';
     const mapUrl = hasLoc ? `https://www.google.com/maps?q=${encodeURIComponent(b.driverLat)},${encodeURIComponent(b.driverLng)}` : '';
+    // Every way the guest signed the waiver, all saved on this booking:
+    // drawn online (signatureUrl), typed name online, drawn at handover.
+    const has = v => v && v !== 'N/A';
+    const fieldSig = has(b.fieldSignatureUrl) ? b.fieldSignatureUrl : '';
+    const hasFieldSig = !!fieldSig;
+    // saveFieldSignature copies the beach one into signatureUrl when the
+    // guest didn't draw online — don't show the same picture twice.
+    const hasOnlineSig = has(b.signatureUrl) && b.signatureUrl !== fieldSig;
+    const sigSummary = [
+      hasOnlineSig ? 'signed online (drawn)' : '',
+      has(b.typedSignature) ? 'signed online (typed: ' + escapeHtml(b.typedSignature) + ')' : '',
+      hasFieldSig ? 'signed on the beach at handover' : '',
+      (!hasOnlineSig && !has(b.typedSignature) && !hasFieldSig && String(b.waiverAccepted).toLowerCase()==='true') ? 'accepted online' : ''
+    ].filter(Boolean).join(' · ');
     return `<div class="booking-card ${state==='pending'?'new':''} ${state==='done'?'done':''}" id="bkc-${escapeHtml(ref)}">
       <div class="bk-header">
         <span class="bk-ref">${escapeHtml(ref)}</span>
@@ -1444,8 +1458,10 @@ function renderBookings() {
         ${phone?`<a class="bk-btn wa" href="https://wa.me/${encodeURIComponent(phone)}?text=${waMsg}" target="_blank">WhatsApp</a>`:''}
         <button class="bk-btn" data-ref="${refAttr}" onclick="notifyDelivery(this.dataset.ref)">Notify Driver</button>
         ${b.idPhotoUrl && /^https?:/.test(b.idPhotoUrl)?`<button class="bk-btn" data-ref="${refAttr}" onclick="viewIdPhoto(this.dataset.ref)">View ID</button>`:''}
-        ${b.signatureUrl && b.signatureUrl!=='N/A'?`<button class="bk-btn" data-ref="${refAttr}" onclick="viewSignature(this.dataset.ref)">View Signature</button>`:''}
+        ${hasOnlineSig?`<button class="bk-btn" data-ref="${refAttr}" onclick="viewSignature(this.dataset.ref)">View Signature${hasFieldSig?' (online)':''}</button>`:''}
+        ${hasFieldSig?`<button class="bk-btn" data-ref="${refAttr}" onclick="viewSignature(this.dataset.ref,'field')">View Signature (beach)</button>`:''}
       </div>
+      ${sigSummary?`<div class="bk-detail" style="flex:1 1 100%;margin-top:6px">Waiver: ${sigSummary}</div>`:''}
       <div style="flex:1 1 100%;display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
         <span style="font-size:0.72rem;color:var(--muted)">Staff credit</span>
         <select id="staffSel-${refAttr}" data-ref="${refAttr}" onchange="assignBookingStaffUI(this.dataset.ref)" style="flex:1;padding:6px 8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;font-size:0.78rem">
@@ -3067,17 +3083,18 @@ async function viewIdPhoto(ref) {
 
 // Same private-fetch-and-overlay pattern as viewIdPhoto — a drawn waiver
 // signature is guest PII too, so it's never a public Drive link either.
-async function viewSignature(ref) {
-  return _viewPhotoOverlay(ref, 'getSignature', 'signatureOverlay', 'signature');
+// which: 'field' = the signature drawn on the staff phone at handover.
+async function viewSignature(ref, which) {
+  return _viewPhotoOverlay(ref, 'getSignature', 'signatureOverlay', 'signature', which ? { which } : null);
 }
 
-async function _viewPhotoOverlay(ref, action, overlayId, label) {
+async function _viewPhotoOverlay(ref, action, overlayId, label, extra) {
   if (!ref) return;
   showToast('Loading '+label+'…', 'ok');
   try {
-    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+    const res = await fetch(BACKEND,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({
       action, token:APP_TOKEN, ref
-    }),signal:AbortSignal.timeout(20000)});
+    }, extra||{})),signal:AbortSignal.timeout(20000)});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
     if (!data || !data.ok || !data.base64) throw new Error((data && data.error) || 'No '+label+' available');
@@ -3748,6 +3765,7 @@ function renderCustomers() {
         ${c.signatureUrl?`<button class="team-wa" style="background:var(--teal);border:none;cursor:pointer" data-sigref="${escapeHtml(c.signatureRef)}" onclick="event.stopPropagation();viewSignature(this.dataset.sigref)">View Signature</button>`:''}
         <span style="font-size:0.68rem;padding:4px 8px;border-radius:12px;background:${c.waiverOnFile?'rgba(46,204,113,0.15);color:#2ecc71':'var(--line);color:var(--muted)'}">${c.waiverOnFile?'✓ Waiver on file':'No waiver on file'}</span>
       </div>
+      ${c.typedSignature?`<div style="margin-top:6px;font-size:0.72rem;color:var(--muted)">Typed signature: ${escapeHtml(c.typedSignature)}</div>`:''}
       ${expanded ? `<div style="margin-top:10px">${bookingsHtml}</div>` : `<div style="margin-top:6px;font-size:0.7rem;color:var(--muted)">Tap to ${expanded?'hide':'view'} booking history</div>`}
     </div>`;
   }).join('');
