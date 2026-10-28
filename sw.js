@@ -1,8 +1,8 @@
-// APR Service Worker v9.0
+// APR Service Worker v10.0
 // Bump CACHE whenever static assets (manifest, icons, logo) change — they're
 // cached-first with no expiry, so the version string is the only thing that
 // forces a refresh. HTML is network-first and self-heals on next reload.
-const CACHE = 'apr-v9';
+const CACHE = 'apr-v10';
 const ASSETS = [
   './manifest.json',
   './logo.jpg',
@@ -16,6 +16,8 @@ const ASSETS = [
   './img/gear/KAY2.jpg',
   './img/gear/SNK.jpg',
   './img/gear/FLT.jpg',
+  './img/gear/FLC.jpg',
+  './img/gear/BPG.jpg',
 ];
 // apr-config.js rides with the HTML (network-first) so edits to deposit %,
 // PayPal or partners reach guests immediately instead of sticking in cache.
@@ -63,11 +65,15 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Cache-first for static assets (images, manifest)
+  // Cache-first for static assets (images, manifest). Only good responses are
+  // stored: caching a 404 (e.g. a photo requested a moment before it was
+  // uploaded) would keep showing the fallback forever on that phone.
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
-      const clone = res.clone();
-      caches.open(CACHE).then(c => c.put(e.request, clone));
+      if (res.ok) {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+      }
       return res;
     }))
   );
