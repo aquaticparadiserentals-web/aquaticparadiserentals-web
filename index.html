@@ -355,6 +355,18 @@ a:not([class]):not([style]){color:var(--teal)}
 .deposit-box a.dep-card{background:var(--navy);color:#fff}
 .deposit-box a.dep-bank{background:#157A41;color:#fff}
 .deposit-box .dep-fine{font-size:0.75rem;color:var(--muted);margin-top:10px;line-height:1.45}
+/* Pay by bank transfer — 4 steps. Hidden until staff switch it on in admin. */
+.bank-guide{max-width:360px;margin:14px auto 0;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 16px;text-align:left}
+#sec-rates .bank-guide{max-width:none;margin:0 0 14px;border-radius:var(--radius);box-shadow:var(--shadow)}
+.bank-guide h3{font-size:0.95rem;font-weight:600;color:var(--ink);margin:0 0 12px}
+.bank-steps{list-style:none;margin:0;padding:0;counter-reset:bank}
+.bank-steps li{counter-increment:bank;position:relative;padding:0 0 14px 36px;font-size:0.84rem;color:var(--muted);line-height:1.5}
+.bank-steps li::before{content:counter(bank);position:absolute;left:0;top:0;width:24px;height:24px;border-radius:50%;background:var(--teal);color:#fff;font-size:0.78rem;font-weight:700;display:flex;align-items:center;justify-content:center}
+.bank-steps li strong{display:block;color:var(--ink);font-weight:600;margin-bottom:2px}
+.bank-steps .bank-btn{display:inline-flex;align-items:center;min-height:44px;margin-top:8px;padding:10px 14px;border-radius:10px;font-size:0.84rem;font-weight:600;text-decoration:none;border:1.5px solid var(--teal);color:var(--teal);background:var(--card)}
+.bank-steps .bank-btn.wa{background:#157A41;border-color:#157A41;color:#fff}
+.bank-steps code{font-family:inherit;font-weight:700;color:var(--ink);background:var(--light);padding:1px 6px;border-radius:4px}
+.bank-safe{font-size:0.75rem;color:var(--muted);line-height:1.45;margin:2px 0 0;padding-top:10px;border-top:1px dashed var(--line)}
 .partner-note{margin-top:-6px;margin-bottom:14px;padding:10px 12px;border-radius:10px;background:rgba(14,124,144,0.08);border:1px solid rgba(14,124,144,0.25);font-size:0.8rem;color:var(--teal-ink);font-weight:600}
 @media (prefers-color-scheme: dark){.partner-note{color:#7fd3e0}.dur-btn.selected,.chat-b.guest,.chat-send,.gear-check{color:#04222A}}
 
@@ -715,6 +727,7 @@ header .top-links a:hover,header .top-links a.active{color:#fff}
     <p data-i18n="success_desc">Your booking is <strong>pending</strong> — our team will confirm it on WhatsApp shortly. If you gave an email, a summary is on its way to your inbox.</p>
     <div class="booking-ref" id="bookingRef">APR-XXXXXX</div>
     <div id="depositBox" class="deposit-box" style="display:none"></div>
+    <div id="bankGuideSuccess" class="bank-guide" hidden></div>
     <p id="successNote" style="margin-top:16px;font-size:0.82rem;color:var(--muted)" data-i18n="success_note">Want to lock in your slot right away? Message us for bank-transfer deposit details — a deposit secures your booking.</p>
     <button class="btn-primary" style="margin-top:20px;max-width:320px" onclick="newBooking()" data-i18n="btn_book_another">Book Another ↺</button>
     <a href="https://wa.me/17844963447" class="btn-secondary" style="display:block;max-width:320px;margin:8px auto;text-align:center;padding:13px;text-decoration:none;font-weight:700;border:2px solid var(--teal);border-radius:14px;color:var(--teal)" data-i18n="btn_whatsapp">
@@ -777,16 +790,16 @@ header .top-links a:hover,header .top-links a.active{color:#fff}
   <div class="info-card">
     <ul>
       <li data-i18n="pay_cash"><strong>Cash</strong> — XCD or USD, paid at the start of your rental</li>
-      <!-- BANK DETAILS: when ready to publish the account, replace the line
-           below with e.g.:
-           Account name: Aquatic Paradise Rentals · Account #: 12345678
-           (keep the bank name line) -->
+      <!-- The account number is NEVER published on the site: guests ask for it
+           on WhatsApp. The step-by-step guide below (#bankGuideRates) appears
+           only when staff switch it on in admin → Stock & Deals. -->
       <li><strong data-i18n="pay_bank_label">Bank Transfer</strong> <span data-i18n="pay_bank_desc">— Bank of St. Vincent &amp; the Grenadines (BOSVG).</span>
         <a href="https://wa.me/17844963447?text=Hi%20APR!%20Please%20send%20me%20the%20bank%20transfer%20details%20for%20my%20booking." data-i18n="link_whatsapp_msg">Message us on WhatsApp</a> <span data-i18n="pay_bank_for">for the account details.</span></li>
       <li data-i18n="pay_card"><strong>Card</strong> — arranged via WhatsApp</li>
     </ul>
     <p style="font-size:0.78rem;color:var(--muted);margin-top:8px" data-i18n="pay_ref_note">Paying by bank transfer? Send us your booking reference (APR-…) with the payment so we can match it.</p>
   </div>
+  <div id="bankGuideRates" class="bank-guide" hidden></div>
 </div>
 
 <!-- ========== INFO SECTION ========== -->
@@ -1501,8 +1514,9 @@ async function loadServiceStatus() {
   try {
     const res = await fetch(BACKEND+'?action=getServiceStatus',{signal:AbortSignal.timeout(8000)});
     const data = await res.json();
-    if (data && data.ok) serviceStatus = data.status || {};
+    if (data && data.ok) { serviceStatus = data.status || {}; bankGuideOn = data.bankGuide === true; }
   } catch (err) { /* fail open */ }
+  renderBankGuide('bankGuideRates');
   // Drop anything already in the cart that staff just turned off.
   Object.keys(selectedGear).forEach(id => { if (isOff(id)) delete selectedGear[id]; });
   if (selectedPackage && packageBlocked(PACKAGES.find(p => p.id === selectedPackage))) selectedPackage = null;
@@ -2073,6 +2087,39 @@ function renderDepositBox(ref, totalXCD, fname) {
   if (note) note.style.display = 'none';
 }
 
+// ── PAY BY BANK TRANSFER GUIDE ──
+// Hidden unless staff switch it on in admin → Stock & Deals (Code.gs
+// setBankGuide; arrives with getServiceStatus). Off/unreachable = hidden.
+// The account number is never on the site: step 1 asks for it on WhatsApp.
+let bankGuideOn = false;
+function renderBankGuide(id, ref, amountXCD) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (!bankGuideOn) { el.hidden = true; el.innerHTML = ''; return; }
+  const wa = String(APR_CFG.whatsapp || '17844963447').replace(/\D/g, '');
+  const askText = ref
+    ? `Hi Aquatic Paradise, I would like to pay for booking ${ref} by bank transfer. Please send me your account details.`
+    : 'Hi Aquatic Paradise, I would like to pay by bank transfer. Please send me your account details.';
+  const receiptText = ref
+    ? `Hi Aquatic Paradise, here is my bank transfer receipt for booking ${ref}.`
+    : 'Hi Aquatic Paradise, here is my bank transfer receipt for my booking.';
+  const amount = Number(amountXCD) > 0 ? `XCD $${Number(amountXCD).toFixed(0)}` : t('bank_amount_any', 'the amount for your booking');
+  const refHtml = ref ? `<code>${escapeHtmlText(ref)}</code>` : t('bank_ref_any', 'your booking reference (APR-…)');
+  el.innerHTML = `
+    <h3>${t('bank_title', 'Pay by bank transfer')}</h3>
+    <ol class="bank-steps">
+      <li><strong>${t('bank_s1', 'Get our account details')}</strong>${t('bank_s1_d', 'We send them privately on WhatsApp, never on the website.')}<br>
+        <a class="bank-btn wa" href="https://wa.me/${wa}?text=${encodeURIComponent(askText)}" target="_blank" rel="noopener">${t('bank_s1_btn', 'Ask for account details on WhatsApp')}</a></li>
+      <li><strong>${t('bank_s2', 'Open your online banking')}</strong>${t('bank_s2_d', 'Bank of St. Vincent and the Grenadines customers can use BOSVG iBank. Visiting from abroad? Use your own bank’s international transfer and ask us for the details.')}<br>
+        <a class="bank-btn" href="https://www.bosvg.com/ibank/" target="_blank" rel="noopener">${t('bank_s2_btn', 'Open BOSVG iBank')}</a></li>
+      <li><strong>${t('bank_s3', 'Send')} ${amount}</strong>${t('bank_s3_d', 'Type this as the payment reference:')} ${refHtml}</li>
+      <li><strong>${t('bank_s4', 'Send us the receipt')}</strong>${t('bank_s4_d', 'A screenshot is fine.')}<br>
+        <a class="bank-btn wa" href="https://wa.me/${wa}?text=${encodeURIComponent(receiptText)}" target="_blank" rel="noopener">${t('bank_s4_btn', 'Send receipt on WhatsApp')}</a></li>
+    </ol>
+    <p class="bank-safe">${t('bank_safe', 'We will never ask for your online banking password or PIN. Only type it on your bank’s own website or app.')}</p>`;
+  el.hidden = false;
+}
+
 function newBooking() {
   selectedGear = {};
   selectedPackage = null;
@@ -2471,6 +2518,7 @@ async function submitBooking() {
   if (ok) {
     document.getElementById('bookingRef').textContent = refNum;
     renderDepositBox(refNum, payload.total, payload.fname);
+    renderBankGuide('bankGuideSuccess', refNum, depositFor(payload.total) || payload.total);
     document.getElementById('step-gear').style.display='none';
     document.getElementById('step-details').style.display='none';
     document.getElementById('successScreen').classList.add('show');

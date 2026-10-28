@@ -446,6 +446,9 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
     <div id="dealList" style="margin-top:12px"></div>
   </div>
 
+  <div class="sec-title">Pay by Bank Transfer (guest guide)</div>
+  <div class="card" id="bankGuideCard">Loading…</div>
+
   <div class="sec-title">Alarms to Your Phone (Telegram)</div>
   <div class="card" id="tgCard">Loading…</div>
 
@@ -2433,6 +2436,7 @@ async function fetchStockOverview() {
   }
   renderStock();
   renderDeals();
+  renderBankGuide();
   renderAlarm();
   renderSms();
   renderWa();
@@ -2537,6 +2541,33 @@ async function saveStockCounts() {
     showToast('Stock saved ');
     fetchStockOverview();
   } catch (err) { showToast('Could not save: '+err.message, 'warn'); }
+}
+
+// Bank transfer steps on the booking page (Rates tab + after booking). Off
+// until the business bank account is set up (Code.gs setBankGuide).
+function renderBankGuide() {
+  const on = !!(stockOverview && stockOverview.bankGuide);
+  document.getElementById('bankGuideCard').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div>
+        <div style="font-weight:700"><span class="dot ${on ? 'ok' : 'off'}"></span>${on ? 'Showing to guests' : 'Hidden from guests'}</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:4px">${on
+          ? 'Guests see the 4 bank transfer steps on the Rates tab and after they book.'
+          : 'Turn it on once the bank account is ready. Guests then see how to pay by bank transfer.'}</div>
+      </div>
+      <button class="stock-btn" style="width:auto;margin:0;${on ? 'background:var(--coral)' : ''}" onclick="setBankGuideUI(${!on})">${on ? 'Hide from guests' : 'Show to guests'}</button>
+    </div>
+    <p style="font-size:0.72rem;color:var(--muted);margin:10px 0 0">Your account number is never on the website. Guests ask for it on WhatsApp.</p>`;
+}
+
+async function setBankGuideUI(on) {
+  if (on && !confirm('Show the bank transfer steps to guests now? Only do this once the bank account is set up.')) return;
+  try {
+    const data = await stockApi('setBankGuide', { on });
+    stockOverview.bankGuide = !!data.bankGuide;
+    renderBankGuide();
+    showToast(on ? 'Bank transfer guide is now showing to guests' : 'Bank transfer guide hidden from guests');
+  } catch (err) { showToast('Could not change: '+err.message, 'warn'); }
 }
 
 // Same switch as Dispatch → Equipment & Services (Code.gs setServiceStatus).

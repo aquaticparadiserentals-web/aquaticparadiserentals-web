@@ -722,6 +722,27 @@ function setServiceStatus(p) {
   }
 }
 
+// ── BANK TRANSFER GUIDE ON/OFF ──
+// The "Pay by bank transfer" steps on the booking page stay hidden until the
+// owner switches them on in admin (Stock & Deals) — i.e. once the business
+// bank account is actually set up. Off by default. The account number itself
+// is never stored here or published; guests ask for it on WhatsApp.
+var BANK_GUIDE_PROP = 'bank_guide_on';
+
+function _bankGuideOn() {
+  try { return PropertiesService.getScriptProperties().getProperty(BANK_GUIDE_PROP) === 'true'; }
+  catch (err) { _logError('_bankGuideOn', err); return false; }
+}
+
+function setBankGuide(p) {
+  try {
+    PropertiesService.getScriptProperties().setProperty(BANK_GUIDE_PROP, p && p.on ? 'true' : 'false');
+    return { ok: true, bankGuide: _bankGuideOn() };
+  } catch (err) {
+    return _fail('setBankGuide', err);
+  }
+}
+
 // ── STOCK, LIMITED DEALS & TELEGRAM ALARMS ──
 // Stock is a simple per-item count the owner sets in admin (Stock & Deals):
 // how many units we own and how many are out for repair. A booking holds its
@@ -862,7 +883,7 @@ function getStockOverview() {
     });
     var alarm = getAlarmStatus();
     if (alarm.connected) _ensureTelegramTriggers(); // cheap no-op once installed
-    return { ok: true, items: items, deals: _readJsonProp(DEALS_PROP, []), alarm: alarm, sms: getSmsStatus(), wa: getWaStatus(), cmb: getCmbStatus() };
+    return { ok: true, items: items, deals: _readJsonProp(DEALS_PROP, []), alarm: alarm, sms: getSmsStatus(), wa: getWaStatus(), cmb: getCmbStatus(), bankGuide: _bankGuideOn() };
   } catch (err) {
     return _fail('getStockOverview', err);
   }
@@ -2692,7 +2713,7 @@ function doGet(e) {
     }
     if (p.action === 'getServiceStatus') {
       // Public — guests need to see what's unavailable before booking.
-      return _json({ ok: true, status: getServiceStatus() });
+      return _json({ ok: true, status: getServiceStatus(), bankGuide: _bankGuideOn() });
     }
     if (p.action === 'getBookings') {
       if (!_authOk(p)) return _json({ ok: false, error: 'Unauthorized' });
@@ -2869,9 +2890,10 @@ function doPost(e) {
     if (payload.action === 'getAvailability') {
       return _json(getAvailability(payload));
     }
-    if (['getStockOverview', 'setStock', 'createDeal', 'endDeal', 'setTelegramToken', 'connectTelegram', 'testAlarm', 'sendBriefing', 'setSmsConfig', 'testSms', 'setWaConfig', 'testWa', 'setCmbConfig', 'testCmb', 'getHandoffs', 'setBeachPartners', 'markHandoffsPaid'].indexOf(payload.action) !== -1) {
+    if (['getStockOverview', 'setStock', 'createDeal', 'endDeal', 'setTelegramToken', 'connectTelegram', 'testAlarm', 'sendBriefing', 'setSmsConfig', 'testSms', 'setWaConfig', 'testWa', 'setCmbConfig', 'testCmb', 'getHandoffs', 'setBeachPartners', 'markHandoffsPaid', 'setBankGuide'].indexOf(payload.action) !== -1) {
       // Owner-only: stock counts, deals, the alarm phone and beach partners.
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      if (payload.action === 'setBankGuide') return _json(setBankGuide(payload));
       if (payload.action === 'getHandoffs') return _json(getHandoffs());
       if (payload.action === 'setBeachPartners') return _json(setBeachPartners(payload));
       if (payload.action === 'markHandoffsPaid') return _json(markHandoffsPaid(payload));
@@ -2891,7 +2913,7 @@ function doPost(e) {
       return _json(testAlarm());
     }
     if (payload.action === 'getServiceStatus') {
-      return _json({ ok: true, status: getServiceStatus() });
+      return _json({ ok: true, status: getServiceStatus(), bankGuide: _bankGuideOn() });
     }
     if (payload.action === 'setServiceStatus') {
       // Staff-level on purpose — whoever is on the beach knows the boat is down.
