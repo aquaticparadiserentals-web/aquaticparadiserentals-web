@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<meta name="robots" content="noindex, nofollow">
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="theme-color" content="#070E1A"/>
@@ -2731,6 +2732,42 @@ function renderCmb() {
        <button class="stock-btn ghost" style="margin-top:8px" onclick="document.getElementById('cmbSetup').style.display='block'">Change settings</button>
        <div id="cmbSetup" style="display:none;margin-top:12px">${setup}</div>`
     : setup;
+  el.innerHTML += renderCmbBackup(s, field);
+}
+
+// Backup WhatsApp: alerted when a guest chat waits with no human reply (opening hours).
+function renderCmbBackup(s, field) {
+  const mins = s.escalateMin || 10;
+  const setup = `<div style="font-size:0.8rem;color:var(--muted);margin:6px 0 10px">On the backup phone, send <code>I allow callmebot to send me messages</code> to CallMeBot (+34 611 08 28 80). It replies with that phone's own apikey.</div>
+    ${field('cmbBackupPhone', 'Backup WhatsApp number (with country code)', 'tel', '')}
+    ${field('cmbBackupKey', 'apikey CallMeBot sent to the backup phone', 'password')}
+    <button class="stock-btn" onclick="saveCmbBackup()">Save &amp; Send Test</button>`;
+  return `<div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px">
+    <div style="font-weight:700;margin-bottom:4px">Backup alert when nobody replies</div>
+    <div style="font-size:0.8rem;color:var(--muted);margin-bottom:10px">If a guest's chat has no reply from the team after ${mins} minutes (8 AM to 6 PM), this phone gets a WhatsApp alert with a link to the chat. Automatic answers don't count as a reply.</div>
+    ${s.backupConfigured
+      ? `<div style="font-weight:700;color:var(--teal);margin-bottom:8px">Backup alerts go to ${escapeHtml(s.backupMasked)}</div>
+         <button class="stock-btn" onclick="alarmAction('testCmbBackup','Test sent — check the backup phone ')">Send Test Message</button>
+         <button class="stock-btn ghost" style="margin-top:8px" onclick="document.getElementById('cmbBackupSetup').style.display='block'">Change number</button>
+         <button class="stock-btn ghost" style="margin-top:8px" onclick="clearCmbBackup()">Turn off backup alerts</button>
+         <div id="cmbBackupSetup" style="display:none;margin-top:12px">${setup}</div>`
+      : setup}
+  </div>`;
+}
+
+async function saveCmbBackup() {
+  const v = id => document.getElementById(id).value.trim();
+  try {
+    await stockApi('setCmbBackup', { phone: v('cmbBackupPhone'), apiKey: v('cmbBackupKey') });
+    showToast('Backup alerts on — check that phone for the test');
+    fetchStockOverview();
+  } catch (err) { showToast(err.message, 'warn'); }
+}
+
+async function clearCmbBackup() {
+  if (!confirm('Turn off backup alerts?')) return;
+  try { await stockApi('setCmbBackup', { clear: true }); showToast('Backup alerts off'); fetchStockOverview(); }
+  catch (err) { showToast(err.message, 'warn'); }
 }
 
 async function saveCmb() {

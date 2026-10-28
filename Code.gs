@@ -1372,10 +1372,90 @@ function _waOwnerMessage(m) {
 var CMB_PHONE_PROP = 'CMB_PHONE', CMB_KEY_PROP = 'CMB_APIKEY';
 var SITE_URL = 'https://aquaticparadiserental.vacations/';
 
+var CMB_BACKUP_PHONE_PROP = 'CMB_BACKUP_PHONE', CMB_BACKUP_KEY_PROP = 'CMB_BACKUP_APIKEY';
+var CHAT_ESCALATE_MIN = 10;                 // minutes with no human reply before the backup alert
+var CHAT_ESCALATED_PROP = 'CHAT_ESCALATED'; // { convo: lastGuestAt } so each waiting message alerts once
+
 function getCmbStatus() {
   var props = PropertiesService.getScriptProperties();
   var phone = props.getProperty(CMB_PHONE_PROP) || '';
-  return { configured: !!(phone && props.getProperty(CMB_KEY_PROP)), phoneMasked: phone ? '+' + phone.slice(0, 1) + ' •••' + phone.slice(-4) : '' };
+  var backup = props.getProperty(CMB_BACKUP_PHONE_PROP) || '';
+  var mask = function (p) { return p ? '+' + p.slice(0, 1) + ' •••' + p.slice(-4) : ''; };
+  return { configured: !!(phone && props.getProperty(CMB_KEY_PROP)), phoneMasked: mask(phone),
+           backupConfigured: !!(backup && props.getProperty(CMB_BACKUP_KEY_PROP)), backupMasked: mask(backup),
+           escalateMin: CHAT_ESCALATE_MIN };
+}
+
+// Backup WhatsApp (e.g. the owner's personal phone): gets an alert when a guest's
+// chat has had no human reply for CHAT_ESCALATE_MIN minutes during opening hours.
+// CallMeBot keys are per phone, so the backup phone needs its own apikey.
+function setCmbBackup(p) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    if (p && p.clear) {
+      props.deleteProperty(CMB_BACKUP_PHONE_PROP);
+      props.deleteProperty(CMB_BACKUP_KEY_PROP);
+      return { ok: true };
+    }
+    var phone = String((p && p.phone) || '').replace(/\D/g, '');
+    var key = String((p && p.apiKey) || '').trim();
+    if (phone.length === 10) phone = '1' + phone;
+    if (!/^\d{11,15}$/.test(phone)) return { ok: false, error: 'Phone needs the country code, e.g. 1 784 496 3447' };
+    if (!/^[A-Za-z0-9]{4,40}$/.test(key)) return { ok: false, error: 'Paste the apikey CallMeBot sent to this backup phone' };
+    props.setProperty(CMB_BACKUP_PHONE_PROP, phone);
+    props.setProperty(CMB_BACKUP_KEY_PROP, key);
+    var t = _cmbSendTo(phone, key, '✅ Aquatic Paradise: backup alerts are on. You will hear here when a guest chat waits ' + CHAT_ESCALATE_MIN + ' minutes without a reply.');
+    return t.ok ? { ok: true } : { ok: false, error: 'Saved, but the test failed: ' + t.error };
+  } catch (err) {
+    return _fail('setCmbBackup', err);
+  }
+}
+
+function testCmbBackup() {
+  var props = PropertiesService.getScriptProperties();
+  var r = _cmbSendTo(props.getProperty(CMB_BACKUP_PHONE_PROP), props.getProperty(CMB_BACKUP_KEY_PROP),
+    '🔔 Test from Aquatic Paradise: backup alerts for unanswered guest chats arrive here.');
+  return r.ok ? { ok: true } : r;
+}
+
+// Runs from pollTelegram (every minute). Opening hours only, 8 AM to 6 PM Bequia time.
+// "Answered" means a team member replied after the guest's last message; an automatic
+// answer does not count. Each waiting message triggers one alert.
+function _chatEscalate() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var phone = props.getProperty(CMB_BACKUP_PHONE_PROP), key = props.getProperty(CMB_BACKUP_KEY_PROP);
+    if (!phone || !key) return;
+    var hour = Number(Utilities.formatDate(new Date(), 'America/St_Vincent', 'H'));
+    if (hour < 8 || hour >= 18) return;
+    var sh = _chatSheet(), last = sh.getLastRow();
+    if (last < 2) return;
+    var first = Math.max(2, last - 400);
+    var rows = sh.getRange(first, 1, last - first + 1, 6).getValues();
+    var threads = {};
+    rows.forEach(function (r) {
+      var c = String(r[0] || ''), from = String(r[1] || ''), at = Date.parse(r[5]) || 0;
+      if (!c || !at) return;
+      var t = threads[c] || (threads[c] = { guestAt: 0, teamAt: 0, name: '', text: '', contact: '' });
+      if (from === 'guest' && at >= t.guestAt) { t.guestAt = at; t.name = String(r[2] || 'Guest'); t.contact = String(r[3] || ''); t.text = String(r[4] || ''); }
+      if (from === 'team' && at > t.teamAt) t.teamAt = at;
+    });
+    var done = _readJsonProp(CHAT_ESCALATED_PROP, {}), now = Date.now(), changed = false;
+    Object.keys(done).forEach(function (c) { if (now - done[c] > 2 * 86400000) { delete done[c]; changed = true; } });
+    Object.keys(threads).forEach(function (c) {
+      var t = threads[c], waited = now - t.guestAt;
+      if (t.teamAt >= t.guestAt) return;                            // already answered
+      if (waited < CHAT_ESCALATE_MIN * 60000 || waited > 6 * 3600000) return;
+      if (done[c] === t.guestAt) return;                            // this message already escalated
+      var msg = ['⏰ Guest chat waiting ' + Math.round(waited / 60000) + ' min with no reply',
+        t.name + (t.contact ? ' (' + t.contact + ')' : '') + ': "' + t.text.slice(0, 300) + '"', '',
+        '↩️ Reply: ' + SITE_URL + 'admin.html#chat=' + c].join('\n');
+      if (_cmbSendTo(phone, key, msg).ok) { done[c] = t.guestAt; changed = true; }
+    });
+    if (changed) props.setProperty(CHAT_ESCALATED_PROP, JSON.stringify(done));
+  } catch (err) {
+    _logError('_chatEscalate', err);
+  }
 }
 
 function setCmbConfig(p) {
@@ -1397,7 +1477,10 @@ function setCmbConfig(p) {
 
 function _cmbSend(text) {
   var props = PropertiesService.getScriptProperties();
-  var phone = props.getProperty(CMB_PHONE_PROP), key = props.getProperty(CMB_KEY_PROP);
+  return _cmbSendTo(props.getProperty(CMB_PHONE_PROP), props.getProperty(CMB_KEY_PROP), text);
+}
+
+function _cmbSendTo(phone, key, text) {
   if (!phone || !key) return { ok: false, error: 'Not set up' };
   try {
     var res = UrlFetchApp.fetch('https://api.callmebot.com/whatsapp.php?phone=' + phone +
@@ -1632,6 +1715,7 @@ function pollTelegram() {
     var chat = props.getProperty(TG_CHAT_PROP);
     if (!chat) return;
     props.setProperty(TG_LAST_POLL_PROP, new Date().toISOString()); // health check shown in admin
+    _chatEscalate(); // backup WhatsApp alert for chats nobody has answered
     // One-time: installs the 6pm wrap-up trigger on existing setups and sends
     // a preview so the owner sees what will arrive each evening.
     if (!props.getProperty('EVENING_WRAPUP_V1')) {
@@ -2907,7 +2991,7 @@ function doPost(e) {
     if (payload.action === 'getAvailability') {
       return _json(getAvailability(payload));
     }
-    if (['getStockOverview', 'setStock', 'createDeal', 'endDeal', 'setTelegramToken', 'connectTelegram', 'testAlarm', 'sendBriefing', 'setSmsConfig', 'testSms', 'setWaConfig', 'testWa', 'setCmbConfig', 'testCmb', 'getHandoffs', 'setBeachPartners', 'markHandoffsPaid', 'setBankGuide'].indexOf(payload.action) !== -1) {
+    if (['getStockOverview', 'setStock', 'createDeal', 'endDeal', 'setTelegramToken', 'connectTelegram', 'testAlarm', 'sendBriefing', 'setSmsConfig', 'testSms', 'setWaConfig', 'testWa', 'setCmbConfig', 'testCmb', 'setCmbBackup', 'testCmbBackup', 'getHandoffs', 'setBeachPartners', 'markHandoffsPaid', 'setBankGuide'].indexOf(payload.action) !== -1) {
       // Owner-only: stock counts, deals, the alarm phone and beach partners.
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       if (payload.action === 'setBankGuide') return _json(setBankGuide(payload));
@@ -2927,6 +3011,8 @@ function doPost(e) {
       if (payload.action === 'testWa') return _json(testWa());
       if (payload.action === 'setCmbConfig') return _json(setCmbConfig(payload));
       if (payload.action === 'testCmb') return _json(testCmb());
+      if (payload.action === 'setCmbBackup') return _json(setCmbBackup(payload));
+      if (payload.action === 'testCmbBackup') return _json(testCmbBackup());
       return _json(testAlarm());
     }
     if (payload.action === 'getServiceStatus') {
