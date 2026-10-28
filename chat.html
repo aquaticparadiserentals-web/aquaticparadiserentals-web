@@ -95,10 +95,10 @@ button{font:inherit}
 .compose{flex-shrink:0;background:var(--card);border-top:1px solid var(--line);padding:10px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom))}
 .who-form{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
 .who-form label{display:block;font-size:.74rem;font-weight:600;color:var(--muted);margin-bottom:4px}
-.field{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--light);color:var(--ink);font:inherit;font-size:.92rem}
+.field{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--light);color:var(--ink);font:inherit;font-size:16px} /* 16px: no iPhone zoom on tap */
 .field:focus{outline:none;border-color:var(--teal)}
 .bar{display:flex;align-items:flex-end;gap:8px}
-.bar textarea{flex:1;resize:none;min-height:44px;max-height:140px;padding:11px 14px;border:1px solid var(--line);border-radius:22px;background:var(--light);color:var(--ink);font:inherit;font-size:.95rem;line-height:1.4}
+.bar textarea{flex:1;resize:none;min-height:44px;max-height:140px;padding:11px 14px;border:1px solid var(--line);border-radius:22px;background:var(--light);color:var(--ink);font:inherit;font-size:16px;line-height:1.4}
 .bar textarea:focus{outline:none;border-color:var(--teal)}
 .send{width:44px;height:44px;border-radius:50%;border:none;background:var(--me);color:var(--me-ink);display:grid;place-items:center;cursor:pointer;flex-shrink:0}
 .send:disabled{opacity:.45;cursor:default}
@@ -166,7 +166,7 @@ button{font:inherit}
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg>
       </button>
     </div>
-    <p class="fine" id="fine">Our team reads these messages on their phones. Replies marked "AI assistant" are written by AI from our price list and rules; they can be wrong, and a team member follows up. Please don't send card numbers or passwords. Chats are kept for up to 6 months. Voice input is turned into text by your browser's speech service (Google or Apple); we only receive the text — <a href="privacy.html#chat">privacy notice</a>.</p>
+    <p class="fine" id="fine">Our team reads these messages on their phones. Automatic answers come from our price list and rules; a team member follows up. Please don't send card numbers or passwords. Chats are kept for up to 6 months. Voice input is turned into text by your browser's speech service (Google or Apple); we only receive the text — <a href="privacy.html#chat">privacy notice</a>.</p>
   </form>
 </div>
 <div class="toast" id="toast" role="status"></div>
