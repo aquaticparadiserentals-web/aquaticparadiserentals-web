@@ -102,6 +102,11 @@ button{font:inherit}
 .bar textarea:focus{outline:none;border-color:var(--teal)}
 .send{width:44px;height:44px;border-radius:50%;border:none;background:var(--me);color:var(--me-ink);display:grid;place-items:center;cursor:pointer;flex-shrink:0}
 .send:disabled{opacity:.45;cursor:default}
+/* Voice: speak instead of typing; answers read aloud (same as the bubble on index.html) */
+.mic{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--teal-ink);display:grid;place-items:center;cursor:pointer;flex-shrink:0}
+.mic[hidden],.icon-btn[hidden]{display:none}
+.mic.on{background:var(--coral);border-color:var(--coral);color:#fff}
+.icon-btn.muted{opacity:.45}
 .fine{font-size:.72rem;color:var(--muted);margin-top:8px;line-height:1.45}
 .fine a{color:var(--muted)}
 .who-form[hidden]{display:none}
@@ -123,6 +128,9 @@ button{font:inherit}
       <h1>Aquatic Paradise Team</h1>
       <div class="status" id="status"><i></i><span id="statusText">On the beach now · usually reply in minutes</span></div>
     </div>
+    <button class="icon-btn" id="speakBtn" type="button" onclick="toggleSpeak()" aria-pressed="true" aria-label="Read answers aloud" hidden>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>
+    </button>
     <button class="icon-btn" id="menuBtn" aria-label="More options" aria-haspopup="true" aria-expanded="false" onclick="toggleMenu()">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
     </button>
@@ -150,12 +158,15 @@ button{font:inherit}
       <div><label for="chatContact">WhatsApp (optional)</label><input class="field" id="chatContact" maxlength="40" type="tel" autocomplete="tel" placeholder="In case you leave the page"/></div>
     </div>
     <div class="bar">
+      <button class="mic" id="micBtn" type="button" onclick="toggleVoice()" aria-label="Speak your question" title="Speak instead of typing" hidden>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>
+      </button>
       <textarea id="chatInput" rows="1" maxlength="1000" placeholder="Message the team…" aria-label="Message"></textarea>
       <button class="send" id="sendBtn" type="submit" aria-label="Send">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg>
       </button>
     </div>
-    <p class="fine" id="fine">Our team reads these messages on their phones. Please don't send card numbers or passwords. Chats are kept for up to 6 months — <a href="privacy.html">privacy notice</a>.</p>
+    <p class="fine" id="fine">Our team reads these messages on their phones. Please don't send card numbers or passwords. Chats are kept for up to 6 months. Voice input is turned into text by your browser's speech service (Google or Apple); we only receive the text — <a href="privacy.html#chat">privacy notice</a>.</p>
   </form>
 </div>
 <div class="toast" id="toast" role="status"></div>
@@ -257,9 +268,91 @@ function prefill(text) { const ta = $('chatInput'); ta.value = text; grow(); ta.
 function grow() { const ta = $('chatInput'); ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 140) + 'px'; }
 
 function apply(serverMsgs) {
+  const replies = list => (list || []).filter(m => m.from === 'team' || m.from === 'auto');
+  const before = replies(chat.msgs).length;
   const unsent = (chat.msgs || []).filter(m => m.failed);
   chat.msgs = (serverMsgs || []).concat(unsent);
   save(); render();
+  // After the guest has asked by voice, read new answers aloud.
+  const after = replies(chat.msgs);
+  if (voiceUsed && after.length > before) speakText(after[after.length - 1].text);
+}
+
+// ── VOICE ── Speak a question instead of typing; answers are read aloud.
+// Browser speech services only (no cost); buttons stay hidden where unsupported.
+// Shares apr_voice_out with the chat bubble on index.html.
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+const VOICE_LANGS = { en:'en-US', fr:'fr-FR', sv:'sv-SE', es:'es-ES', de:'de-DE', it:'it-IT', pt:'pt-PT', nl:'nl-NL' };
+let voiceRec = null, voiceListening = false, voiceUsed = false;
+let speakOn = (() => { try { return localStorage.getItem('apr_voice_out') !== 'off'; } catch (e) { return true; } })();
+function voiceLang() { try { return VOICE_LANGS[localStorage.getItem('apr_lang') || 'en'] || 'en-US'; } catch (e) { return 'en-US'; } }
+
+function initVoice() {
+  if (SpeechRec) $('micBtn').hidden = false;
+  if ('speechSynthesis' in window) { $('speakBtn').hidden = false; updateSpeakBtn(); }
+}
+function updateSpeakBtn() {
+  const b = $('speakBtn');
+  b.setAttribute('aria-pressed', speakOn ? 'true' : 'false');
+  b.setAttribute('aria-label', speakOn ? 'Answers are read aloud, tap to turn off' : 'Answers are not read aloud, tap to turn on');
+  b.title = b.getAttribute('aria-label');
+  b.classList.toggle('muted', !speakOn);
+}
+function toggleSpeak() {
+  speakOn = !speakOn;
+  try { localStorage.setItem('apr_voice_out', speakOn ? 'on' : 'off'); } catch (e) {}
+  if (!speakOn && 'speechSynthesis' in window) speechSynthesis.cancel();
+  updateSpeakBtn();
+}
+function speakText(text) {
+  if (!speakOn || !('speechSynthesis' in window)) return;
+  const clean = String(text || '').replace(/https?:\/\/\S+/g, '').replace(/\s+/g, ' ').trim();
+  if (!clean) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(clean);
+  u.lang = voiceLang();
+  speechSynthesis.speak(u);
+}
+function toggleVoice() {
+  if (!SpeechRec) return;
+  if (voiceListening && voiceRec) { voiceRec.stop(); return; }
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  const ta = $('chatInput'), mic = $('micBtn');
+  let finalText = '';
+  voiceRec = new SpeechRec();
+  voiceRec.lang = voiceLang();
+  voiceRec.interimResults = true;
+  voiceRec.maxAlternatives = 1;
+  voiceRec.onstart = () => { voiceListening = true; mic.classList.add('on'); mic.setAttribute('aria-label', 'Listening, tap to stop'); ta.placeholder = 'Listening… ask your question'; };
+  voiceRec.onresult = (e) => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) finalText += e.results[i][0].transcript; else interim += e.results[i][0].transcript;
+    }
+    ta.value = (finalText + ' ' + interim).trim(); grow();
+  };
+  voiceRec.onerror = (e) => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') toast('Allow the microphone to ask by voice, or type instead');
+    else if (e.error === 'no-speech') toast('I didn\'t catch that. Tap the mic and try again');
+  };
+  voiceRec.onend = () => {
+    voiceListening = false;
+    mic.classList.remove('on');
+    mic.setAttribute('aria-label', 'Speak your question');
+    ta.placeholder = 'Message the team…';
+    const text = (finalText || ta.value).trim();
+    if (!text) return;
+    voiceUsed = true;
+    ta.value = text; grow();
+    // New guests still need a name before the first message goes to the team.
+    if (!chat.name && !$('chatName').value.trim()) {
+      speakText('Please add your name, then tap send, and our team will reply here.');
+      $('chatName').focus();
+      return;
+    }
+    sendChat();
+  };
+  try { voiceRec.start(); } catch (e) { voiceListening = false; }
 }
 
 async function sendChat(retryText) {
@@ -326,7 +419,7 @@ $('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.sh
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { renderStatus(); poll(); } });
 window.addEventListener('storage', e => { if (e.key === CHAT_KEY) { try { chat = JSON.parse(e.newValue) || {}; } catch (x) { chat = {}; } render(); } });
 
-renderStatus(); render(); poll(); schedule();
+renderStatus(); render(); poll(); schedule(); initVoice();
 setInterval(renderStatus, 60000);
 </script>
 </body>
