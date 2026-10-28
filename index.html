@@ -2991,7 +2991,9 @@ function handleSpokenQuestion(text) {
   speakText('Please add your name, then tap send, and our team will reply here.');
   document.getElementById('chatName')?.focus();
 }
-window.addEventListener('load', initVoice);
+// Show the voice buttons as soon as the chat exists — not after every photo has loaded,
+// which can take a long time on slow Wi-Fi.
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initVoice); else initVoice();
 
 function teamReplyCount() { return (chatState.msgs || []).filter(m => m.from === 'team' || m.from === 'auto').length; }
 
