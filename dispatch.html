@@ -509,7 +509,7 @@ function renderStaffThread(msgs) {
   const el = document.getElementById("chatThreadMsgs");
   el.innerHTML = msgs.map(m => {
     const cls = m.from === "guest" ? "" : m.from === "auto" ? " auto" : " team";
-    const who = m.from === "auto" ? "Automatic answer" : m.name || "Guest";
+    const who = m.from === "auto" ? (m.name || "Automatic answer") : m.name || "Guest";
     return `<div class="cmsg${cls}"><small>${escapeHtml(who)} · ${ago(m.at)}</small>${escapeHtml(m.text)}</div>`;
   }).join("");
   el.scrollTop = el.scrollHeight;

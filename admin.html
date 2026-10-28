@@ -455,6 +455,9 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
   <div class="sec-title">Pay by Bank Transfer (guest guide)</div>
   <div class="card" id="bankGuideCard">Loading…</div>
 
+  <div class="sec-title">AI Chat Assistant</div>
+  <div class="card" id="aiCard">Loading…</div>
+
   <div class="sec-title">Alarms to Your Phone (Telegram)</div>
   <div class="card" id="tgCard">Loading…</div>
 
@@ -2466,6 +2469,7 @@ async function fetchStockOverview() {
   renderStock();
   renderDeals();
   renderBankGuide();
+  renderAiCard();
   renderAlarm();
   renderSms();
   renderWa();
@@ -2587,6 +2591,60 @@ function renderBankGuide() {
       <button class="stock-btn" style="width:auto;margin:0;${on ? 'background:var(--coral)' : ''}" onclick="setBankGuideUI(${!on})">${on ? 'Hide from guests' : 'Show to guests'}</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin:10px 0 0">Your account number is never on the website. Guests ask for it on WhatsApp.</p>`;
+}
+
+// AI chat assistant (Code.gs setAiConfig). Uses the owner's own Anthropic API
+// key; the key is sent once to the server and never shown again.
+function renderAiCard() {
+  const a = (stockOverview && stockOverview.ai) || {};
+  const keyForm = `
+    <div style="font-size:0.78rem;color:var(--muted);margin:8px 0">Create a key at console.anthropic.com → API Keys (add a few dollars of credit and a monthly spend limit there). Paste it here once; it's stored on the server and never shown again.</div>
+    <input id="aiKeyInput" type="password" autocomplete="off" placeholder="sk-ant-…" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);margin-bottom:8px">
+    <button class="stock-btn" onclick="saveAiKey()">Save &amp; test key</button>`;
+  document.getElementById('aiCard').innerHTML = `
+    <div style="font-size:0.8rem;color:var(--muted);margin-bottom:10px">Answers guests' typed or spoken chat questions straight away, using only your prices and rules. It can't make or change bookings and hands anything else to your team. Your team still gets every message, and the backup WhatsApp alert still fires if nobody replies. Costs roughly 1–3 US cents per answer, capped at ${a.dailyMax || 300} answers a day.</div>
+    ${a.configured ? `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:700"><span class="dot ${a.on ? 'ok' : 'off'}"></span>${a.on ? 'On: answering guests' : 'Off: guests get the standard instant answers'}</div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:4px">${a.today || 0} AI answers today</div>
+        </div>
+        <button class="stock-btn" style="width:auto;margin:0;${a.on ? 'background:var(--coral)' : ''}" onclick="setAiOn(${!a.on})">${a.on ? 'Turn off' : 'Turn on'}</button>
+      </div>
+      <button class="stock-btn ghost" style="margin-top:10px" onclick="document.getElementById('aiKeyBox').style.display='block'">Change API key</button>
+      <button class="stock-btn ghost" style="margin-top:8px" onclick="clearAiKey()">Remove API key</button>
+      <div id="aiKeyBox" style="display:none;margin-top:10px">${keyForm}</div>`
+    : keyForm}`;
+}
+
+async function saveAiKey() {
+  const input = document.getElementById('aiKeyInput');
+  const apiKey = input.value.trim();
+  if (!apiKey) { showToast('Paste your API key first', 'warn'); return; }
+  showToast('Testing the key…');
+  try {
+    const data = await stockApi('setAiConfig', { apiKey });
+    input.value = '';
+    stockOverview.ai = data.ai; renderAiCard();
+    showToast('Key works. Tap Turn on when you\'re ready.');
+  } catch (err) { showToast(err.message, 'warn'); }
+}
+
+async function setAiOn(on) {
+  try {
+    const data = await stockApi('setAiConfig', { on });
+    stockOverview.ai = data.ai; renderAiCard();
+    showToast(on ? 'AI assistant is answering guests' : 'AI assistant off');
+  } catch (err) { showToast(err.message, 'warn'); }
+}
+
+async function clearAiKey() {
+  if (!confirm('Remove the API key and turn the AI assistant off?')) return;
+  try {
+    const data = await stockApi('setAiConfig', { clear: true });
+    stockOverview.ai = data.ai; renderAiCard();
+    showToast('API key removed');
+  } catch (err) { showToast(err.message, 'warn'); }
 }
 
 async function setBankGuideUI(on) {
@@ -4212,7 +4270,7 @@ function renderChatThread(msgs) {
     // 'auto' = instant answer the chat gave by itself (Code.gs _chatAutoAnswer).
     const auto = m.from === 'auto', team = m.from === 'team' || auto;
     return `<div style="align-self:${team ? 'flex-end' : 'flex-start'};max-width:85%;padding:8px 11px;border-radius:12px;font-size:0.85rem;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;background:${auto ? 'var(--surface)' : team ? 'var(--teal)' : 'var(--bg)'};color:${team && !auto ? 'var(--navy)' : 'var(--ink)'};border:1px ${auto ? 'dashed' : 'solid'} ${team && !auto ? 'transparent' : 'var(--line)'}">`
-      + `<div style="font-size:0.66rem;font-weight:700;opacity:0.8;margin-bottom:2px">${escapeHtml(auto ? 'Automatic answer' : team ? m.name : (m.name || 'Guest'))}</div>`
+      + `<div style="font-size:0.66rem;font-weight:700;opacity:0.8;margin-bottom:2px">${escapeHtml(auto ? (m.name || 'Automatic answer') : team ? m.name : (m.name || 'Guest'))}</div>`
       + escapeHtml(m.text)
       + `<div style="font-size:0.63rem;opacity:0.7;margin-top:3px">${chatAgo(m.at)}</div></div>`;
   }).join('');

@@ -166,7 +166,7 @@ button{font:inherit}
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg>
       </button>
     </div>
-    <p class="fine" id="fine">Our team reads these messages on their phones. Please don't send card numbers or passwords. Chats are kept for up to 6 months. Voice input is turned into text by your browser's speech service (Google or Apple); we only receive the text — <a href="privacy.html#chat">privacy notice</a>.</p>
+    <p class="fine" id="fine">Our team reads these messages on their phones. Replies marked "AI assistant" are written by AI from our price list and rules. Please don't send card numbers or passwords. Chats are kept for up to 6 months. Voice input is turned into text by your browser's speech service (Google or Apple); we only receive the text — <a href="privacy.html#chat">privacy notice</a>.</p>
   </form>
 </div>
 <div class="toast" id="toast" role="status"></div>
@@ -248,7 +248,7 @@ function render() {
       return;
     }
     html += `<div class="row ${mine ? 'me' : 'them'}${auto ? ' auto' : ''}">` +
-      (showName ? `<div class="who">${auto ? 'Automatic answer' : esc(m.name || 'Aquatic Paradise')}</div>` : '') +
+      (showName ? `<div class="who">${auto ? esc(m.name || 'Automatic answer') : esc(m.name || 'Aquatic Paradise')}</div>` : '') +
       `<div class="bubble">${linkify(m.text)}</div>` +
       `<div class="meta">${m.pending ? 'Sending…' : timeOf(m.at)}</div></div>`;
   });
