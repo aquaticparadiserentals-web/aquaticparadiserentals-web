@@ -70,6 +70,11 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 .home-tile .ht-icon{display:flex;color:var(--teal);margin-bottom:8px}
 .home-tile .ht-label{font-size:0.92rem;font-weight:650;color:var(--ink)}
 .home-tile .ht-sub{font-size:0.72rem;color:var(--muted);line-height:1.35}
+/* New guest chat message: the Chats tile blinks gold until it's opened */
+.home-tile.chat-alert{border-color:var(--gold);animation:chatBlink 1s steps(2,start) infinite}
+.home-tile.chat-alert .ht-icon{color:var(--gold)}
+@keyframes chatBlink{to{background:rgba(212,160,23,0.18)}}
+@media (prefers-reduced-motion:reduce){.home-tile.chat-alert{animation:none;background:rgba(212,160,23,0.18)}}
 
 /* Status dots and small text tags (replace emoji markers) */
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:1px;background:var(--muted)}
@@ -749,12 +754,18 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 <div class="asection" id="asec-chats">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
     <div class="sec-title" style="margin:0">Guest Chats</div>
-    <button class="refresh-btn" onclick="fetchChats()">Refresh</button>
+    <div style="display:flex;gap:8px">
+      <button class="refresh-btn" id="chatAlertBtn" onclick="toggleChatAlerts()">🔔 Alerts on</button>
+      <button class="refresh-btn" onclick="fetchChats()">Refresh</button>
+    </div>
   </div>
   <p style="font-size:0.72rem;color:var(--muted);margin-bottom:12px">Messages guests send from the booking page's button. Each one also goes to your Telegram bot and your WhatsApp (if set up in Fleet) — away from the computer, reply to that message on your phone and the guest sees it here and on their screen.</p>
   <div id="chatsList"></div>
   <div id="chatThread" style="display:none">
-    <button class="refresh-btn" onclick="closeChatThread()" style="margin-bottom:10px">← All chats</button>
+    <div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:10px">
+      <button class="refresh-btn" onclick="closeChatThread()">← All chats</button>
+      <button class="refresh-btn" onclick="deleteChat(openChatConvo)" style="color:var(--coral);border-color:var(--coral)">🗑 Delete chat</button>
+    </div>
     <div class="card" style="padding:12px">
       <div id="chatThreadHead" style="font-weight:700;margin-bottom:4px"></div>
       <div id="chatThreadContact" style="font-size:0.75rem;color:var(--muted);margin-bottom:10px"></div>
@@ -1081,6 +1092,7 @@ async function checkPin() {
     document.getElementById('sessionTime').textContent = new Date().toLocaleTimeString();
     onLogin();
     openDeepLink();
+    startChatWatch();
     addLog('' + currentUser.name + ' logged in');
     resetIdleTimer();
   } else {
@@ -3771,7 +3783,7 @@ function switchATab(tab) {
   if (tab==='partners') fetchPartnerReport();
   if (tab==='cashflow') fetchCashFlow();
   if (tab==='messages') fetchMessages();
-  if (tab==='chats') { fetchChats(); startChatsPolling(); } else { stopChatsPolling(); }
+  if (tab==='chats') { clearChatAlert(); fetchChats(); startChatsPolling(); } else { stopChatsPolling(); }
   if (tab==='settings') fetchLockdownStatus();
 }
 function goHome() { switchATab('home'); }
@@ -3973,16 +3985,111 @@ function chatAgo(iso) {
   return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-async function fetchChats() {
+async function fetchChats(quiet) {
   try {
     const d = await chatsApi({ action: 'getChats' });
     if (!d || !d.ok) throw new Error();
     chatsCache = d.chats || [];
+    checkNewGuestMessages(chatsCache);
     renderChatsList();
     if (openChatConvo) { setChatHeader(openChatConvo); fetchChatThread(openChatConvo); }
   } catch (err) {
-    showToast('Could not load chats', 'warn');
+    if (!quiet) showToast('Could not load chats', 'warn');
   }
+}
+
+async function deleteChat(convo) {
+  if (!convo) return;
+  const c = chatsCache.find(x => x.convo === convo) || {};
+  if (!confirm(`Delete the chat with ${c.name || 'this guest'}? All its messages are removed for good.`)) return;
+  try {
+    const d = await chatsApi({ action: 'chatDeleteAdmin', convo });
+    if (!d || !d.ok) throw new Error((d && d.error) || 'Not deleted');
+    chatsCache = chatsCache.filter(x => x.convo !== convo);
+    if (openChatConvo === convo) closeChatThread();
+    renderChatsList();
+    showToast('Chat deleted', 'ok');
+  } catch (err) {
+    showToast(err.message || 'Chat not deleted', 'warn');
+  }
+}
+
+// ── NEW-MESSAGE ALERTS: sound + vibration + flashing tab title + phone/desktop
+// notification while admin is open (any tab). Checks every 20s in the background.
+let chatSeen = null, chatWatchTimer = null, chatAudio = null, titleFlashTimer = null;
+const baseTitle = document.title;
+function chatAlertsOn() { try { return localStorage.getItem('apr_chat_alerts') !== 'off'; } catch (e) { return true; } }
+function paintChatAlertBtn() {
+  const b = document.getElementById('chatAlertBtn');
+  if (b) b.textContent = chatAlertsOn() ? '🔔 Alerts on' : '🔕 Alerts off';
+}
+function toggleChatAlerts() {
+  const on = !chatAlertsOn();
+  try { localStorage.setItem('apr_chat_alerts', on ? 'on' : 'off'); } catch (e) {}
+  paintChatAlertBtn();
+  if (on) { unlockChatSound(); askNotifyPermission(); playChatSound(); }
+}
+function unlockChatSound() {
+  try {
+    chatAudio = chatAudio || new (window.AudioContext || window.webkitAudioContext)();
+    if (chatAudio.state === 'suspended') chatAudio.resume();
+  } catch (e) { /* no audio support */ }
+}
+function askNotifyPermission() {
+  if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
+}
+function playChatSound() {
+  if (!chatAudio) return;
+  [0, 0.18].forEach((t, i) => {
+    const o = chatAudio.createOscillator(), g = chatAudio.createGain();
+    o.type = 'sine'; o.frequency.value = i ? 1320 : 880;
+    g.gain.setValueAtTime(0.0001, chatAudio.currentTime + t);
+    g.gain.exponentialRampToValueAtTime(0.35, chatAudio.currentTime + t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, chatAudio.currentTime + t + 0.16);
+    o.connect(g).connect(chatAudio.destination);
+    o.start(chatAudio.currentTime + t); o.stop(chatAudio.currentTime + t + 0.18);
+  });
+}
+function flashTitle(n) {
+  clearInterval(titleFlashTimer);
+  let on = false;
+  titleFlashTimer = setInterval(() => { on = !on; document.title = on ? `🔴 (${n}) New message` : baseTitle; }, 1000);
+}
+function stopTitleFlash() { clearInterval(titleFlashTimer); titleFlashTimer = null; document.title = baseTitle; }
+function checkNewGuestMessages(chats) {
+  const fresh = chats.filter(c => c.lastFrom === 'guest' && chatSeen && chatSeen[c.convo] !== c.lastAt);
+  const next = {};
+  chats.forEach(c => { if (c.lastFrom === 'guest') next[c.convo] = c.lastAt; });
+  const first = chatSeen === null;
+  chatSeen = next;
+  if (first || !fresh.length || !chatAlertsOn()) return;
+  playChatSound();
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  const tile = document.querySelector('[onclick="switchATab(\'chats\')"]');
+  if (tile) tile.classList.add('chat-alert');
+  if (document.hidden || !document.getElementById('asec-chats').classList.contains('active')) flashTitle(fresh.length);
+  if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
+    const c = fresh[0];
+    try { new Notification('New message from ' + (c.name || 'a guest'), { body: c.lastText || '', tag: 'apr-chat', renotify: true }); } catch (e) {}
+  }
+}
+function clearChatAlert() {
+  stopTitleFlash();
+  const tile = document.querySelector('[onclick="switchATab(\'chats\')"]');
+  if (tile) tile.classList.remove('chat-alert');
+}
+function startChatWatch() {
+  paintChatAlertBtn();
+  unlockChatSound(); // PIN entry was a tap, so the browser lets us make sound from now on
+  if (chatAlertsOn()) askNotifyPermission();
+  document.addEventListener('pointerdown', unlockChatSound, { once: true });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && document.getElementById('asec-chats').classList.contains('active')) clearChatAlert();
+  });
+  clearInterval(chatWatchTimer);
+  fetchChats(true);
+  // Only when the Chats tab isn't already polling (startChatsPolling).
+  chatWatchTimer = setInterval(() => { if (!chatsPollTimer) fetchChats(true); }, 20000);
 }
 
 function renderChatsList() {
@@ -3998,7 +4105,8 @@ function renderChatsList() {
     <div class="card" style="cursor:pointer;margin:8px 0;padding:12px 14px;${c.lastFrom === 'guest' ? 'border-color:var(--gold)' : ''}" onclick="openChat('${c.convo}')">
       <div style="display:flex;justify-content:space-between;gap:8px">
         <strong>${escapeHtml(c.name || 'Guest')}</strong>
-        <span style="font-size:0.7rem;color:var(--muted);white-space:nowrap">${chatAgo(c.lastAt)}</span>
+        <span style="display:flex;align-items:center;gap:8px;font-size:0.7rem;color:var(--muted);white-space:nowrap">${chatAgo(c.lastAt)}
+          <button type="button" onclick="event.stopPropagation();deleteChat('${c.convo}')" aria-label="Delete this chat" title="Delete chat" style="background:none;border:none;cursor:pointer;color:var(--coral);font-size:0.95rem;padding:2px 4px">🗑</button></span>
       </div>
       <div style="font-size:0.8rem;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.lastFrom === 'guest' ? 'Guest: ' : 'You: '}${escapeHtml(c.lastText)}</div>
     </div>`).join('');

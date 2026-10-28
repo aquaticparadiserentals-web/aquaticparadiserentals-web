@@ -2810,9 +2810,10 @@ function doPost(e) {
       if (payload.action === 'staffGetChatThread') return _json(staffGetChatThread(payload));
       return _json(staffChatReply(payload));
     }
-    if (['getChats', 'getChatThread', 'chatReplyAdmin'].indexOf(payload.action) !== -1) {
+    if (['getChats', 'getChatThread', 'chatReplyAdmin', 'chatDeleteAdmin'].indexOf(payload.action) !== -1) {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       if (payload.action === 'getChats') return _json(getChats());
+      if (payload.action === 'chatDeleteAdmin') return _json(chatDeleteAdmin(payload));
       if (payload.action === 'getChatThread') return _json(getChatThread(payload));
       return _json(chatReplyAdmin(payload));
     }
@@ -4278,6 +4279,19 @@ function chatDelete(p) {
     return { ok: true, deleted: n };
   } catch (err) {
     return _fail('chatDelete', err);
+  }
+}
+
+// ── CHAT: ADMIN DELETES A CONVERSATION (admin.html Chats → Delete) ──
+function chatDeleteAdmin(p) {
+  try {
+    var convo = p && p.convo;
+    if (!_chatValidId(convo)) return { ok: false, error: 'Unknown chat' };
+    var n = _chatDeleteRows(function (c) { return c === convo; });
+    CacheService.getScriptCache().remove('chat_' + convo);
+    return { ok: true, deleted: n };
+  } catch (err) {
+    return _fail('chatDeleteAdmin', err);
   }
 }
 
