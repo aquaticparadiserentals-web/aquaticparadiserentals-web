@@ -761,8 +761,16 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
     <div style="display:flex;gap:8px">
       <button class="refresh-btn" id="chatAlertBtn" onclick="toggleChatAlerts()">🔔 Alerts on</button>
       <button class="refresh-btn" onclick="fetchChats()">Refresh</button>
-      <button class="refresh-btn" onclick="deleteAllChats()" style="color:var(--coral);border-color:var(--coral)">Delete all</button>
+      <button class="refresh-btn" id="chatSelectBtn" onclick="toggleChatSelect()">Select</button>
     </div>
+  </div>
+  <div id="chatSelectBar" class="card" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:10px 14px">
+    <label style="display:flex;align-items:center;gap:8px;font-size:0.85rem;cursor:pointer"><input type="checkbox" id="chatSelectAll" onchange="selectAllChats(this.checked)" style="width:18px;height:18px"> Select all</label>
+    <span id="chatSelectCount" style="font-size:0.8rem;color:var(--muted)">0 selected</span>
+    <span style="margin-left:auto;display:flex;gap:8px">
+      <button class="refresh-btn" onclick="toggleChatSelect(false)">Cancel</button>
+      <button class="refresh-btn" id="chatDeleteSelBtn" onclick="deleteSelectedChats()" disabled style="color:#fff;background:var(--coral);border-color:var(--coral)">Delete selected</button>
+    </span>
   </div>
   <div id="chatReports"></div>
   <p style="font-size:0.72rem;color:var(--muted);margin-bottom:12px">Messages guests send from the booking page's button. Each one also goes to your Telegram bot and your WhatsApp (if set up in Fleet) — away from the computer, reply to that message on your phone and the guest sees it here and on their screen.</p>
@@ -4114,21 +4122,60 @@ async function fetchChats(quiet) {
   }
 }
 
-// Wipes every guest chat. Abuse reports are kept (evidence).
-async function deleteAllChats() {
-  if (!chatsCache.length) { showToast('No chats to delete', 'warn'); return; }
-  const typed = prompt('Delete ALL ' + chatsCache.length + ' guest chats for good? Abuse reports are kept.\n\nType DELETE ALL to confirm.');
-  if (typed === null) return;
-  if (typed.trim().toUpperCase() !== 'DELETE ALL') { showToast('Not deleted: type DELETE ALL exactly', 'warn'); return; }
+// ── SELECT & DELETE ── Tick chats (or Select all), delete them, then the list
+// is reloaded from the server to prove they're gone. Abuse reports are kept.
+let chatSelecting = false;
+const chatPicked = new Set();
+function toggleChatSelect(force) {
+  chatSelecting = typeof force === 'boolean' ? force : !chatSelecting;
+  chatPicked.clear();
+  document.getElementById('chatSelectBar').style.display = chatSelecting ? 'flex' : 'none';
+  document.getElementById('chatSelectBtn').textContent = chatSelecting ? 'Done' : 'Select';
+  if (chatSelecting && openChatConvo) closeChatThread();
+  renderChatsList();
+}
+function pickChat(convo) {
+  if (chatPicked.has(convo)) chatPicked.delete(convo); else chatPicked.add(convo);
+  renderChatsList();
+}
+function selectAllChats(on) {
+  chatPicked.clear();
+  if (on) chatsCache.forEach(c => chatPicked.add(c.convo));
+  renderChatsList();
+}
+function paintChatSelectBar() {
+  const n = chatPicked.size;
+  document.getElementById('chatSelectCount').textContent = n + ' selected';
+  const all = document.getElementById('chatSelectAll');
+  all.checked = n > 0 && n === chatsCache.length;
+  all.indeterminate = n > 0 && n < chatsCache.length;
+  const btn = document.getElementById('chatDeleteSelBtn');
+  btn.disabled = !n;
+  btn.textContent = n ? 'Delete selected (' + n + ')' : 'Delete selected';
+}
+async function deleteSelectedChats() {
+  const picked = [...chatPicked];
+  if (!picked.length) return;
+  const names = picked.map(c => (chatsCache.find(x => x.convo === c) || {}).name || 'Guest');
+  const list = names.length > 5 ? names.slice(0, 5).join(', ') + ' and ' + (names.length - 5) + ' more' : names.join(', ');
+  if (!confirm('Delete ' + picked.length + ' chat' + (picked.length > 1 ? 's' : '') + ' for good?\n\n' + list + '\n\nAbuse reports are kept.')) return;
+  const btn = document.getElementById('chatDeleteSelBtn');
+  btn.disabled = true; btn.textContent = 'Deleting…';
   try {
-    const d = await chatsApi({ action: 'chatDeleteAllAdmin', confirm: 'DELETE ALL' });
+    const d = await chatsApi({ action: 'chatDeleteSelectedAdmin', convos: picked });
     if (!d || !d.ok) throw new Error((d && d.error) || 'Not deleted');
-    chatsCache = [];
-    if (openChatConvo) closeChatThread();
-    renderChatsList();
-    showToast('All chats deleted', 'ok');
+    // Reload from the server and check none of them came back.
+    const fresh = await chatsApi({ action: 'getChats' });
+    if (!fresh || !fresh.ok) throw new Error('Deleted, but the list could not be reloaded. Tap Refresh.');
+    chatsCache = fresh.chats || [];
+    const still = picked.filter(c => chatsCache.some(x => x.convo === c)).length;
+    toggleChatSelect(false);
+    fetchChatReports();
+    if (still) showToast(still + ' chat' + (still > 1 ? 's are' : ' is') + ' still there. Select and delete again.', 'warn');
+    else showToast(picked.length + ' chat' + (picked.length > 1 ? 's' : '') + ' deleted and checked', 'ok');
   } catch (err) {
     showToast(err.message || 'Not deleted', 'warn');
+    paintChatSelectBar();
   }
 }
 
@@ -4254,14 +4301,16 @@ function renderChatsList() {
     return;
   }
   el.innerHTML = chatsCache.map(c => `
-    <div class="card" style="cursor:pointer;margin:8px 0;padding:12px 14px;${c.lastFrom === 'guest' ? 'border-color:var(--gold)' : ''}" onclick="openChat('${c.convo}')">
+    <div class="card" style="cursor:pointer;margin:8px 0;padding:12px 14px;${chatSelecting && chatPicked.has(c.convo) ? 'border-color:var(--coral);background:rgba(214,58,58,.08)' : c.lastFrom === 'guest' ? 'border-color:var(--gold)' : ''}" onclick="${chatSelecting ? `pickChat('${c.convo}')` : `openChat('${c.convo}')`}">
       <div style="display:flex;justify-content:space-between;gap:8px">
-        <strong>${escapeHtml(c.name || 'Guest')}${c.strikes ? ` <span style="font-size:0.65rem;font-weight:600;color:#fff;background:var(--coral);border-radius:6px;padding:1px 6px;vertical-align:middle">${c.strikes >= 2 ? 'Closed' : 'Warned'}</span>` : ''}</strong>
+        ${chatSelecting ? `<input type="checkbox" ${chatPicked.has(c.convo) ? 'checked' : ''} aria-label="Select chat with ${escapeHtml(c.name || 'Guest')}" onclick="event.stopPropagation();pickChat('${c.convo}')" style="width:20px;height:20px;flex-shrink:0;margin:0 4px 0 0">` : ''}
+        <strong style="flex:1;min-width:0">${escapeHtml(c.name || 'Guest')}${c.strikes ? ` <span style="font-size:0.65rem;font-weight:600;color:#fff;background:var(--coral);border-radius:6px;padding:1px 6px;vertical-align:middle">${c.strikes >= 2 ? 'Closed' : 'Warned'}</span>` : ''}</strong>
         <span style="display:flex;align-items:center;gap:8px;font-size:0.7rem;color:var(--muted);white-space:nowrap">${chatAgo(c.lastAt)}
-          <button type="button" onclick="event.stopPropagation();deleteChat('${c.convo}')" aria-label="Delete this chat" title="Delete chat" style="background:none;border:none;cursor:pointer;color:var(--coral);font-size:0.95rem;padding:2px 4px">🗑</button></span>
+          ${chatSelecting ? '' : `<button type="button" onclick="event.stopPropagation();deleteChat('${c.convo}')" aria-label="Delete this chat" title="Delete chat" style="background:none;border:none;cursor:pointer;color:var(--coral);font-size:0.95rem;padding:2px 4px">🗑</button>`}</span>
       </div>
       <div style="font-size:0.8rem;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.lastFrom === 'guest' ? 'Guest: ' : 'You: '}${escapeHtml(c.lastText)}</div>
     </div>`).join('');
+  if (chatSelecting) paintChatSelectBar();
 }
 
 function openChat(convo) {

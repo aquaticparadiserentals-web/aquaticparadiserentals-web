@@ -3096,10 +3096,10 @@ function doPost(e) {
       if (payload.action === 'staffGetChatThread') return _json(staffGetChatThread(payload));
       return _json(staffChatReply(payload));
     }
-    if (['getChats', 'getChatThread', 'chatReplyAdmin', 'chatDeleteAdmin', 'chatDeleteAllAdmin', 'getChatReports'].indexOf(payload.action) !== -1) {
+    if (['getChats', 'getChatThread', 'chatReplyAdmin', 'chatDeleteAdmin', 'chatDeleteSelectedAdmin', 'getChatReports'].indexOf(payload.action) !== -1) {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       if (payload.action === 'getChats') return _json(getChats());
-      if (payload.action === 'chatDeleteAllAdmin') return _json(chatDeleteAllAdmin(payload));
+      if (payload.action === 'chatDeleteSelectedAdmin') return _json(chatDeleteSelectedAdmin(payload));
       if (payload.action === 'getChatReports') return _json(getChatReports());
       if (payload.action === 'chatDeleteAdmin') return _json(chatDeleteAdmin(payload));
       if (payload.action === 'getChatThread') return _json(getChatThread(payload));
@@ -4886,20 +4886,40 @@ function getChatReports() {
   }
 }
 
-// Removes every guest chat. The CHAT_REPORTS sheet is kept as evidence.
-function chatDeleteAllAdmin(p) {
+// Deletes the chats picked in Admin → Guest Chats → Select, then reads the
+// sheet back so the page can say for certain they're gone. The CHAT_REPORTS
+// sheet is kept as evidence.
+function chatDeleteSelectedAdmin(p) {
   try {
-    if (!p || p.confirm !== 'DELETE ALL') return { ok: false, error: 'Not confirmed' };
-    var sh = _chatSheet(), last = sh.getLastRow();
-    var convos = last > 1 ? sh.getRange(2, 1, last - 1, 1).getValues().map(function (r) { return String(r[0]); }) : [];
-    var lock = LockService.getScriptLock();
-    lock.waitLock(10000);
-    try { if (last > 1) sh.deleteRows(2, last - 1); } finally { lock.releaseLock(); }
+    var picked = (p && Array.isArray(p.convos) ? p.convos : []).filter(_chatValidId);
+    if (!picked.length) return { ok: false, error: 'Nothing selected' };
+    var set = {};
+    picked.forEach(function (c) { set[c] = true; });
+    var sh = _chatSheet(), lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    var rowsDeleted = 0;
+    try {
+      // Rewrite the sheet in one go: far faster than deleting rows one by one.
+      var rows = sh.getDataRange().getValues();
+      var keep = rows.slice(1).filter(function (r) { return !set[String(r[0])]; });
+      rowsDeleted = rows.length - 1 - keep.length;
+      if (rowsDeleted) {
+        sh.getRange(2, 1, rows.length - 1, rows[0].length).clearContent();
+        if (keep.length) sh.getRange(2, 1, keep.length, rows[0].length).setValues(keep);
+        if (sh.getMaxRows() > keep.length + 1) sh.deleteRows(keep.length + 2, sh.getMaxRows() - keep.length - 1);
+      }
+    } finally {
+      lock.releaseLock();
+    }
     var cache = CacheService.getScriptCache();
-    convos.filter(function (c, i) { return convos.indexOf(c) === i; }).forEach(function (c) { cache.remove('chat_' + c); });
-    return { ok: true, deleted: convos.length };
+    picked.forEach(function (c) { cache.remove('chat_' + c); });
+    SpreadsheetApp.flush();
+    var left = sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues()
+      .filter(function (r) { return set[String(r[0])]; }).length : 0;
+    return { ok: left === 0, chats: picked.length, messages: rowsDeleted, remaining: left,
+      error: left ? left + ' messages could not be deleted. Try again.' : '' };
   } catch (err) {
-    return _fail('chatDeleteAllAdmin', err);
+    return _fail('chatDeleteSelectedAdmin', err);
   }
 }
 
