@@ -122,6 +122,7 @@ header p{font-size:0.72rem;color:var(--muted);margin-top:2px}
       <summary>Guest Chats <span class="svc-count" id="chatCount">—</span></summary>
       <div class="svc-body">
         <div class="svc-help">Messages from the website chat. Your reply appears in the guest's chat signed with your first name. Guest phone numbers aren't shown here.</div>
+        <div class="svc-help" id="staffAlerts" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"></div>
         <label class="svc-help" for="staffName" style="display:block;margin-bottom:4px">Your first name</label>
         <input class="svc-input" id="staffName" maxlength="20" autocomplete="given-name" placeholder="e.g. Kevin" onchange="saveStaffName(this.value)"/>
         <div id="chatList"></div>
@@ -141,6 +142,8 @@ header p{font-size:0.72rem;color:var(--muted);margin-top:2px}
 <div class="toast" id="toast"></div>
 
 <script src="offline-queue.js"></script>
+<script src="chat-alerts.js"></script>
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});</script>
 <script>
 const BACKEND = 'https://script.google.com/macros/s/AKfycbzr1KHela518-pgQ3dJyvv77tm9z2JWo_TTovRNys6RwYNBIUfdyJKxGF_ETzNk9m47Ww/exec';
 // No longer a hardcoded constant — this page's source used to hand out the
@@ -189,7 +192,10 @@ async function checkPin() {
     fetchDispatch();
     fetchServiceStatus();
     fetchStaffChats();
-    setInterval(() => { if (!document.hidden) { fetchStaffChats(); if (openConvo) fetchStaffThread(openConvo); } }, 30000);
+    renderStaffAlerts();
+    setInterval(() => { if (!document.hidden) { fetchStaffChats(); if (openConvo) fetchStaffThread(openConvo); } }, 15000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { fetchStaffChats(); if (openConvo) fetchStaffThread(openConvo); } });
+    openChatFromHash();
     startDispatchPolling();
   } else {
     showToast('Wrong PIN');
@@ -470,11 +476,54 @@ function ago(iso) {
   if (isNaN(m)) return "";
   return m < 1 ? "now" : m < 60 ? m + "m" : m < 1440 ? Math.round(m / 60) + "h" : Math.round(m / 1440) + "d";
 }
+// New guest messages ring and buzz while this page is open (see chat-alerts.js);
+// "Turn on chat alerts" adds lock-screen alerts for when it's closed.
+let staffSeenAt = 0;
+function alertNewGuestMessages(chats) {
+  const newest = chats.filter(c => c.lastFrom === "guest").reduce((t, c) => Math.max(t, Date.parse(c.lastAt) || 0), 0);
+  if (staffSeenAt && newest > staffSeenAt) {
+    const c = chats.find(x => x.lastFrom === "guest" && Date.parse(x.lastAt) === newest);
+    AprAlerts.tone();
+    AprAlerts.notifyHere("Guest chat · " + (c ? c.name : "Guest"), c ? c.lastText : "", "dispatch.html#chat=" + (c ? c.convo : ""));
+    showToast("New guest message from " + (c ? c.name : "a guest"));
+  }
+  staffSeenAt = Math.max(staffSeenAt, newest, 1);
+}
+function renderStaffAlerts() {
+  const el = document.getElementById("staffAlerts");
+  const st = AprAlerts.pushState();
+  el.innerHTML = st === "on" ? "Chat alerts are on for this phone."
+    : st === "blocked" ? "Notifications are blocked. Allow them for this site in your browser settings."
+    : st === "ios-home" ? "iPhone: tap Share, then \"Add to Home Screen\", open it from there and turn chat alerts on."
+    : st === "unsupported" ? "This browser can't show alerts when closed. Keep this page open, or use Chrome."
+    : "Get a lock-screen alert for every guest message, even with this page closed. <button class='svc-chip' type='button' onclick='enableStaffAlerts(this)'>Turn on chat alerts</button>";
+}
+async function enableStaffAlerts(btn) {
+  btn.disabled = true; btn.textContent = "Turning on…";
+  const res = await AprAlerts.enablePush({ token: STAFF_TOKEN });
+  showToast(res.ok ? "Chat alerts are on" : res.error);
+  renderStaffAlerts();
+}
+// Notification taps open dispatch.html#chat=<id>, straight to that chat.
+function openChatFromHash() {
+  const m = location.hash.match(/^#chat=([a-f0-9]{32})$/);
+  if (!m || !STAFF_TOKEN) return;
+  document.getElementById("chatPanel").open = true;
+  openStaffThread(m[1]);
+  document.getElementById("chatPanel").scrollIntoView({ block: "start" });
+  history.replaceState(null, "", location.pathname);
+}
+window.addEventListener("hashchange", openChatFromHash);
+// Guests' voice messages arrive as a Drive link: make it tappable.
+function chatTextHtml(text) {
+  return escapeHtml(text).replace(/https:\/\/drive\.google\.com\/[^\s<]+/g, u => '<a href="' + u + '" target="_blank" rel="noopener">play</a>');
+}
 async function fetchStaffChats() {
   try {
     const d = await chatApi({ action: "staffGetChats" });
     if (!d || !d.ok) return;
     const chats = d.chats || [];
+    alertNewGuestMessages(chats);
     const waiting = chats.filter(c => c.lastFrom === "guest").length;
     const cnt = document.getElementById("chatCount");
     cnt.textContent = waiting ? waiting + " waiting" : chats.length ? "All answered" : "None";
@@ -482,7 +531,7 @@ async function fetchStaffChats() {
     document.getElementById("chatList").innerHTML = chats.length ? chats.map(c =>
       `<button class="chat-row${c.lastFrom === "guest" ? " waiting" : ""}" data-convo="${escapeHtml(c.convo)}" onclick="openStaffThread(this.dataset.convo)">
         <span class="when">${ago(c.lastAt)}</span><b>${escapeHtml(c.name)}</b>
-        <span class="last">${c.lastFrom === "guest" ? "" : c.lastFrom === "auto" ? "Auto: " : "Team: "}${escapeHtml(c.lastText)}</span></button>`).join("")
+        <span class="last">${c.lastFrom === "guest" ? "" : c.lastFrom === "auto" ? "Auto: " : "Team: "}${escapeHtml(String(c.lastText).replace(/: https:\/\/drive\.google\.com\/\S+/, ''))}</span></button>`).join("")
       : "<div class=\"svc-help\">No guest chats in the last 30 days.</div>";
   } catch (e) { /* offline — next refresh */ }
 }
@@ -510,7 +559,7 @@ function renderStaffThread(msgs) {
   el.innerHTML = msgs.map(m => {
     const cls = m.from === "guest" ? "" : m.from === "auto" ? " auto" : " team";
     const who = m.from === "auto" ? (m.name || "Automatic answer") : m.name || "Guest";
-    return `<div class="cmsg${cls}"><small>${escapeHtml(who)} · ${ago(m.at)}</small>${escapeHtml(m.text)}</div>`;
+    return `<div class="cmsg${cls}"><small>${escapeHtml(who)} · ${ago(m.at)}</small>${chatTextHtml(m.text)}</div>`;
   }).join("");
   el.scrollTop = el.scrollHeight;
 }

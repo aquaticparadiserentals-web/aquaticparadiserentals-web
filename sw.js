@@ -1,8 +1,8 @@
-// APR Service Worker v10.0
+// APR Service Worker v11.0
 // Bump CACHE whenever static assets (manifest, icons, logo) change — they're
 // cached-first with no expiry, so the version string is the only thing that
 // forces a refresh. HTML is network-first and self-heals on next reload.
-const CACHE = 'apr-v10';
+const CACHE = 'apr-v11';
 const ASSETS = [
   './manifest.json',
   './logo.jpg',
@@ -21,7 +21,7 @@ const ASSETS = [
 ];
 // apr-config.js rides with the HTML (network-first) so edits to deposit %,
 // PayPal or partners reach guests immediately instead of sticking in cache.
-const HTML_FILES = ['./', './index.html', './admin.html', './apr-config.js'];
+const HTML_FILES = ['./', './index.html', './admin.html', './apr-config.js', './chat-alerts.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -129,3 +129,32 @@ function drainOfflineQueueFromSW() {
     };
   });
 }
+
+// ── Chat notifications ──
+// Sent by the platform server (aquatic-platform src/apr-push.js) when the
+// team replies to a guest, or a guest writes to the team. Shows even when
+// the site is closed; the phone plays its normal notification sound.
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (err) { d = { body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'Aquatic Paradise', {
+    body: d.body || 'You have a new message',
+    icon: 'icons/icon-192.png',
+    badge: 'icons/icon-48.png',
+    tag: d.tag || 'apr-chat',
+    renotify: true,
+    vibrate: [200, 100, 200],
+    data: { url: d.url || './' },
+  }));
+});
+
+// Tapping it opens the chat, reusing a tab of the site that's already open.
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = new URL((e.notification.data && e.notification.data.url) || './', self.location.href).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    const same = list.find(c => c.url.split('#')[0] === url.split('#')[0]);
+    if (same) return same.focus().then(c => (c && 'navigate' in c ? c.navigate(url) : c));
+    return self.clients.openWindow(url);
+  }));
+});

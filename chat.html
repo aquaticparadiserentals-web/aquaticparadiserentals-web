@@ -114,6 +114,10 @@ button{font:inherit}
 
 .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:.85rem;opacity:0;pointer-events:none;transition:opacity .2s;z-index:30;max-width:90vw;text-align:center}
 .toast.on{opacity:1}
+.notify{display:flex;align-items:center;gap:10px;align-self:stretch;max-width:520px;margin:4px auto 8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:.82rem;line-height:1.4}
+.notify button{margin-left:auto;flex-shrink:0;background:var(--navy);color:#fff;border:0;border-radius:8px;padding:9px 12px;font:inherit;font-size:.82rem;font-weight:600;cursor:pointer}
+@media (prefers-color-scheme: dark){.notify button{background:var(--teal);color:#04222A}}
+.bubble a.voice{color:inherit;font-weight:600}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -166,11 +170,12 @@ button{font:inherit}
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg>
       </button>
     </div>
-    <p class="fine" id="fine">Our team reads these messages on their phones. Automatic answers come from our price list and rules; a team member follows up. Please don't send card numbers or passwords. Chats are kept for up to 6 months. Voice input is turned into text by your browser's speech service (Google or Apple); we only receive the text — <a href="privacy.html#chat">privacy notice</a>.</p>
+    <p class="fine" id="fine">Our team reads these messages on their phones. Automatic answers come from our price list and rules; a team member follows up. Please don't send card numbers or passwords. Chats are kept for up to 6 months. Voice input is turned into text by your browser's speech service (Google or Apple); where a phone can't do that, your voice message is sent to our team as a recording — <a href="privacy.html#chat">privacy notice</a>.</p>
   </form>
 </div>
 <div class="toast" id="toast" role="status"></div>
 
+<script src="chat-alerts.js"></script>
 <script>
 const BACKEND = 'https://script.google.com/macros/s/AKfycbzr1KHela518-pgQ3dJyvv77tm9z2JWo_TTovRNys6RwYNBIUfdyJKxGF_ETzNk9m47Ww/exec';
 // Same storage key as the chat bubble on index.html, so both show one conversation.
@@ -249,11 +254,12 @@ function render() {
     }
     html += `<div class="row ${mine ? 'me' : 'them'}${auto ? ' auto' : ''}">` +
       (showName ? `<div class="who">${auto ? esc(m.name || 'Automatic answer') : esc(m.name || 'Aquatic Paradise')}</div>` : '') +
-      `<div class="bubble">${linkify(m.text)}</div>` +
+      `<div class="bubble">${msgHtml(m.text)}</div>` +
       `<div class="meta">${m.pending ? 'Sending…' : timeOf(m.at)}</div></div>`;
   });
   const sent = msgs.some(m => m.from === 'guest' && !m.failed && !m.pending);
   const answered = msgs.some(m => m.from === 'team');
+  if (sent) html += notifyHtml();
   if (sent && !answered) html += `<p class="note">Sent to the team's phones. ${openNow() ? 'We usually reply within a few minutes.' : 'We\'re off the water now and reply from 8AM.'} You can leave this page and come back — the conversation stays on this device.</p>`;
   const log = $('log');
   const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
@@ -264,6 +270,26 @@ function render() {
   chat.seenTeam = msgs.filter(m => m.from !== 'guest').length; save();
 }
 
+// A guest's own voice message shows as a play link (the team gets the audio too).
+function msgHtml(text) {
+  const m = String(text).match(/^🎤 Voice message \((\d+)s\): (https:\/\/drive\.google\.com\/\S+)$/);
+  if (m) return '🎤 <a class="voice" href="' + m[2] + '" target="_blank" rel="noopener">Voice message (' + m[1] + 's) · play</a>';
+  return linkify(text);
+}
+// Lock-screen alerts when the team replies (see chat-alerts.js).
+function notifyHtml() {
+  const st = AprAlerts.pushState();
+  if (st === 'on' || st === 'unsupported') return '';
+  if (st === 'blocked') return '<div class="notify">Notifications are blocked for this site. Allow them in your browser settings to get our reply on your lock screen.</div>';
+  if (st === 'ios-home') return '<div class="notify">To get our reply on your lock screen: tap Share, then "Add to Home Screen", and open the app from there.</div>';
+  return '<div class="notify">Get our reply on your lock screen, even if you close this page.<button type="button" onclick="enableAlerts(this)">Notify me</button></div>';
+}
+async function enableAlerts(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Turning on…'; }
+  const res = await AprAlerts.enablePush({ convo: convoId() });
+  toast(res.ok ? 'Done. We\'ll notify you when the team replies' : res.error);
+  render();
+}
 function prefill(text) { const ta = $('chatInput'); ta.value = text; grow(); ta.focus(); }
 function grow() { const ta = $('chatInput'); ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 140) + 'px'; }
 
@@ -273,9 +299,16 @@ function apply(serverMsgs) {
   const unsent = (chat.msgs || []).filter(m => m.failed);
   chat.msgs = (serverMsgs || []).concat(unsent);
   save(); render();
-  // After the guest has asked by voice, read new answers aloud.
   const after = replies(chat.msgs);
-  if (voiceUsed && after.length > before) speakText(after[after.length - 1].text);
+  if (after.length > before) {
+    const last = after[after.length - 1];
+    if (last.from === 'team') {
+      AprAlerts.tone();
+      AprAlerts.notifyHere((last.name || 'Aquatic Paradise') + ' replied', last.text, 'chat.html');
+    }
+    // After the guest has asked by voice, read new answers aloud.
+    if (voiceUsed) speakText(last.text);
+  }
 }
 
 // ── VOICE ── Speak a question instead of typing; answers are read aloud.
@@ -288,7 +321,8 @@ let speakOn = (() => { try { return localStorage.getItem('apr_voice_out') !== 'o
 function voiceLang() { try { return VOICE_LANGS[localStorage.getItem('apr_lang') || 'en'] || 'en-US'; } catch (e) { return 'en-US'; } }
 
 function initVoice() {
-  if (SpeechRec) $('micBtn').hidden = false;
+  if (SpeechRec || AprAlerts.canRecord) $('micBtn').hidden = false;
+  if (!SpeechRec && AprAlerts.canRecord) { $('micBtn').title = 'Record a voice message'; $('micBtn').setAttribute('aria-label', 'Record a voice message'); }
   if ('speechSynthesis' in window) { $('speakBtn').hidden = false; updateSpeakBtn(); }
 }
 function updateSpeakBtn() {
@@ -314,7 +348,8 @@ function speakText(text) {
   speechSynthesis.speak(u);
 }
 function toggleVoice() {
-  if (!SpeechRec) return;
+  if (voiceRecorder) { stopVoiceMessage(); return; }
+  if (!SpeechRec || !speechRecUsable) { startVoiceMessage(); return; }
   if (voiceListening && voiceRec) { voiceRec.stop(); return; }
   if ('speechSynthesis' in window) speechSynthesis.cancel();
   const ta = $('chatInput'), mic = $('micBtn');
@@ -332,7 +367,9 @@ function toggleVoice() {
     ta.value = (finalText + ' ' + interim).trim(); grow();
   };
   voiceRec.onerror = (e) => {
-    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') toast('Allow the microphone to ask by voice, or type instead');
+    // iPhone home-screen apps report speech-to-text as not allowed; record a voice message instead.
+    if ((e.error === 'service-not-allowed' || e.error === 'network') && AprAlerts.canRecord) voiceFallback = true;
+    else if (e.error === 'not-allowed' || e.error === 'service-not-allowed') toast('Allow the microphone to ask by voice, or type instead');
     else if (e.error === 'no-speech') toast('I didn\'t catch that. Tap the mic and try again');
   };
   voiceRec.onend = () => {
@@ -340,6 +377,7 @@ function toggleVoice() {
     mic.classList.remove('on');
     mic.setAttribute('aria-label', 'Speak your question');
     ta.placeholder = 'Message the team…';
+    if (voiceFallback) { voiceFallback = false; speechRecUsable = false; startVoiceMessage(); return; }
     const text = (finalText || ta.value).trim();
     if (!text) return;
     voiceUsed = true;
@@ -352,7 +390,49 @@ function toggleVoice() {
     }
     sendChat();
   };
-  try { voiceRec.start(); } catch (e) { voiceListening = false; }
+  try { voiceRec.start(); } catch (e) { voiceListening = false; if (AprAlerts.canRecord) { speechRecUsable = false; startVoiceMessage(); } }
+}
+// ── VOICE MESSAGES ── For phones that can't turn speech into text: record up to
+// a minute and send the audio to the team (chatVoice in Code.gs). Tap the mic
+// to start, tap again to send.
+let voiceRecorder = null, voiceFallback = false, speechRecUsable = true;
+async function startVoiceMessage() {
+  const mic = $('micBtn'), ta = $('chatInput');
+  if (!AprAlerts.canRecord) { toast('Voice isn\'t available in this browser. Use your keyboard\'s mic key, or type'); ta.focus(); return; }
+  if (!chat.name && !$('chatName').value.trim()) { toast('Add your name first, then tap the mic'); $('chatName').focus(); return; }
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  const rec = new AprAlerts.Recorder(secs => {
+    ta.placeholder = 'Recording ' + secs + 's… tap the mic to send';
+    if (secs >= AprAlerts.RECORD_MAX_SECS && voiceRecorder === rec) stopVoiceMessage();
+  });
+  try { await rec.start(); } catch (e) { toast('Allow the microphone to send a voice message, or type instead'); return; }
+  voiceRecorder = rec;
+  mic.classList.add('on'); mic.setAttribute('aria-label', 'Recording, tap to send');
+  ta.placeholder = 'Recording… tap the mic to send';
+}
+async function stopVoiceMessage() {
+  const rec = voiceRecorder, mic = $('micBtn'), ta = $('chatInput');
+  voiceRecorder = null;
+  mic.classList.remove('on'); mic.setAttribute('aria-label', 'Record a voice message');
+  ta.placeholder = 'Message the team…';
+  const clip = await rec.stop();
+  if (!clip) { toast('That was too short. Hold on a second longer'); return; }
+  if (!chat.name) { chat.name = $('chatName').value.trim(); chat.contact = $('chatContact').value.trim(); save(); }
+  voiceUsed = true;
+  const pending = { from: 'guest', text: '🎤 Voice message (' + clip.secs + 's)', at: new Date().toISOString(), pending: true };
+  chat.msgs = (chat.msgs || []).concat(pending); render();
+  $('log').scrollTop = $('log').scrollHeight;
+  try {
+    const data = await AprAlerts.blobToBase64(clip.blob);
+    const d = await call({ action: 'chatVoice', convo: convoId(), name: chat.name, contact: chat.contact || '', mime: clip.mime, secs: clip.secs, data });
+    if (!d || !d.ok) throw new Error((d && d.error) || 'Not sent');
+    chat.msgs = chat.msgs.filter(m => m !== pending);
+    apply(d.messages);
+    fastUntil = Date.now() + 5 * 60000;
+  } catch (err) {
+    chat.msgs = chat.msgs.filter(m => m !== pending); save(); render();
+    toast(err.message && !/fetch|abort|timeout|network/i.test(err.message) ? err.message : 'Voice message not sent. Check your connection and try again');
+  } finally { schedule(); }
 }
 
 async function sendChat(retryText) {
@@ -416,7 +496,9 @@ document.addEventListener('click', e => { if (!e.target.closest('#menu, #menuBtn
 document.addEventListener('keydown', e => { if (e.key === 'Escape') toggleMenu(false); });
 $('chatInput').addEventListener('input', grow);
 $('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !matchMedia('(pointer:coarse)').matches) { e.preventDefault(); sendChat(); } });
-document.addEventListener('visibilitychange', () => { if (!document.hidden) { renderStatus(); poll(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { renderStatus(); poll(); schedule(); } });
+window.addEventListener('pageshow', e => { if (e.persisted) { poll(); schedule(); } }); // back/forward cache
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
 window.addEventListener('storage', e => { if (e.key === CHAT_KEY) { try { chat = JSON.parse(e.newValue) || {}; } catch (x) { chat = {}; } render(); } });
 
 renderStatus(); render(); poll(); schedule(); initVoice();

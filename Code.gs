@@ -3072,12 +3072,18 @@ function doPost(e) {
       if (!_rateLimitOk('chat', CHAT_RATE_MAX_PER_MINUTE)) return _json({ ok: false, error: 'Busy' });
       return _json(waWebhook(payload));
     }
-    if (payload.action === 'chatSend' || payload.action === 'chatFetch' || payload.action === 'chatDelete') {
+    if (payload.action === 'chatSend' || payload.action === 'chatVoice') {
+      // Sending gets its own bucket, so lots of open chat windows polling for
+      // replies can never block a guest's message from going through.
+      if (!_rateLimitOk('chatsend', CHAT_SEND_MAX_PER_MINUTE)) return _json({ ok: false, error: 'Busy — try again in a minute.' });
+      return _json(payload.action === 'chatSend' ? chatSend(payload) : chatVoice(payload));
+    }
+    if (payload.action === 'chatFetch' || payload.action === 'chatDelete') {
       // Public guest chat. Own rate bucket so open chat windows polling for
       // replies can never use up the budget real bookings need.
       if (!_rateLimitOk('chat', CHAT_RATE_MAX_PER_MINUTE)) return _json({ ok: false, error: 'Busy — try again in a minute.' });
       if (payload.action === 'chatDelete') return _json(chatDelete(payload));
-      return _json(payload.action === 'chatSend' ? chatSend(payload) : chatFetch(payload));
+      return _json(chatFetch(payload));
     }
     if (!_rateLimitOk('api', API_RATE_LIMIT_MAX_PER_MINUTE)) {
       return _json({ ok: false, error: 'Too many requests — please wait a minute.' });
@@ -4482,6 +4488,9 @@ function archiveOldBookingRows() {
 var CHAT_SHEET_NAME = 'CHAT';
 var CHAT_MAX_LEN = 1000;
 var CHAT_RATE_MAX_PER_MINUTE = 300; // own bucket, so guest polling never starves bookings
+var CHAT_SEND_MAX_PER_MINUTE = 120; // sends, separate from polling
+var CHAT_VOICE_FOLDER_NAME = 'APR Chat Voice Messages';
+var CHAT_VOICE_MAX_BASE64 = 2800000; // about 2 MB of audio, over a minute on any phone
 var CHAT_CACHE_SECS = 21600;
 
 function _chatSheet() {
@@ -4536,9 +4545,26 @@ function _chatAppend(convo, from, name, contact, text) {
     _chatLastRow = sh.getLastRow();
     msgs.push(msg);
     _chatCachePut(convo, msgs);
-    return msgs;
   } finally {
     lock.releaseLock();
+  }
+  _pushPing(convo);
+  return msgs;
+}
+
+// ── CHAT: LOCK-SCREEN NOTIFICATIONS ──
+// Apps Script can't sign Web Push messages, so the platform server on Render
+// sends them (aquatic-platform src/apr-push.js). Each saved message pings it
+// with the conversation id only; it reads the chat back from chatFetch and
+// notifies staff about guest messages and the guest about team replies.
+var PUSH_RELAY_URL = 'https://aquatic-platform.onrender.com/apr/push/ping';
+
+function _pushPing(convo) {
+  try {
+    UrlFetchApp.fetch(PUSH_RELAY_URL, { method: 'post', contentType: 'text/plain',
+      payload: JSON.stringify({ convo: convo }), muteHttpExceptions: true });
+  } catch (err) {
+    _logError('_pushPing', err); // a notification is never worth losing the message over
   }
 }
 
@@ -4931,6 +4957,62 @@ function chatSend(p) {
   } catch (err) {
     return _fail('chatSend', err);
   }
+}
+
+// Voice message from a phone whose browser can't turn speech into text
+// (iPhone home-screen app, in-app browsers, Firefox). The recording is kept
+// in Drive with a view-by-link URL so the owner, staff and the guest can all
+// play it, and the audio itself goes to the team's Telegram.
+function chatVoice(p) {
+  try {
+    var convo = p && p.convo;
+    if (!_chatValidId(convo)) return { ok: false, error: 'Chat expired — reload the page.' };
+    var name = String((p && p.name) || '').trim().slice(0, 60);
+    var contact = String((p && p.contact) || '').trim().slice(0, 40);
+    if (!name) return { ok: false, error: 'Please add your name.' };
+    var mime = String((p && p.mime) || '').split(';')[0];
+    if (!/^audio\/(webm|mp4|ogg|mpeg|aac|x-m4a|wav)$/.test(mime)) return { ok: false, error: 'This phone recorded in a format we can\'t play. Please type instead.' };
+    var data = String((p && p.data) || '');
+    if (!data) return { ok: false, error: 'The recording was empty. Try again.' };
+    if (data.length > CHAT_VOICE_MAX_BASE64) return { ok: false, error: 'That recording is too long. Keep it under a minute.' };
+    if (!_rateLimitOk('chat_' + convo, 8)) return { ok: false, error: 'Slow down a little — try again in a minute.' };
+    var secs = Math.max(1, Math.min(120, Math.round(Number(p.secs) || 0)));
+    var ext = { webm: 'webm', mp4: 'm4a', ogg: 'ogg', mpeg: 'mp3', aac: 'aac', 'x-m4a': 'm4a', wav: 'wav' }[mime.split('/')[1]];
+    var blob = Utilities.newBlob(Utilities.base64Decode(data), mime, 'chat_' + convo.slice(0, 6) + '_' + Date.now() + '.' + ext);
+    var folders = DriveApp.getFoldersByName(CHAT_VOICE_FOLDER_NAME);
+    var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(CHAT_VOICE_FOLDER_NAME);
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    var url = 'https://drive.google.com/file/d/' + file.getId() + '/view';
+
+    var isNew = _chatThread(convo).length === 0;
+    var text = '🎤 Voice message (' + secs + 's): ' + url;
+    var msgs = _chatAppend(convo, 'guest', name, contact, text);
+
+    var tag = convo.slice(0, 6);
+    var caption = (isNew ? '💬 NEW GUEST CHAT' : '💬 Guest chat') + ' · Chat #' + tag + '\nFrom: ' + name +
+      (contact ? ' · ' + contact : '') + '\n🎤 Voice message (' + secs + 's)\n\n↩️ Swipe this message → Reply to answer in their chat.';
+    var notified = _tgSendAudio(blob, caption);
+    if (!notified) notified = _tgSend(caption + '\n' + url);
+    try { if (_cmbChatAlert(convo, isNew, name, contact, '🎤 Voice message: ' + url)) notified = true; }
+    catch (err) { _logError('chatVoice.callmebot', err); }
+    return { ok: true, messages: _chatPublic(msgs), notified: !!notified };
+  } catch (err) {
+    return _fail('chatVoice', err);
+  }
+}
+
+// Sends a recording to the team chat as a playable file. The caption carries
+// "Chat #abc123" so swiping it and replying reaches the guest like any alert.
+function _tgSendAudio(blob, caption) {
+  var props = PropertiesService.getScriptProperties();
+  var token = props.getProperty(TG_TOKEN_PROP), chat = props.getProperty(TG_CHAT_PROP);
+  if (!token || !chat) return false;
+  var res = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/sendDocument', {
+    method: 'post', muteHttpExceptions: true,
+    payload: { chat_id: chat, caption: String(caption).slice(0, 1000), document: blob }
+  });
+  try { return !!JSON.parse(res.getContentText()).ok; } catch (e) { return false; }
 }
 
 function chatFetch(p) {

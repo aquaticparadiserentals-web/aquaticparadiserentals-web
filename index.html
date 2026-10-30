@@ -475,6 +475,10 @@ header .top-links a:hover,header .top-links a.active{color:#fff}
 @keyframes micPulse{50%{box-shadow:0 0 0 6px rgba(214,58,58,.25)}}
 @media (prefers-reduced-motion: reduce){.chat-mic.on{animation:none}}
 .chat-speak[hidden]{display:none}
+.chat-notify{display:flex;align-items:center;gap:10px;background:var(--light);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px;font-size:.8rem;color:var(--ink);line-height:1.4}
+.chat-notify button{margin-left:auto;flex-shrink:0;background:var(--navy);color:#fff;border:0;border-radius:8px;padding:8px 12px;font:inherit;font-size:.8rem;font-weight:600;cursor:pointer}
+.chat-b a.chat-voice{color:inherit;font-weight:600}
+@media (max-width:360px){.chat-bar{gap:4px;padding:8px}.chat-mic{width:40px}.chat-send{padding:0 11px}}
 .chat-speak.muted{opacity:.45}
 </style>
 </head>
@@ -981,7 +985,7 @@ header .top-links a:hover,header .top-links a.active{color:#fff}
     <button class="chat-mic" id="chatMicBtn" type="button" onclick="toggleVoice()" aria-label="Speak your question" title="Speak instead of typing" hidden><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
     <button class="chat-send" id="chatSendBtn" onclick="sendChat()">Send</button>
   </div>
-  <p class="chat-privacy" id="chatPrivacy">Automatic answers come from our price list and rules; a team member follows up. Your name, number and messages are kept so our team can reply. Voice input is turned into text by your browser's speech service (Google or Apple); we only receive the text. <a href="privacy.html#chat" target="_blank" rel="noopener">Privacy notice</a></p>
+  <p class="chat-privacy" id="chatPrivacy">Automatic answers come from our price list and rules; a team member follows up. Your name, number and messages are kept so our team can reply. Voice input is turned into text by your browser's speech service (Google or Apple); where a phone can't do that, your voice message is sent to our team as a recording. <a href="privacy.html#chat" target="_blank" rel="noopener">Privacy notice</a></p>
   <div class="help-footer">
     <a class="help-wa-btn" href="https://wa.me/17844963447?text=Hi%20APR!%20I%20have%20a%20question.">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
@@ -992,6 +996,7 @@ header .top-links a:hover,header .top-links a.active{color:#fff}
 
 <script src="apr-config.js"></script>
 <script src="offline-queue.js"></script>
+<script src="chat-alerts.js"></script>
 <script>
 // ── CONFIG ──
 const BACKEND = 'https://script.google.com/macros/s/AKfycbzr1KHela518-pgQ3dJyvv77tm9z2JWo_TTovRNys6RwYNBIUfdyJKxGF_ETzNk9m47Ww/exec';
@@ -2763,13 +2768,14 @@ function renderChat() {
       html += `<div class="chat-b guest failed" onclick="retryChat(${i})">${esc(m.text)}<span class="chat-meta">Not sent. Tap to retry</span></div>`;
     } else {
       const who = m.from === 'team' || m.from === 'auto' ? `<span class="chat-who">${esc(m.from === 'auto' ? (m.name || 'Automatic answer') : (m.name || 'Aquatic Paradise'))}</span>` : '';
-      html += `<div class="chat-b ${m.from === 'guest' ? 'guest' : 'team'}">${who}${esc(m.text)}<span class="chat-meta">${m.pending ? 'Sending…' : chatTime(m.at)}</span></div>`;
+      html += `<div class="chat-b ${m.from === 'guest' ? 'guest' : 'team'}">${who}${chatMsgHtml(m.text)}<span class="chat-meta">${m.pending ? 'Sending…' : chatTime(m.at)}</span></div>`;
     }
   });
   const sent = msgs.filter(m => m.from === 'guest' && !m.failed && !m.pending).length;
   const answered = msgs.some(m => m.from === 'team');
   if (sent && !answered) html += `<div class="chat-note">✓ Sent to the team's phone — we'll reply here. You can close this and come back.</div>`;
   html += '</div>';
+  if (sent) html += chatNotifyHtml();
 
   if (!chatState.name) {
     html += `<div class="chat-intro">
@@ -2889,7 +2895,14 @@ function applyChatMessages(serverMsgs) {
   if (panelOpen && helpView === 'chat') { markChatSeen(); renderChat(); }
   else updateChatBadge();
   const replies = chatState.msgs.filter(m => m.from === 'team' || m.from === 'auto');
-  if (chatState.voiceUsed && replies.length > repliesBefore) speakText(replies[replies.length - 1].text);
+  if (replies.length > repliesBefore) {
+    const last = replies[replies.length - 1];
+    if (last.from === 'team') {
+      AprAlerts.tone();
+      AprAlerts.notifyHere((last.name || 'Aquatic Paradise') + ' replied', last.text, location.pathname + '#chat');
+    }
+    if (chatState.voiceUsed) speakText(last.text);
+  }
 }
 
 // ── VOICE ── Speak a question instead of typing; answers are read aloud.
@@ -2903,7 +2916,10 @@ function voiceLang() { try { return VOICE_LANGS[localStorage.getItem('apr_lang')
 
 function initVoice() {
   const mic = document.getElementById('chatMicBtn'), spk = document.getElementById('chatSpeakBtn');
-  if (SpeechRec && mic) mic.hidden = false;
+  if (mic && (SpeechRec || AprAlerts.canRecord)) {
+    mic.hidden = false;
+    if (!SpeechRec) { mic.title = 'Record a voice message'; mic.setAttribute('aria-label', 'Record a voice message'); }
+  }
   if ('speechSynthesis' in window && spk) { spk.hidden = false; updateSpeakBtn(); }
 }
 
@@ -2935,7 +2951,8 @@ function speakText(htmlOrText) {
 }
 
 function toggleVoice() {
-  if (!SpeechRec) return;
+  if (voiceRecorder) { stopVoiceMessage(); return; }
+  if (!SpeechRec || !speechRecUsable) { startVoiceMessage(); return; }
   if (voiceListening && voiceRec) { voiceRec.stop(); return; }
   if ('speechSynthesis' in window) speechSynthesis.cancel();
   const ta = document.getElementById('chatInput'), mic = document.getElementById('chatMicBtn');
@@ -2953,7 +2970,9 @@ function toggleVoice() {
     ta.value = (finalText + ' ' + interim).trim();
   };
   voiceRec.onerror = (e) => {
-    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') showToast('Allow the microphone to ask by voice, or type instead', 'warn');
+    // iPhone home-screen apps report speech-to-text as not allowed; record a voice message instead.
+    if ((e.error === 'service-not-allowed' || e.error === 'network') && AprAlerts.canRecord) voiceFallback = true;
+    else if (e.error === 'not-allowed' || e.error === 'service-not-allowed') showToast('Allow the microphone to ask by voice, or type instead', 'warn');
     else if (e.error === 'no-speech') showToast('I didn\'t catch that. Tap the mic and try again', 'warn');
   };
   voiceRec.onend = () => {
@@ -2961,10 +2980,94 @@ function toggleVoice() {
     mic.classList.remove('on');
     mic.setAttribute('aria-label', 'Speak your question');
     ta.placeholder = 'Ask about gear, prices, delivery…';
+    if (voiceFallback) { voiceFallback = false; speechRecUsable = false; startVoiceMessage(); return; }
     const text = (finalText || ta.value).trim();
     if (text) handleSpokenQuestion(text);
   };
-  try { voiceRec.start(); } catch (e) { voiceListening = false; }
+  try { voiceRec.start(); } catch (e) { voiceListening = false; if (AprAlerts.canRecord) { speechRecUsable = false; startVoiceMessage(); } }
+}
+
+// ── VOICE MESSAGES ── For phones that can't turn speech into text: record up to
+// a minute and send the audio to the team (chatVoice in Code.gs). Tap the mic
+// to start, tap again to send.
+let voiceRecorder = null, voiceFallback = false, speechRecUsable = true;
+
+async function startVoiceMessage() {
+  const mic = document.getElementById('chatMicBtn'), ta = document.getElementById('chatInput');
+  if (!AprAlerts.canRecord) { showToast('Voice isn\'t available in this browser. Use your keyboard\'s mic key, or type', 'warn'); ta.focus(); return; }
+  if (!chatState.name && !(document.getElementById('chatName')?.value || '').trim()) {
+    showToast('Add your name first, then tap the mic', 'warn'); document.getElementById('chatName')?.focus(); return;
+  }
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  const rec = new AprAlerts.Recorder(secs => {
+    ta.placeholder = 'Recording ' + secs + 's… tap the mic to send';
+    if (secs >= AprAlerts.RECORD_MAX_SECS && voiceRecorder === rec) stopVoiceMessage();
+  });
+  try { await rec.start(); }
+  catch (e) { showToast('Allow the microphone to send a voice message, or type instead', 'warn'); return; }
+  voiceRecorder = rec;
+  mic.classList.add('on');
+  mic.setAttribute('aria-label', 'Recording, tap to send');
+  ta.placeholder = 'Recording… tap the mic to send';
+}
+
+async function stopVoiceMessage() {
+  const rec = voiceRecorder, mic = document.getElementById('chatMicBtn'), ta = document.getElementById('chatInput');
+  voiceRecorder = null;
+  mic.classList.remove('on');
+  mic.setAttribute('aria-label', 'Record a voice message');
+  ta.placeholder = 'Ask about gear, prices, delivery…';
+  const clip = await rec.stop();
+  if (!clip) { showToast('That was too short. Hold on a second longer', 'warn'); return; }
+  sendVoiceMessage(clip);
+}
+
+async function sendVoiceMessage(clip) {
+  if (!chatState.name) {
+    chatState.name = (document.getElementById('chatName')?.value || '').trim();
+    chatState.contact = (document.getElementById('chatContact')?.value || '').trim();
+  }
+  chatState.voiceUsed = true;
+  const pending = { from: 'guest', text: '🎤 Voice message (' + clip.secs + 's)', at: new Date().toISOString(), pending: true };
+  chatState.msgs = (chatState.msgs || []).concat(pending);
+  renderChat();
+  try {
+    const data = await AprAlerts.blobToBase64(clip.blob);
+    const d = await chatCall({ action: 'chatVoice', convo: chatConvoId(), name: chatState.name, contact: chatState.contact || '', mime: clip.mime, secs: clip.secs, data });
+    if (!d || !d.ok) throw new Error((d && d.error) || 'Not sent');
+    chatState.msgs = chatState.msgs.filter(m => m !== pending);
+    applyChatMessages(d.messages);
+    chatFastUntil = Date.now() + 5 * 60000;
+  } catch (err) {
+    chatState.msgs = chatState.msgs.filter(m => m !== pending);
+    saveChat(); renderChat();
+    showToast(err.message && !/fetch|abort|timeout/i.test(err.message) ? err.message : 'Voice message not sent. Check your connection and try again', 'warn');
+  } finally {
+    scheduleChatPoll();
+  }
+}
+
+// A guest's own voice message shows as a play link (the team gets the audio too).
+function chatMsgHtml(text) {
+  const m = String(text).match(/^🎤 Voice message \((\d+)s\): (https:\/\/drive\.google\.com\/\S+)$/);
+  if (m) return '🎤 <a class="chat-voice" href="' + m[2] + '" target="_blank" rel="noopener">Voice message (' + m[1] + 's) · play</a>';
+  return escapeHtmlText(text);
+}
+
+// ── ALERTS ── Lock-screen alerts when the team replies (see chat-alerts.js).
+function chatNotifyHtml() {
+  const st = AprAlerts.pushState();
+  if (st === 'on' || st === 'unsupported') return '';
+  if (st === 'blocked') return '<div class="chat-notify">Notifications are blocked for this site. Allow them in your browser settings to get our reply on your lock screen.</div>';
+  if (st === 'ios-home') return '<div class="chat-notify">To get our reply on your lock screen: tap Share, then "Add to Home Screen", and open the app from there.</div>';
+  return '<div class="chat-notify">Get our reply on your lock screen, even if you close this page.<button type="button" onclick="enableChatAlerts(this)">Notify me</button></div>';
+}
+
+async function enableChatAlerts(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Turning on…'; }
+  const r = await AprAlerts.enablePush({ convo: chatConvoId() });
+  showToast(r.ok ? 'Done. We\'ll notify you when the team replies' : r.error, r.ok ? 'success' : 'warn');
+  renderChat();
 }
 
 // A spoken question with an instant answer is answered on the spot (and read aloud);
@@ -3081,8 +3184,22 @@ function scheduleChatPoll() {
   }, delay);
 }
 
-document.addEventListener('visibilitychange', () => { if (!document.hidden) pollChat(); });
-window.addEventListener('load', () => { updateChatBadge(); scheduleChatPoll(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { pollChat(); scheduleChatPoll(); } });
+window.addEventListener('pageshow', e => { if (e.persisted) { pollChat(); scheduleChatPoll(); } }); // back/forward cache
+// Another tab of the site changed the chat (e.g. chat.html): show it here too.
+window.addEventListener('storage', e => {
+  if (e.key !== CHAT_KEY) return;
+  try { chatState = JSON.parse(e.newValue) || {}; } catch (x) { chatState = {}; }
+  renderChat(); updateChatBadge(); scheduleChatPoll();
+});
+// A notification tap or a shared link to index.html#chat opens the chat.
+function openChatFromHash() {
+  if (location.hash === '#chat' && !document.getElementById('helpPanel').classList.contains('open')) { helpView = 'chat'; toggleHelp(); }
+}
+// Start right away rather than after every photo loads (slow on beach Wi-Fi).
+function startChat() { updateChatBadge(); pollChat(); scheduleChatPoll(); openChatFromHash(); }
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startChat); else startChat();
+window.addEventListener('hashchange', openChatFromHash);
 
 function showHelpMenu() {
   document.getElementById('helpBody').innerHTML = HELP_TOPICS.map(t =>
