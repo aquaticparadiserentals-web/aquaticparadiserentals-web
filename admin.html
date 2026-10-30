@@ -761,8 +761,10 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
     <div style="display:flex;gap:8px">
       <button class="refresh-btn" id="chatAlertBtn" onclick="toggleChatAlerts()">🔔 Alerts on</button>
       <button class="refresh-btn" onclick="fetchChats()">Refresh</button>
+      <button class="refresh-btn" onclick="deleteAllChats()" style="color:var(--coral);border-color:var(--coral)">Delete all</button>
     </div>
   </div>
+  <div id="chatReports"></div>
   <p style="font-size:0.72rem;color:var(--muted);margin-bottom:12px">Messages guests send from the booking page's button. Each one also goes to your Telegram bot and your WhatsApp (if set up in Fleet) — away from the computer, reply to that message on your phone and the guest sees it here and on their screen.</p>
   <div id="chatsList"></div>
   <div id="chatThread" style="display:none">
@@ -4105,10 +4107,47 @@ async function fetchChats(quiet) {
     chatsCache = d.chats || [];
     checkNewGuestMessages(chatsCache);
     renderChatsList();
+    fetchChatReports();
     if (openChatConvo) { setChatHeader(openChatConvo); fetchChatThread(openChatConvo); }
   } catch (err) {
     if (!quiet) showToast('Could not load chats', 'warn');
   }
+}
+
+// Wipes every guest chat. Abuse reports are kept (evidence).
+async function deleteAllChats() {
+  if (!chatsCache.length) { showToast('No chats to delete', 'warn'); return; }
+  const typed = prompt('Delete ALL ' + chatsCache.length + ' guest chats for good? Abuse reports are kept.\n\nType DELETE ALL to confirm.');
+  if (typed === null) return;
+  if (typed.trim().toUpperCase() !== 'DELETE ALL') { showToast('Not deleted: type DELETE ALL exactly', 'warn'); return; }
+  try {
+    const d = await chatsApi({ action: 'chatDeleteAllAdmin', confirm: 'DELETE ALL' });
+    if (!d || !d.ok) throw new Error((d && d.error) || 'Not deleted');
+    chatsCache = [];
+    if (openChatConvo) closeChatThread();
+    renderChatsList();
+    showToast('All chats deleted', 'ok');
+  } catch (err) {
+    showToast(err.message || 'Not deleted', 'warn');
+  }
+}
+
+// Abusive-language reports (CHAT_REPORTS sheet): warning on strike 1, chat closed on strike 2 or a threat.
+async function fetchChatReports() {
+  const el = document.getElementById('chatReports');
+  try {
+    const d = await chatsApi({ action: 'getChatReports' });
+    if (!d || !d.ok || !(d.reports || []).length) { el.innerHTML = ''; return; }
+    el.innerHTML = `<details class="card" style="margin:0 0 12px;padding:12px 14px;border-color:var(--coral)">
+      <summary style="cursor:pointer;font-weight:600;color:var(--coral)">Abuse reports (${d.reports.length})</summary>
+      <p style="font-size:0.75rem;color:var(--muted);margin:8px 0">1st offence: guest is warned. 2nd offence or a threat: chat is closed. Nothing goes to the police automatically. ${escapeHtml(d.police)}</p>
+      ${d.reports.map(x => `<div style="border-top:1px solid var(--line);padding:8px 0;font-size:0.8rem">
+        <strong>${escapeHtml(x.name || 'Guest')}</strong>${x.contact ? ' · ' + escapeHtml(x.contact) : ''} · #${escapeHtml(x.tag)}
+        <span style="float:right;color:var(--muted);font-size:0.7rem">${chatAgo(x.at)}</span>
+        <div style="color:var(--coral);font-size:0.72rem">${x.type === 'threat' ? 'Threat' : 'Abusive language'} · strike ${x.strike} · ${escapeHtml(x.action)}</div>
+        <div style="margin-top:2px">${escapeHtml(x.text)}</div></div>`).join('')}
+    </details>`;
+  } catch (e) { /* keep what is shown */ }
 }
 
 async function deleteChat(convo) {
@@ -4217,7 +4256,7 @@ function renderChatsList() {
   el.innerHTML = chatsCache.map(c => `
     <div class="card" style="cursor:pointer;margin:8px 0;padding:12px 14px;${c.lastFrom === 'guest' ? 'border-color:var(--gold)' : ''}" onclick="openChat('${c.convo}')">
       <div style="display:flex;justify-content:space-between;gap:8px">
-        <strong>${escapeHtml(c.name || 'Guest')}</strong>
+        <strong>${escapeHtml(c.name || 'Guest')}${c.strikes ? ` <span style="font-size:0.65rem;font-weight:600;color:#fff;background:var(--coral);border-radius:6px;padding:1px 6px;vertical-align:middle">${c.strikes >= 2 ? 'Closed' : 'Warned'}</span>` : ''}</strong>
         <span style="display:flex;align-items:center;gap:8px;font-size:0.7rem;color:var(--muted);white-space:nowrap">${chatAgo(c.lastAt)}
           <button type="button" onclick="event.stopPropagation();deleteChat('${c.convo}')" aria-label="Delete this chat" title="Delete chat" style="background:none;border:none;cursor:pointer;color:var(--coral);font-size:0.95rem;padding:2px 4px">🗑</button></span>
       </div>

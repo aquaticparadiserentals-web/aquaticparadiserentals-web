@@ -3096,9 +3096,11 @@ function doPost(e) {
       if (payload.action === 'staffGetChatThread') return _json(staffGetChatThread(payload));
       return _json(staffChatReply(payload));
     }
-    if (['getChats', 'getChatThread', 'chatReplyAdmin', 'chatDeleteAdmin'].indexOf(payload.action) !== -1) {
+    if (['getChats', 'getChatThread', 'chatReplyAdmin', 'chatDeleteAdmin', 'chatDeleteAllAdmin', 'getChatReports'].indexOf(payload.action) !== -1) {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
       if (payload.action === 'getChats') return _json(getChats());
+      if (payload.action === 'chatDeleteAllAdmin') return _json(chatDeleteAllAdmin(payload));
+      if (payload.action === 'getChatReports') return _json(getChatReports());
       if (payload.action === 'chatDeleteAdmin') return _json(chatDeleteAdmin(payload));
       if (payload.action === 'getChatThread') return _json(getChatThread(payload));
       return _json(chatReplyAdmin(payload));
@@ -4801,6 +4803,106 @@ function chatDelete(p) {
 }
 
 // ── CHAT: ADMIN DELETES A CONVERSATION (admin.html Chats → Delete) ──
+// ── CHAT: ABUSIVE LANGUAGE ──
+// Strike 1: the guest gets a written warning in the chat. Strike 2 (or any
+// threat): the chat is closed and further messages are refused. Every hit is
+// kept in the CHAT_REPORTS sheet (evidence, survives "Delete all") and sent to
+// the owner's Telegram. Nothing is sent to the police automatically: a word
+// list gets slang, other languages and quotes wrong, so the owner decides and
+// the alert carries the police number.
+var CHAT_REPORTS_SHEET = 'CHAT_REPORTS';
+var CHAT_STRIKES_PROP = 'chat_strikes';
+var CHAT_CLOSED_MSG = 'This chat is closed because of abusive language. If this is a mistake, message us on WhatsApp.';
+var CHAT_POLICE_LINE = 'Police emergency (SVG): 999 or 911';
+var CHAT_ABUSE_RE = /\b(f+u+c+k+\w*|motherf\w*|sh[i1]t+(s|ty|head|hole|e)?|bitch\w*|bastard\w*|cunt\w*|dick(head)?s?|cock(sucker)?s?|puss(y|ies)|pussyhole|asshole\w*|arsehole\w*|whore\w*|slut\w*|nigg(a|er)s?\w*|fag(got)?s?|retard\w*|wanker\w*|twat\w*|bumbo\w*|bumboclaat|bloodclaat|blood ?clot|rass\w*|raasclaat|batty ?(boy|man)\w*|chupid ?ass|stfu|gtfo)\b/i;
+var CHAT_THREAT_RE = /\b((i('?m| am)? ?(gonna|going to|will|go)) (kill|shoot|stab|rob|hurt|beat|burn) (you|u|ya|yuh|unu)|(kill|shoot|stab) (you|u|yuh)|you('?re| are) dead|watch your back)\b/i;
+
+function _chatAbuseCheck(text) {
+  var t = String(text || '');
+  if (CHAT_THREAT_RE.test(t)) return 'threat';
+  if (CHAT_ABUSE_RE.test(t)) return 'language';
+  return '';
+}
+
+function _chatStrikes() {
+  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty(CHAT_STRIKES_PROP) || '{}'); }
+  catch (e) { return {}; }
+}
+
+function _chatBlocked(convo) {
+  var s = _chatStrikes()[convo];
+  return !!(s && s.count >= 2);
+}
+
+function _chatHandleAbuse(convo, name, contact, text, kind) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  var strikes, count;
+  try {
+    strikes = _chatStrikes();
+    var s = strikes[convo] || { count: 0 };
+    s.count = kind === 'threat' ? 2 : s.count + 1;
+    s.name = name; s.contact = contact; s.at = new Date().toISOString();
+    strikes[convo] = s; count = s.count;
+    PropertiesService.getScriptProperties().setProperty(CHAT_STRIKES_PROP, JSON.stringify(strikes));
+  } finally {
+    lock.releaseLock();
+  }
+  var closed = count >= 2;
+  var action = closed ? 'Chat closed' : 'Warning sent';
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(CHAT_REPORTS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(CHAT_REPORTS_SHEET);
+    sh.appendRow(['at', 'chat', 'name', 'contact', 'message', 'type', 'strike', 'action']);
+    sh.getRange('1:1').setFontWeight('bold');
+    sh.getRange('A:H').setNumberFormat('@');
+  }
+  sh.appendRow([new Date().toISOString(), convo.slice(0, 6), _chatCell(name), _chatCell(contact), _chatCell(text), kind, count, action]);
+
+  _chatAppend(convo, 'guest', name, contact, text);
+  var msgs = _chatAppend(convo, 'auto', 'Aquatic Paradise', '', closed
+    ? '⛔ This chat is now closed because of abusive language. A report has been saved and may be passed to the police.'
+    : '⚠️ Warning: abusive language is not allowed. This message is on record. One more and this chat closes and may be reported to the police.');
+
+  var tag = convo.slice(0, 6);
+  _tgSend('🚩 ' + (kind === 'threat' ? 'THREAT' : 'ABUSIVE LANGUAGE') + ' · Chat #' + tag + ' · strike ' + count + ' · ' + action + '\n' +
+    'From: ' + name + (contact ? ' · ' + contact : '') + '\n\n' + text.slice(0, 500) + '\n\n' +
+    'Saved in the CHAT_REPORTS sheet. If you feel unsafe: ' + CHAT_POLICE_LINE);
+  return { ok: true, messages: _chatPublic(msgs), warned: true };
+}
+
+function getChatReports() {
+  try {
+    var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CHAT_REPORTS_SHEET);
+    if (!sh) return { ok: true, reports: [], police: CHAT_POLICE_LINE };
+    var rows = sh.getDataRange().getValues().slice(1).reverse().slice(0, 50);
+    return { ok: true, police: CHAT_POLICE_LINE, reports: rows.map(function (r) {
+      return { at: r[0] instanceof Date ? r[0].toISOString() : String(r[0]), tag: String(r[1]), name: String(r[2]), contact: String(r[3]),
+        text: String(r[4]), type: String(r[5]), strike: Number(r[6]) || 0, action: String(r[7]) };
+    }) };
+  } catch (err) {
+    return _fail('getChatReports', err);
+  }
+}
+
+// Removes every guest chat. The CHAT_REPORTS sheet is kept as evidence.
+function chatDeleteAllAdmin(p) {
+  try {
+    if (!p || p.confirm !== 'DELETE ALL') return { ok: false, error: 'Not confirmed' };
+    var sh = _chatSheet(), last = sh.getLastRow();
+    var convos = last > 1 ? sh.getRange(2, 1, last - 1, 1).getValues().map(function (r) { return String(r[0]); }) : [];
+    var lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try { if (last > 1) sh.deleteRows(2, last - 1); } finally { lock.releaseLock(); }
+    var cache = CacheService.getScriptCache();
+    convos.filter(function (c, i) { return convos.indexOf(c) === i; }).forEach(function (c) { cache.remove('chat_' + c); });
+    return { ok: true, deleted: convos.length };
+  } catch (err) {
+    return _fail('chatDeleteAllAdmin', err);
+  }
+}
+
 function chatDeleteAdmin(p) {
   try {
     var convo = p && p.convo;
@@ -4924,6 +5026,9 @@ function chatSend(p) {
     if (text.length > CHAT_MAX_LEN) return { ok: false, error: 'Message is too long (max ' + CHAT_MAX_LEN + ' characters).' };
     if (!name) return { ok: false, error: 'Please add your name.' };
     if (!_rateLimitOk('chat_' + convo, 8)) return { ok: false, error: 'Slow down a little — try again in a minute.' };
+    if (_chatBlocked(convo)) return { ok: false, error: CHAT_CLOSED_MSG };
+    var abuse = _chatAbuseCheck(text);
+    if (abuse) return _chatHandleAbuse(convo, name, contact, text, abuse);
 
     var before = _chatThread(convo);
     var isNew = before.length === 0;
@@ -4970,6 +5075,7 @@ function chatVoice(p) {
     var name = String((p && p.name) || '').trim().slice(0, 60);
     var contact = String((p && p.contact) || '').trim().slice(0, 40);
     if (!name) return { ok: false, error: 'Please add your name.' };
+    if (_chatBlocked(convo)) return { ok: false, error: CHAT_CLOSED_MSG };
     var mime = String((p && p.mime) || '').split(';')[0];
     if (!/^audio\/(webm|mp4|ogg|mpeg|aac|x-m4a|wav)$/.test(mime)) return { ok: false, error: 'This phone recorded in a format we can\'t play. Please type instead.' };
     var data = String((p && p.data) || '');
@@ -5045,7 +5151,11 @@ function _chatSummaries(sinceMs) {
 
 function getChats() {
   try {
-    return { ok: true, chats: _chatSummaries(0).slice(0, 100) };
+    var strikes = _chatStrikes();
+    return { ok: true, chats: _chatSummaries(0).slice(0, 100).map(function (s) {
+      if (strikes[s.convo]) s.strikes = strikes[s.convo].count;
+      return s;
+    }) };
   } catch (err) {
     return _fail('getChats', err);
   }
