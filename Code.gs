@@ -893,7 +893,10 @@ function getStockOverview() {
         leftNow: n.left, off: n.off, bookedToday: todayHeld[k] || 0 };
     });
     var alarm = getAlarmStatus();
-    if (alarm.connected) _ensureTelegramTriggers(); // cheap no-op once installed
+    // Briefings, wrap-ups and the unanswered-chat check also go to WhatsApp, so
+    // the same timers are needed when only CallMeBot is set up.
+    var cmb = getCmbStatus();
+    if (alarm.connected || cmb.configured || cmb.backupConfigured) _ensureTelegramTriggers(); // cheap no-op once installed
     return { ok: true, items: items, deals: _readJsonProp(DEALS_PROP, []), alarm: alarm, sms: getSmsStatus(), wa: getWaStatus(), cmb: getCmbStatus(), bankGuide: _bankGuideOn(), ai: _aiStatus() };
   } catch (err) {
     return _fail('getStockOverview', err);
@@ -1135,6 +1138,36 @@ function _tgSend(text) {
   if (!chat) return false;
   var res = _tgApi('sendMessage', { chat_id: chat, text: String(text).slice(0, 4000) });
   return !!(res && res.ok);
+}
+
+// Owner reports (morning briefing, evening wrap-up, ships) go to Telegram AND
+// to the owner's WhatsApp through CallMeBot, so they arrive even when Telegram
+// isn't used. WhatsApp target: the backup (personal) number if set up, else
+// the main CallMeBot number. Long reports are split at line breaks.
+function _ownerWhatsApp(text) {
+  var props = PropertiesService.getScriptProperties();
+  var phone = props.getProperty(CMB_BACKUP_PHONE_PROP), key = props.getProperty(CMB_BACKUP_KEY_PROP);
+  if (!phone || !key) { phone = props.getProperty(CMB_PHONE_PROP); key = props.getProperty(CMB_KEY_PROP); }
+  if (!phone || !key) return false;
+  var chunks = [], cur = '';
+  String(text).split('\n').forEach(function (line) {
+    if (cur && (cur + '\n' + line).length > 650) { chunks.push(cur); cur = line.slice(0, 650); }
+    else cur = cur ? cur + '\n' + line : line.slice(0, 650);
+  });
+  if (cur) chunks.push(cur);
+  var ok = true;
+  chunks.slice(0, 6).forEach(function (c, i) {
+    if (i) Utilities.sleep(2000); // CallMeBot asks for a gap between messages
+    if (!_cmbSendTo(phone, key, c).ok) ok = false;
+  });
+  return ok;
+}
+
+function _ownerNotify(text) {
+  var tg = false, wa = false;
+  try { tg = _tgSend(text); } catch (e) { _logError('_ownerNotify.telegram', e); }
+  try { wa = _ownerWhatsApp(text); } catch (e) { _logError('_ownerNotify.whatsapp', e); }
+  return tg || wa;
 }
 
 // ── SMS ALARMS (Twilio) — urgent alarms only, for when the owner has no data ──
@@ -1404,6 +1437,7 @@ function setCmbBackup(p) {
     if (!/^[A-Za-z0-9]{4,40}$/.test(key)) return { ok: false, error: 'Paste the apikey CallMeBot sent to this backup phone' };
     props.setProperty(CMB_BACKUP_PHONE_PROP, phone);
     props.setProperty(CMB_BACKUP_KEY_PROP, key);
+    _ensureTelegramTriggers(); // daily briefing/wrap-up + unanswered-chat check, also sent to WhatsApp
     var t = _cmbSendTo(phone, key, '✅ Aquatic Paradise: backup alerts are on. You will hear here when a guest chat waits ' + CHAT_ESCALATE_MIN + ' minutes without a reply.');
     return t.ok ? { ok: true } : { ok: false, error: 'Saved, but the test failed: ' + t.error };
   } catch (err) {
@@ -1468,6 +1502,7 @@ function setCmbConfig(p) {
     var props = PropertiesService.getScriptProperties();
     props.setProperty(CMB_PHONE_PROP, phone);
     props.setProperty(CMB_KEY_PROP, key);
+    _ensureTelegramTriggers();
     var t = _cmbSend('✅ Aquatic Paradise: guest chat alerts are connected to this WhatsApp.');
     return t.ok ? { ok: true } : { ok: false, error: 'Saved, but the test failed: ' + t.error };
   } catch (err) {
@@ -1713,9 +1748,9 @@ function pollTelegram() {
   try {
     var props = PropertiesService.getScriptProperties();
     var chat = props.getProperty(TG_CHAT_PROP);
+    _chatEscalate(); // backup WhatsApp alert for chats nobody has answered (runs with or without Telegram)
     if (!chat) return;
     props.setProperty(TG_LAST_POLL_PROP, new Date().toISOString()); // health check shown in admin
-    _chatEscalate(); // backup WhatsApp alert for chats nobody has answered
     // One-time: installs the 6pm wrap-up trigger on existing setups and sends
     // a preview so the owner sees what will arrive each evening.
     if (!props.getProperty('EVENING_WRAPUP_V1')) {
@@ -1748,13 +1783,14 @@ function _handleTgMessage(msg) {
   var raw = String(msg.text || '').trim();
   var text = raw.toLowerCase();
   // A reply to a guest-chat alert goes back to that guest's chat window.
-  var tagMatch = msg.reply_to_message && String(msg.reply_to_message.text || '').match(/Chat #([a-f0-9]{6})\b/);
+  var tagMatch = msg.reply_to_message && String(msg.reply_to_message.text || msg.reply_to_message.caption || '').match(/Chat #([a-f0-9]{6})\b/);
   if (tagMatch) { _chatReplyFromTelegram(tagMatch[1], raw, msg.from); return; }
   if (text === '/today' || text === 'today') { _sendBriefing(); return; }
   if (text === '/tonight' || text === 'tonight' || text === '/wrapup') { _sendWrapUp(); return; }
   if (text === '/chats' || text === 'chats') { _tgSend(_chatsDigest()); return; }
+  if (text === '/ships' || text === 'ships' || text === '/cruise') { _tgSend(_cruiseDigest()); return; }
   if (/^\/book\b/.test(text)) { _startBookDraft(raw); return; }
-  _tgSend('Commands:\n/today — today\'s briefing\n/tonight — evening wrap-up (also sent at 6pm)\n/chats — guest chats from the last 24 hours\n/book — log a WhatsApp booking (send /book for how)\n\nBooking alerts have Confirm/Decline buttons.\nTo answer a guest chat, swipe the chat message and Reply.');
+  _tgSend('Commands:\n/today — today\'s briefing\n/tonight — evening wrap-up (also sent at 6pm)\n/chats — guest chats from the last 24 hours\n/ships — cruise ships at Bequia and Kingstown, next 14 days\n/book — log a WhatsApp booking (send /book for how)\n\nBooking alerts have Confirm/Decline buttons.\nTo answer a guest chat, swipe the chat message and Reply.');
 }
 
 function _handleTgTap(cb, ownerChat) {
@@ -2101,7 +2137,9 @@ function _sendBriefing() {
     _activeDeals().forEach(function (d) { lines.push('🏷️ Deal: ' + d.pct + '% off ' + GEAR_LABELS[d.gear] + ' — ' + (d.cap - d.used) + ' left'); });
   } catch (sErr) { _logError('_sendBriefing.stock', sErr); }
 
-  _tgSend(lines.join('\n'));
+  try { lines = lines.concat(_cruiseBriefingLines()); } catch (cErr) { _logError('_sendBriefing.cruise', cErr); }
+
+  _ownerNotify(lines.join('\n'));
 }
 
 // ── 6PM EVENING WRAP-UP (also on demand: send "/tonight" to the bot) ──
@@ -2193,8 +2231,155 @@ function _sendWrapUp(note) {
   tomorrow.slice(0, 12).forEach(function (x) { lines.push('  ' + x.line); });
   if (tomorrow.length > 12) lines.push('  …and ' + (tomorrow.length - 12) + ' more in admin');
   if (tmrPending) lines.push('⏳ ' + tmrPending + ' still pending — confirm them tonight');
+  try { var ships = _cruiseWrapUpLines(); if (ships.length) { lines.push(''); lines = lines.concat(ships); } }
+  catch (cErr) { _logError('_sendWrapUp.cruise', cErr); }
 
-  _tgSend(lines.join('\n'));
+  _ownerNotify(lines.join('\n'));
+}
+
+// ── CRUISE SHIPS (Telegram: morning briefing, evening wrap-up, /ships) ──
+// Same public source as the platform's cruise calendar: the year schedules on
+// cruisetimetables.com for Bequia and Kingstown. Cached for 6 hours so the
+// bot never hammers the site; if the site is down the ship lines are skipped.
+var CRUISE_PAGES = {
+  Bequia: 'bequia-grenadines-cruise-ship-schedule',
+  Kingstown: 'st-vincent-st-vincent-and-the-grenadines-cruise-ship-schedule'
+};
+var CRUISE_CACHE_KEY = 'cruise_calls_v1';
+var CRUISE_BIG_BEQUIA = 600; // passengers at Bequia that count as a "busy beach" day
+var CRUISE_MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+
+function _cruiseText(s) {
+  return String(s || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+    .replace(/&#\d+;/g, '').replace(/\s+/g, ' ').trim();
+}
+
+// One year page → [{ port, date:'yyyy-MM-dd', ship, line, arrive, depart, pax }]
+function _parseCruisePage(html, year, port) {
+  var out = [], re = /<div class='psovde-(month|day|cruiseline|ship|times|passengers)'>([\s\S]*?)<\/div>/g;
+  var month = -1, day = null, line = '', cur = null, m;
+  var flush = function () {
+    if (cur && cur.ship && month >= 0 && day) {
+      cur.port = port;
+      cur.date = year + '-' + ('0' + (month + 1)).slice(-2) + '-' + ('0' + day).slice(-2);
+      out.push(cur);
+    }
+    cur = null;
+  };
+  while ((m = re.exec(html))) {
+    var kind = m[1], raw = m[2];
+    if (kind === 'month') { flush(); month = CRUISE_MONTHS.indexOf(_cruiseText(raw).toLowerCase()); }
+    else if (kind === 'day') { flush(); var d = /(\d{1,2})/.exec(_cruiseText(raw)); if (d) day = Number(d[1]); } // empty = same day as above
+    else if (kind === 'cruiseline') { flush(); var a = /alt='([^']*)'/.exec(raw); line = a ? a[1].replace(/\s*logo$/i, '') : ''; }
+    else if (kind === 'ship') { flush(); cur = { ship: _cruiseText(raw), line: line, arrive: '', depart: '', pax: 0 }; }
+    else if (kind === 'times' && cur) {
+      var t = /a\s+(.+?)\s+d\s+(.+)$/i.exec(_cruiseText(raw));
+      var fmt = function (v) { return /^\d{4}$/.test(v) ? v.slice(0, 2) + ':' + v.slice(2) : v; };
+      if (t) { cur.arrive = fmt(t[1]); cur.depart = fmt(t[2]); }
+    }
+    else if (kind === 'passengers' && cur) { cur.pax = parseInt(_cruiseText(raw).replace(/\D/g, ''), 10) || 0; flush(); }
+  }
+  flush();
+  return out;
+}
+
+// Upcoming calls (next 60 days) for both ports. Returns [] if the site can't be reached.
+function _cruiseCalls() {
+  var cache = CacheService.getScriptCache();
+  var hit = cache.get(CRUISE_CACHE_KEY);
+  if (hit) { try { return JSON.parse(hit); } catch (e) {} }
+  var tz = 'America/St_Vincent';
+  var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  var until = Utilities.formatDate(new Date(Date.now() + 60 * 86400000), tz, 'yyyy-MM-dd');
+  var year = Number(today.slice(0, 4)), calls = [];
+  Object.keys(CRUISE_PAGES).forEach(function (port) {
+    [year, year + 1].forEach(function (y) {
+      try {
+        var resp = UrlFetchApp.fetch('https://www.cruisetimetables.com/' + CRUISE_PAGES[port] + '-' + y + '.html',
+          { muteHttpExceptions: true, headers: { 'User-Agent': 'Mozilla/5.0 (Aquatic Paradise Rentals briefing)' } });
+        if (resp.getResponseCode() === 200) calls = calls.concat(_parseCruisePage(resp.getContentText(), y, port));
+      } catch (err) { _logError('_cruiseCalls', err); }
+    });
+  });
+  calls = calls.filter(function (c) { return c.date >= today && c.date <= until; })
+    .sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : a.port < b.port ? -1 : 1; });
+  if (calls.length) { try { cache.put(CRUISE_CACHE_KEY, JSON.stringify(calls), 6 * 3600); } catch (e) { _logError('_cruiseCalls.cache', e); } }
+  return calls;
+}
+
+function _cruiseDayKey(offsetDays) {
+  return Utilities.formatDate(new Date(Date.now() + offsetDays * 86400000), 'America/St_Vincent', 'yyyy-MM-dd');
+}
+
+function _cruiseShipLine(c) {
+  var hours = c.arrive || c.depart ? ', ' + (c.arrive || '?') + '–' + (c.depart || '?') : '';
+  return c.ship + (c.pax ? ' (' + c.pax.toLocaleString() + hours + ')' : (hours ? ' (' + hours.slice(2) + ')' : ''));
+}
+
+// "Bequia: Azamara Journey (690, 08:00–20:00) + Star Pride (312, …) — 1,002 people"
+function _cruiseDaySummary(calls, port) {
+  var list = calls.filter(function (c) { return c.port === port; });
+  if (!list.length) return '';
+  var total = list.reduce(function (s, c) { return s + (c.pax || 0); }, 0);
+  return port + ': ' + list.map(_cruiseShipLine).join(' + ') + (list.length > 1 && total ? ' — ' + total.toLocaleString() + ' people' : '');
+}
+
+function _cruiseDayLines(dateKey, calls) {
+  var day = calls.filter(function (c) { return c.date === dateKey; });
+  return ['Bequia', 'Kingstown'].map(function (p) { return _cruiseDaySummary(day, p); }).filter(Boolean);
+}
+
+function _cruiseBequiaPax(dateKey, calls) {
+  return calls.filter(function (c) { return c.date === dateKey && c.port === 'Bequia'; })
+    .reduce(function (s, c) { return s + (c.pax || 0); }, 0);
+}
+
+// /ships — the next 14 days, both ports.
+function _cruiseDigest() {
+  var calls = _cruiseCalls();
+  if (!calls.length) return '🚢 Could not load the cruise schedule right now. Try again later, or see the platform cruise calendar.';
+  var lines = ['🚢 Cruise ships, next 14 days', ''];
+  for (var i = 0; i < 14; i++) {
+    var key = _cruiseDayKey(i), day = _cruiseDayLines(key, calls);
+    if (!day.length) continue;
+    var label = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : Utilities.formatDate(new Date(key + 'T12:00:00'), 'America/St_Vincent', 'EEE d MMM');
+    var big = _cruiseBequiaPax(key, calls) >= CRUISE_BIG_BEQUIA ? ' ⭐ busy at Bequia' : '';
+    lines.push(label + big);
+    day.forEach(function (l) { lines.push('  ' + l); });
+  }
+  if (lines.length === 2) lines.push('No ships at Bequia or Kingstown in the next 14 days.');
+  lines.push('', 'Passenger numbers are ship capacity, not a head count. Source: cruisetimetables.com');
+  return lines.join('\n');
+}
+
+// Morning briefing block: today's ships + the next busy Bequia day.
+function _cruiseBriefingLines() {
+  var calls = _cruiseCalls();
+  if (!calls.length) return [];
+  var lines = [], today = _cruiseDayLines(_cruiseDayKey(0), calls);
+  if (today.length) { lines.push('🚢 Ships today:'); today.forEach(function (l) { lines.push('  ' + l); }); }
+  else lines.push('🚢 No cruise ships today');
+  for (var i = 1; i <= 14; i++) {
+    var key = _cruiseDayKey(i), pax = _cruiseBequiaPax(key, calls);
+    if (pax >= CRUISE_BIG_BEQUIA) {
+      lines.push('⭐ Next busy Bequia day: ' + (i === 1 ? 'tomorrow' : Utilities.formatDate(new Date(key + 'T12:00:00'), 'America/St_Vincent', 'EEE d MMM')) +
+        ', ' + pax.toLocaleString() + ' people (send /ships)');
+      break;
+    }
+  }
+  return lines;
+}
+
+// Evening wrap-up block: tomorrow's ships, with a heads-up on a busy day.
+function _cruiseWrapUpLines() {
+  var calls = _cruiseCalls();
+  if (!calls.length) return [];
+  var key = _cruiseDayKey(1), tmr = _cruiseDayLines(key, calls);
+  if (!tmr.length) return ['🚢 No cruise ships tomorrow'];
+  var lines = ['🚢 Ships tomorrow:'];
+  tmr.forEach(function (l) { lines.push('  ' + l); });
+  if (_cruiseBequiaPax(key, calls) >= CRUISE_BIG_BEQUIA) lines.push('⭐ Busy beach day: have extra boards, snorkel sets and staff ready.');
+  return lines;
 }
 
 // ── GUEST FEEDBACK ALERT ──
@@ -5217,7 +5402,11 @@ function _fetchWeather() {
       '&daily=wind_speed_10m_max,precipitation_probability_max,weather_code&timezone=auto&wind_speed_unit=kmh';
     var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
     if (resp.getResponseCode() !== 200) {
-      return { status: 'unknown', error: 'HTTP ' + resp.getResponseCode() };
+      // Open-Meteo's free tier is shared by every Google server, so it often
+      // answers 429 (too many requests). MET Norway is the free backup.
+      var backup = _fetchWeatherMet();
+      if (backup) return backup;
+      return { status: 'unknown', error: 'HTTP ' + resp.getResponseCode(), checkedAt: new Date().toISOString() };
     }
     var data = JSON.parse(resp.getContentText());
     var windNow = data.current && typeof data.current.wind_speed_10m === 'number' ? data.current.wind_speed_10m : null;
@@ -5244,12 +5433,63 @@ function _fetchWeather() {
     };
   } catch (err) {
     _logError('_fetchWeather', err);
+    try { var metBackup = _fetchWeatherMet(); if (metBackup) return metBackup; } catch (e2) {}
     // checkedAt matters here too, not just on the success path above — without
     // it, dailyWeatherCheck()'s firstRunToday check (!prev.checkedAt) reads
     // every failed reading as "no previous reading today" and re-emails on
     // every hourly trigger run instead of once, e.g. during a sustained
     // HTTP 429 from the weather API.
     return { status: 'unknown', error: (err && err.message) ? err.message : String(err), checkedAt: new Date().toISOString() };
+  }
+}
+
+// Backup source: MET Norway (api.met.no) — free, no key, but asks for an
+// identifying User-Agent. Wind comes in m/s. It has no weather codes, so its
+// symbol_code is mapped onto the same icons/labels, and any "thunder" symbol
+// counts as a thunderstorm (hard 'unsafe'). Returns null if it fails too.
+function _fetchWeatherMet() {
+  try {
+    var resp = UrlFetchApp.fetch('https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=' + WEATHER_LAT + '&lon=' + WEATHER_LON, {
+      muteHttpExceptions: true,
+      headers: { 'User-Agent': 'AquaticParadiseRentals/1.0 aquaticparadiserentals@gmail.com' }
+    });
+    if (resp.getResponseCode() !== 200) return null;
+    var ts = (JSON.parse(resp.getContentText()).properties || {}).timeseries || [];
+    if (!ts.length || !ts[0].data || !ts[0].data.instant) return null;
+    var kmh = function (ms) { return typeof ms === 'number' ? Math.round(ms * 3.6) : null; };
+    var now = ts[0].data.instant.details || {};
+    var windNow = kmh(now.wind_speed);
+    if (windNow === null) return null;
+    var today = Utilities.formatDate(new Date(), 'America/St_Vincent', 'yyyy-MM-dd');
+    var windMax = windNow;
+    ts.forEach(function (t) {
+      var day = Utilities.formatDate(new Date(t.time), 'America/St_Vincent', 'yyyy-MM-dd');
+      var w = kmh(((t.data || {}).instant || {}).details && t.data.instant.details.wind_speed);
+      if (day === today && w !== null && w > windMax) windMax = w;
+    });
+    var next = ts[0].data.next_1_hours || ts[0].data.next_6_hours || {};
+    var symbol = String((next.summary || {}).symbol_code || '').replace(/_(day|night|polartwilight)$/, '');
+    var code = /thunder/.test(symbol) ? 95
+      : /heavyrain/.test(symbol) ? 65 : /lightrain/.test(symbol) ? 61 : /rain/.test(symbol) ? 63
+      : /fog/.test(symbol) ? 45 : symbol === 'clearsky' ? 0 : symbol === 'fair' ? 1
+      : symbol === 'partlycloudy' ? 2 : symbol === 'cloudy' ? 3 : null;
+    var condition = _weatherConditionInfo(code);
+    return {
+      status: _weatherStatus(Math.max(windNow, windMax), code),
+      windNowKmh: windNow,
+      gustNowKmh: kmh(now.wind_speed_of_gust),
+      windMaxTodayKmh: windMax,
+      weatherCode: code,
+      conditionIcon: condition.icon,
+      conditionLabel: condition.label,
+      precipNowMm: next.details && typeof next.details.precipitation_amount === 'number' ? next.details.precipitation_amount : null,
+      precipProbMaxToday: null,
+      source: 'MET Norway',
+      checkedAt: new Date().toISOString()
+    };
+  } catch (err) {
+    _logError('_fetchWeatherMet', err);
+    return null;
   }
 }
 
