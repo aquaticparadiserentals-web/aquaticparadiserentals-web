@@ -1784,7 +1784,7 @@ function _handleTgMessage(msg) {
   var text = raw.toLowerCase();
   // A reply to a guest-chat alert goes back to that guest's chat window.
   var tagMatch = msg.reply_to_message && String(msg.reply_to_message.text || msg.reply_to_message.caption || '').match(/Chat #([a-f0-9]{6})\b/);
-  if (tagMatch) { _chatReplyFromTelegram(tagMatch[1], raw, msg.from); return; }
+  if (tagMatch) { _chatReplyFromTelegram(tagMatch[1], raw || String(msg.caption || '').trim(), msg.from, msg); return; }
   if (text === '/today' || text === 'today') { _sendBriefing(); return; }
   if (text === '/tonight' || text === 'tonight' || text === '/wrapup') { _sendWrapUp(); return; }
   if (text === '/chats' || text === 'chats') { _tgSend(_chatsDigest()); return; }
@@ -3072,11 +3072,13 @@ function doPost(e) {
       if (!_rateLimitOk('chat', CHAT_RATE_MAX_PER_MINUTE)) return _json({ ok: false, error: 'Busy' });
       return _json(waWebhook(payload));
     }
-    if (payload.action === 'chatSend' || payload.action === 'chatVoice') {
+    if (['chatSend', 'chatVoice', 'chatAttach', 'chatCallRing', 'chatCallLog'].indexOf(payload.action) !== -1) {
       // Sending gets its own bucket, so lots of open chat windows polling for
       // replies can never block a guest's message from going through.
       if (!_rateLimitOk('chatsend', CHAT_SEND_MAX_PER_MINUTE)) return _json({ ok: false, error: 'Busy — try again in a minute.' });
-      return _json(payload.action === 'chatSend' ? chatSend(payload) : chatVoice(payload));
+      if (payload.action === 'chatCallRing') return _json(chatCallRing(payload));
+      if (payload.action === 'chatCallLog') return _json(chatCallLog(payload));
+      return _json(payload.action === 'chatSend' ? chatSend(payload) : chatAttach(payload));
     }
     if (payload.action === 'chatFetch' || payload.action === 'chatDelete') {
       // Public guest chat. Own rate bucket so open chat windows polling for
@@ -3089,15 +3091,21 @@ function doPost(e) {
       return _json({ ok: false, error: 'Too many requests — please wait a minute.' });
     }
 
-    if (['staffGetChats', 'staffGetChatThread', 'staffChatReply'].indexOf(payload.action) !== -1) {
+    if (['staffGetChats', 'staffGetChatThread', 'staffChatReply', 'staffChatAttach'].indexOf(payload.action) !== -1) {
       // Staff PIN (Dispatch console) — threads without guest phone numbers.
       if (!_dispatchAuthOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      if (payload.action === 'staffChatAttach') {
+        var staffWho = String(payload.staffName || '').replace(/[^\p{L}\s'-]/gu, '').trim().split(/\s+/)[0].slice(0, 20);
+        if (!staffWho) return _json({ ok: false, error: 'Add your first name first' });
+        return _json(chatAttachTeam(payload, staffWho + ' · Aquatic Paradise'));
+      }
       if (payload.action === 'staffGetChats') return _json(staffGetChats());
       if (payload.action === 'staffGetChatThread') return _json(staffGetChatThread(payload));
       return _json(staffChatReply(payload));
     }
-    if (['getChats', 'getChatThread', 'chatReplyAdmin', 'chatDeleteAdmin', 'chatDeleteSelectedAdmin', 'getChatReports'].indexOf(payload.action) !== -1) {
+    if (['getChats', 'getChatThread', 'chatReplyAdmin', 'chatDeleteAdmin', 'chatDeleteSelectedAdmin', 'getChatReports', 'chatAttachAdmin'].indexOf(payload.action) !== -1) {
       if (!_authOk(payload)) return _json({ ok: false, error: 'Unauthorized' });
+      if (payload.action === 'chatAttachAdmin') return _json(chatAttachTeam(payload, 'Aquatic Paradise'));
       if (payload.action === 'getChats') return _json(getChats());
       if (payload.action === 'chatDeleteSelectedAdmin') return _json(chatDeleteSelectedAdmin(payload));
       if (payload.action === 'getChatReports') return _json(getChatReports());
@@ -4554,6 +4562,49 @@ function _chatAppend(convo, from, name, contact, text) {
   return msgs;
 }
 
+// ── CHAT: VOICE CALLS ──
+// The call itself runs browser-to-browser; the platform server on Render
+// connects the two sides and rings staff pages and phones
+// (aquatic-platform src/apr-call.js). Here: the Telegram/WhatsApp ring and
+// the line the call leaves in the chat.
+function chatCallRing(p) {
+  try {
+    var convo = p && p.convo, callId = String((p && p.callId) || '');
+    if (!_chatValidId(convo) || !/^[a-f0-9]{24}$/.test(callId)) return { ok: false, error: 'Bad call' };
+    var name = String((p && p.name) || '').trim().slice(0, 60);
+    if (!name) return { ok: false, error: 'Please add your name.' };
+    if (_chatBlocked(convo)) return { ok: false, error: CHAT_CLOSED_MSG };
+    if (!_rateLimitOk('call_' + convo, 3)) return { ok: false, error: 'Please wait a minute before calling again.' };
+    var link = SITE_URL + 'dispatch.html#call=' + callId;
+    var text = '📞 GUEST CALLING NOW · Chat #' + convo.slice(0, 6) + '\nFrom: ' + name + '\n\nTap to answer in the app (rings for 45 seconds):';
+    var ok = _tgSendButtons(text, { inline_keyboard: [[{ text: '📞 Answer call', url: link }]] });
+    try { if (_cmbChatAlert(convo, !_chatThread(convo).length, name, '', '📞 Calling now. Answer: ' + link)) ok = true; }
+    catch (err) { _logError('chatCallRing.callmebot', err); }
+    return { ok: true, notified: !!ok };
+  } catch (err) {
+    return _fail('chatCallRing', err);
+  }
+}
+
+function chatCallLog(p) {
+  try {
+    var convo = p && p.convo;
+    if (!_chatValidId(convo)) return { ok: false, error: 'Bad call' };
+    if (!_rateLimitOk('calllog_' + convo, 4)) return { ok: false };
+    var name = String((p && p.name) || '').trim().slice(0, 60) || 'Guest';
+    var secs = Math.max(0, Math.min(7200, Math.round(Number(p.secs) || 0)));
+    var answered = p.result === 'answered' && secs > 0;
+    var by = String((p && p.by) || '').replace(/[^\p{L}\s'-]/gu, '').trim().slice(0, 20);
+    var line = answered ? '📞 Call · ' + Math.floor(secs / 60) + ':' + ('0' + secs % 60).slice(-2) + (by ? ' with ' + by : '')
+      : '📞 Missed call. The team will call you back or reply here.';
+    var msgs = _chatAppend(convo, 'auto', 'Aquatic Paradise', '', line);
+    if (!answered) _tgSend('📵 Missed call · Chat #' + convo.slice(0, 6) + ' · ' + name + '\nReply to their chat, or call back from the app when they are online.');
+    return { ok: true, messages: _chatPublic(msgs) };
+  } catch (err) {
+    return _fail('chatCallLog', err);
+  }
+}
+
 // ── CHAT: LOCK-SCREEN NOTIFICATIONS ──
 // Apps Script can't sign Web Push messages, so the platform server on Render
 // sends them (aquatic-platform src/apr-push.js). Each saved message pings it
@@ -5084,11 +5135,48 @@ function chatSend(p) {
   }
 }
 
-// Voice message from a phone whose browser can't turn speech into text
-// (iPhone home-screen app, in-app browsers, Firefox). The recording is kept
-// in Drive with a view-by-link URL so the owner, staff and the guest can all
-// play it, and the audio itself goes to the team's Telegram.
-function chatVoice(p) {
+// ── CHAT: VOICE NOTES, PHOTOS AND FILES ──
+// Either side can send them. The file goes to Drive with a view-by-link URL
+// (owner, staff and guest can all open it) and the chat message carries a
+// marker the pages turn into a player, picture or download:
+//   🎤 Voice message (12s): <url>   🖼️ Photo: <url>   📎 menu.pdf: <url>
+// Guest uploads also go to the team's Telegram as the real file.
+var CHAT_FILE_RULES = {
+  voice: { re: /^audio\/(webm|mp4|ogg|mpeg|aac|x-m4a|wav)$/, max: 2800000, tooBig: 'That recording is too long. Keep it under a minute.' },
+  image: { re: /^image\/(jpeg|png|webp|gif|heic|heif)$/, max: 9000000, tooBig: 'That photo is too large (6 MB max).' },
+  file: { re: /^(application\/(pdf|msword|vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet)|vnd\.ms-excel)|text\/plain|image\/(jpeg|png|webp|gif|heic|heif)|audio\/[\w.+-]+|video\/(mp4|quicktime))$/,
+    max: 14000000, tooBig: 'That file is too large (10 MB max).' }
+};
+var CHAT_FILE_EXT = { 'audio/webm': 'webm', 'audio/mp4': 'm4a', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/aac': 'aac', 'audio/x-m4a': 'm4a',
+  'audio/wav': 'wav', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/heic': 'heic', 'image/heif': 'heif',
+  'application/pdf': 'pdf', 'text/plain': 'txt', 'video/mp4': 'mp4', 'video/quicktime': 'mov' };
+
+// Checks and stores one upload. Returns { text, blob, kind } or { error }.
+function _chatSaveUpload(convo, p) {
+  var kind = CHAT_FILE_RULES[p && p.kind] ? p.kind : 'voice'; // older pages send no kind (voice only)
+  var rule = CHAT_FILE_RULES[kind];
+  var mime = String((p && p.mime) || '').split(';')[0].toLowerCase();
+  if (!rule.re.test(mime)) return { error: kind === 'voice' ? 'This phone recorded in a format we can\'t play. Please type instead.' : 'That type of file can\'t be sent here. Photos, PDF, Word, Excel and voice notes work.' };
+  var data = String((p && p.data) || '');
+  if (!data) return { error: 'The file was empty. Try again.' };
+  if (data.length > rule.max) return { error: rule.tooBig };
+  var orig = String((p && p.fileName) || '').replace(/[^\w .()-]/g, '').trim().slice(0, 60);
+  var ext = CHAT_FILE_EXT[mime] || (orig.match(/\.(\w{1,5})$/) || [])[1] || 'bin';
+  var blob = Utilities.newBlob(Utilities.base64Decode(data), mime, kind + '_' + convo.slice(0, 6) + '_' + Date.now() + '.' + ext);
+  var folders = DriveApp.getFoldersByName(CHAT_VOICE_FOLDER_NAME);
+  var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(CHAT_VOICE_FOLDER_NAME);
+  var file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  var url = 'https://drive.google.com/file/d/' + file.getId() + '/view';
+  var secs = Math.max(1, Math.min(120, Math.round(Number(p.secs) || 0)));
+  var text = kind === 'voice' ? '🎤 Voice message (' + secs + 's): ' + url
+    : kind === 'image' ? '🖼️ Photo: ' + url
+    : '📎 ' + (orig || ('file.' + ext)).replace(/:/g, '') + ': ' + url;
+  return { text: text, blob: blob, kind: kind };
+}
+
+// Guest sends a voice note, photo or file (action chatAttach; chatVoice is the older name).
+function chatAttach(p) {
   try {
     var convo = p && p.convo;
     if (!_chatValidId(convo)) return { ok: false, error: 'Chat expired — reload the page.' };
@@ -5096,36 +5184,67 @@ function chatVoice(p) {
     var contact = String((p && p.contact) || '').trim().slice(0, 40);
     if (!name) return { ok: false, error: 'Please add your name.' };
     if (_chatBlocked(convo)) return { ok: false, error: CHAT_CLOSED_MSG };
-    var mime = String((p && p.mime) || '').split(';')[0];
-    if (!/^audio\/(webm|mp4|ogg|mpeg|aac|x-m4a|wav)$/.test(mime)) return { ok: false, error: 'This phone recorded in a format we can\'t play. Please type instead.' };
-    var data = String((p && p.data) || '');
-    if (!data) return { ok: false, error: 'The recording was empty. Try again.' };
-    if (data.length > CHAT_VOICE_MAX_BASE64) return { ok: false, error: 'That recording is too long. Keep it under a minute.' };
     if (!_rateLimitOk('chat_' + convo, 8)) return { ok: false, error: 'Slow down a little — try again in a minute.' };
-    var secs = Math.max(1, Math.min(120, Math.round(Number(p.secs) || 0)));
-    var ext = { webm: 'webm', mp4: 'm4a', ogg: 'ogg', mpeg: 'mp3', aac: 'aac', 'x-m4a': 'm4a', wav: 'wav' }[mime.split('/')[1]];
-    var blob = Utilities.newBlob(Utilities.base64Decode(data), mime, 'chat_' + convo.slice(0, 6) + '_' + Date.now() + '.' + ext);
-    var folders = DriveApp.getFoldersByName(CHAT_VOICE_FOLDER_NAME);
-    var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(CHAT_VOICE_FOLDER_NAME);
-    var file = folder.createFile(blob);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    var url = 'https://drive.google.com/file/d/' + file.getId() + '/view';
+    var up = _chatSaveUpload(convo, p);
+    if (up.error) return { ok: false, error: up.error };
 
     var isNew = _chatThread(convo).length === 0;
-    var text = '🎤 Voice message (' + secs + 's): ' + url;
-    var msgs = _chatAppend(convo, 'guest', name, contact, text);
-
+    var msgs = _chatAppend(convo, 'guest', name, contact, up.text);
     var tag = convo.slice(0, 6);
+    var what = up.text.split(': http')[0];
     var caption = (isNew ? '💬 NEW GUEST CHAT' : '💬 Guest chat') + ' · Chat #' + tag + '\nFrom: ' + name +
-      (contact ? ' · ' + contact : '') + '\n🎤 Voice message (' + secs + 's)\n\n↩️ Swipe this message → Reply to answer in their chat.';
-    var notified = _tgSendAudio(blob, caption);
-    if (!notified) notified = _tgSend(caption + '\n' + url);
-    try { if (_cmbChatAlert(convo, isNew, name, contact, '🎤 Voice message: ' + url)) notified = true; }
-    catch (err) { _logError('chatVoice.callmebot', err); }
+      (contact ? ' · ' + contact : '') + '\n' + what + '\n\n↩️ Swipe this message → Reply to answer in their chat.';
+    var notified = up.kind === 'image' ? _tgSendFile('sendPhoto', 'photo', up.blob, caption) : _tgSendAudio(up.blob, caption);
+    if (!notified) notified = _tgSend(caption + '\n' + up.text.split(': ').pop());
+    try { if (_cmbChatAlert(convo, isNew, name, contact, up.text)) notified = true; }
+    catch (err) { _logError('chatAttach.callmebot', err); }
     return { ok: true, messages: _chatPublic(msgs), notified: !!notified };
   } catch (err) {
-    return _fail('chatVoice', err);
+    return _fail('chatAttach', err);
   }
+}
+
+// Staff (dispatch PIN, signed with their first name) or owner (admin) sends one.
+function chatAttachTeam(p, who) {
+  try {
+    var convo = p && p.convo;
+    if (!_chatValidId(convo)) return { ok: false, error: 'Unknown chat' };
+    if (!_chatThread(convo).length) return { ok: false, error: 'Unknown chat' };
+    var up = _chatSaveUpload(convo, p);
+    if (up.error) return { ok: false, error: up.error };
+    var msgs = _chatAppend(convo, 'team', who, '', up.text);
+    return { ok: true, messages: msgs.map(function (m) { return { from: m.from, name: m.name, text: m.text, at: m.at }; }) };
+  } catch (err) {
+    return _fail('chatAttachTeam', err);
+  }
+}
+
+function _tgSendFile(method, field, blob, caption) {
+  var props = PropertiesService.getScriptProperties();
+  var token = props.getProperty(TG_TOKEN_PROP), chat = props.getProperty(TG_CHAT_PROP);
+  if (!token || !chat) return false;
+  var payload = { chat_id: chat, caption: String(caption).slice(0, 1000) };
+  payload[field] = blob;
+  var res = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/' + method, { method: 'post', muteHttpExceptions: true, payload: payload });
+  try { return !!JSON.parse(res.getContentText()).ok; } catch (e) { return false; }
+}
+
+// A photo, voice note or file sent as a Telegram reply to a chat alert:
+// fetched from Telegram and saved like any other upload.
+function _chatTelegramMedia(convo, msg) {
+  var media = null, kind = 'file', mime = '', fileName = '', secs = 0;
+  if (msg.photo && msg.photo.length) { media = msg.photo[msg.photo.length - 1]; kind = 'image'; mime = 'image/jpeg'; }
+  else if (msg.voice) { media = msg.voice; kind = 'voice'; mime = msg.voice.mime_type || 'audio/ogg'; secs = msg.voice.duration; }
+  else if (msg.audio) { media = msg.audio; kind = 'file'; mime = msg.audio.mime_type || 'audio/mpeg'; fileName = msg.audio.file_name || ''; }
+  else if (msg.document) { media = msg.document; kind = 'file'; mime = msg.document.mime_type || ''; fileName = msg.document.file_name || ''; }
+  if (!media) return null;
+  var token = PropertiesService.getScriptProperties().getProperty(TG_TOKEN_PROP);
+  var info = _tgApi('getFile', { file_id: media.file_id });
+  if (!info || !info.ok) return { error: 'Telegram would not hand over that file (20 MB max).' };
+  var res = UrlFetchApp.fetch('https://api.telegram.org/file/bot' + token + '/' + info.result.file_path, { muteHttpExceptions: true });
+  if (res.getResponseCode() !== 200) return { error: 'Could not download that file from Telegram.' };
+  var data = Utilities.base64Encode(res.getBlob().getBytes());
+  return _chatSaveUpload(convo, { kind: kind, mime: mime, data: data, fileName: fileName, secs: secs });
 }
 
 // Sends a recording to the team chat as a playable file. The caption carries
@@ -5203,11 +5322,19 @@ function chatReplyAdmin(p) {
   }
 }
 
-function _chatReplyFromTelegram(tag, text, from) {
-  if (!text) { _tgSend('Only text replies reach the guest chat for now.'); return; }
+function _chatReplyFromTelegram(tag, text, from, msg) {
   var match = _chatSummaries(0).filter(function (s) { return s.tag === tag; })[0];
   if (!match) { _tgSend('Could not find Chat #' + tag + ' any more.'); return; }
   var who = (from && from.first_name) ? from.first_name + ' · Aquatic Paradise' : 'Aquatic Paradise';
+  var up = msg ? _chatTelegramMedia(match.convo, msg) : null;
+  if (up && up.error) { _tgSend('⚠️ ' + up.error); return; }
+  if (up) {
+    _chatAppend(match.convo, 'team', who, '', up.text);
+    if (msg.caption) _chatAppend(match.convo, 'team', who, '', String(msg.caption).slice(0, CHAT_MAX_LEN));
+    _tgSend('✅ ' + up.text.split(': http')[0] + ' sent to ' + (match.name || 'the guest') + ' in the app chat (Chat #' + tag + ').');
+    return;
+  }
+  if (!text) { _tgSend('Send text, a photo, a voice note or a file as the reply.'); return; }
   _chatAppend(match.convo, 'team', who, '', text.slice(0, CHAT_MAX_LEN));
   var wa = _waLink(match.contact, text);
   var ack = '✅ Sent to ' + (match.name || 'the guest') + ' in the app chat (Chat #' + tag + ').' +

@@ -787,6 +787,8 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
     </div>
     <div style="display:flex;gap:8px">
       <textarea id="chatReplyInput" rows="2" maxlength="1000" placeholder="Type a reply…" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-size:0.85rem;resize:vertical" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatReply();}"></textarea>
+      <button type="button" class="team-tool" onclick="teamAttach()" aria-label="Send a photo or file" title="Send a photo or file"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.4 11.1-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg></button>
+      <button type="button" class="team-tool" id="teamVoiceBtn" onclick="teamVoice()" aria-label="Record a voice note" title="Record a voice note"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg></button>
       <button id="chatReplyBtn" onclick="sendChatReply()" style="background:var(--teal);color:var(--navy);border:none;border-radius:8px;padding:0 18px;font-weight:700;cursor:pointer">Send</button>
     </div>
   </div>
@@ -937,6 +939,11 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 </div>
 
 <script src="apr-config.js"></script>
+<script src="chat-alerts.js"></script>
+<script src="chat-media.js"></script>
+<script src="chat-call.js"></script>
+<style>.team-tool{width:44px;flex-shrink:0;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--teal);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.team-tool.rec{background:#D63A3A;border-color:#D63A3A;color:#fff}</style>
 <script>
 const BACKEND = 'https://script.google.com/macros/s/AKfycbzr1KHela518-pgQ3dJyvv77tm9z2JWo_TTovRNys6RwYNBIUfdyJKxGF_ETzNk9m47Ww/exec';
 // No longer a hardcoded constant — anyone viewing this file's source used to
@@ -1107,6 +1114,7 @@ async function checkPin() {
     onLogin();
     openDeepLink();
     startChatWatch();
+    startCalls();
     addLog('' + currentUser.name + ' logged in');
     resetIdleTimer();
   } else {
@@ -4308,7 +4316,7 @@ function renderChatsList() {
         <span style="display:flex;align-items:center;gap:8px;font-size:0.7rem;color:var(--muted);white-space:nowrap">${chatAgo(c.lastAt)}
           ${chatSelecting ? '' : `<button type="button" onclick="event.stopPropagation();deleteChat('${c.convo}')" aria-label="Delete this chat" title="Delete chat" style="background:none;border:none;cursor:pointer;color:var(--coral);font-size:0.95rem;padding:2px 4px">🗑</button>`}</span>
       </div>
-      <div style="font-size:0.8rem;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.lastFrom === 'guest' ? 'Guest: ' : 'You: '}${escapeHtml(c.lastText)}</div>
+      <div style="font-size:0.8rem;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.lastFrom === 'guest' ? 'Guest: ' : 'You: '}${escapeHtml(AprMedia.label(c.lastText))}</div>
     </div>`).join('');
   if (chatSelecting) paintChatSelectBar();
 }
@@ -4359,7 +4367,7 @@ function renderChatThread(msgs) {
     const auto = m.from === 'auto', team = m.from === 'team' || auto;
     return `<div style="align-self:${team ? 'flex-end' : 'flex-start'};max-width:85%;padding:8px 11px;border-radius:12px;font-size:0.85rem;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;background:${auto ? 'var(--surface)' : team ? 'var(--teal)' : 'var(--bg)'};color:${team && !auto ? 'var(--navy)' : 'var(--ink)'};border:1px ${auto ? 'dashed' : 'solid'} ${team && !auto ? 'transparent' : 'var(--line)'}">`
       + `<div style="font-size:0.66rem;font-weight:700;opacity:0.8;margin-bottom:2px">${escapeHtml(auto ? (m.name || 'Automatic answer') : team ? m.name : (m.name || 'Guest'))}</div>`
-      + escapeHtml(m.text)
+      + (AprMedia.html(m.text) || escapeHtml(m.text))
       + `<div style="font-size:0.63rem;opacity:0.7;margin-top:3px">${chatAgo(m.at)}</div></div>`;
   }).join('');
   el.scrollTop = el.scrollHeight;
@@ -4382,6 +4390,53 @@ async function sendChatReply() {
   } finally {
     btn.disabled = false;
   }
+}
+
+
+// ── Photos, files and voice notes to the guest (chat-media.js, chat-alerts.js) ──
+let teamRec = null;
+async function teamAttach() {
+  if (!openChatConvo) return;
+  
+  const file = await AprMedia.pick();
+  if (!file) return;
+  const up = await AprMedia.prepare(file);
+  if (up.error) { showToast(up.error); return; }
+  teamSendUpload(up, up.kind === 'image' ? 'Photo sent' : 'File sent');
+}
+async function teamVoice() {
+  const btn = document.getElementById('teamVoiceBtn');
+  if (teamRec) {
+    const rec = teamRec; teamRec = null;
+    btn.classList.remove('rec'); btn.setAttribute('aria-label', 'Record a voice note');
+    const clip = await rec.stop();
+    if (!clip) { showToast('Too short. Hold on a second longer'); return; }
+    teamSendUpload({ kind: 'voice', mime: clip.mime, secs: clip.secs, data: await AprAlerts.blobToBase64(clip.blob) }, 'Voice note sent');
+    return;
+  }
+  if (!openChatConvo) return;
+  
+  if (!AprAlerts.canRecord) { showToast('This browser can\'t record. Use Chrome or Safari.'); return; }
+  const rec = new AprAlerts.Recorder(secs => { btn.title = 'Recording ' + secs + 's, tap to send'; if (secs >= AprAlerts.RECORD_MAX_SECS && teamRec === rec) teamVoice(); });
+  try { await rec.start(); } catch (e) { showToast('Allow the microphone to record'); return; }
+  teamRec = rec;
+  btn.classList.add('rec'); btn.setAttribute('aria-label', 'Recording, tap to send');
+}
+async function teamSendUpload(up, done) {
+  const convo = openChatConvo;
+  showToast('Sending…');
+  try {
+    const d = await chatsApi(Object.assign({ action: 'chatAttachAdmin', convo }, up));
+    if (!d || !d.ok) throw new Error((d && d.error) || 'Not sent');
+    if (openChatConvo === convo) renderChatThread(d.messages || []); fetchChats(true);
+    showToast(done);
+  } catch (err) { showToast(err.message || 'Not sent'); }
+}
+
+// Guests can call from the booking page; it rings here while admin is open (chat-call.js).
+function startCalls() {
+  AprCall.staffInit({ token: APP_TOKEN, staffName: () => (currentUser && currentUser.name !== 'Owner' ? currentUser.name : ''),
+    onAnswered: ({ convo }) => { switchATab('chats'); openChat(convo); } });
 }
 
 function startChatsPolling() { stopChatsPolling(); chatsPollTimer = setInterval(() => { if (!document.hidden) fetchChats(); }, 20000); }

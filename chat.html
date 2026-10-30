@@ -50,6 +50,8 @@ button{font:inherit}
 .top-logo{width:40px;height:40px;border-radius:10px;border:1px solid rgba(255,255,255,.15);flex-shrink:0}
 .top-text{min-width:0;flex:1}
 .top-text h1{font-family:var(--display);font-weight:600;font-size:1.08rem;letter-spacing:-.01em;line-height:1.2}
+.top-text h1,.top-text .status span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:400px){.top{gap:6px;padding-left:8px;padding-right:8px}.top-logo{width:34px;height:34px}.top .icon-btn{width:36px}.top-text h1{font-size:.98rem}}
 .status{display:flex;align-items:center;gap:6px;font-size:.78rem;color:rgba(255,255,255,.72);margin-top:2px}
 .status i{width:8px;height:8px;border-radius:50%;background:#34C77B;flex-shrink:0}
 .status.away i{background:#F0A93B}
@@ -132,6 +134,9 @@ button{font:inherit}
       <h1>Aquatic Paradise Team</h1>
       <div class="status" id="status"><i></i><span id="statusText">On the beach now · usually reply in minutes</span></div>
     </div>
+    <button class="icon-btn" id="callBtn" type="button" onclick="callTeam()" aria-label="Call us in the app" title="Call us (free, in the app)" hidden>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>
+    </button>
     <button class="icon-btn" id="speakBtn" type="button" onclick="toggleSpeak()" aria-pressed="true" aria-label="Read answers aloud" hidden>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>
     </button>
@@ -162,6 +167,9 @@ button{font:inherit}
       <div><label for="chatContact">WhatsApp (optional)</label><input class="field" id="chatContact" maxlength="40" type="tel" autocomplete="tel" placeholder="In case you leave the page"/></div>
     </div>
     <div class="bar">
+      <button class="mic" id="attachBtn" type="button" onclick="attachFile()" aria-label="Send a photo or file" title="Send a photo or file">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.4 11.1-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg>
+      </button>
       <button class="mic" id="micBtn" type="button" onclick="toggleVoice()" aria-label="Speak your question" title="Speak instead of typing" hidden>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>
       </button>
@@ -176,6 +184,8 @@ button{font:inherit}
 <div class="toast" id="toast" role="status"></div>
 
 <script src="chat-alerts.js"></script>
+<script src="chat-media.js"></script>
+<script src="chat-call.js"></script>
 <script>
 const BACKEND = 'https://script.google.com/macros/s/AKfycbzr1KHela518-pgQ3dJyvv77tm9z2JWo_TTovRNys6RwYNBIUfdyJKxGF_ETzNk9m47Ww/exec';
 // Same storage key as the chat bubble on index.html, so both show one conversation.
@@ -272,9 +282,21 @@ function render() {
 
 // A guest's own voice message shows as a play link (the team gets the audio too).
 function msgHtml(text) {
-  const m = String(text).match(/^🎤 Voice message \((\d+)s\): (https:\/\/drive\.google\.com\/\S+)$/);
-  if (m) return '🎤 <a class="voice" href="' + m[2] + '" target="_blank" rel="noopener">Voice message (' + m[1] + 's) · play</a>';
-  return linkify(text);
+  return AprMedia.html(text) || linkify(text);
+}
+// ── CALLS ── Free in-app voice call to the team (chat-call.js).
+function callTeam() {
+  if (!ensureName()) return;
+  AprCall.guestCall({
+    convo: convoId(), name: chat.name,
+    ring: id => call({ action: 'chatCallRing', convo: convoId(), name: chat.name, callId: id }),
+    onEnd: (result, secs, by) => {
+      if (result === 'cancelled') return;
+      call({ action: 'chatCallLog', convo: convoId(), name: chat.name, result, secs, by })
+        .then(d => { if (d && d.ok) apply(d.messages); }).catch(() => {});
+    },
+    onVoiceMessage: () => startVoiceMessage(),
+  }).then(res => { if (res && !res.ok) toast(res.error); });
 }
 // Lock-screen alerts when the team replies (see chat-alerts.js).
 function notifyHtml() {
@@ -322,6 +344,7 @@ function voiceLang() { try { return VOICE_LANGS[localStorage.getItem('apr_lang')
 
 function initVoice() {
   if (SpeechRec || AprAlerts.canRecord) $('micBtn').hidden = false;
+  if (AprCall.supported) $('callBtn').hidden = false;
   if (!SpeechRec && AprAlerts.canRecord) { $('micBtn').title = 'Record a voice message'; $('micBtn').setAttribute('aria-label', 'Record a voice message'); }
   if ('speechSynthesis' in window) { $('speakBtn').hidden = false; updateSpeakBtn(); }
 }
@@ -417,21 +440,42 @@ async function stopVoiceMessage() {
   ta.placeholder = 'Message the team…';
   const clip = await rec.stop();
   if (!clip) { toast('That was too short. Hold on a second longer'); return; }
-  if (!chat.name) { chat.name = $('chatName').value.trim(); chat.contact = $('chatContact').value.trim(); save(); }
   voiceUsed = true;
-  const pending = { from: 'guest', text: '🎤 Voice message (' + clip.secs + 's)', at: new Date().toISOString(), pending: true };
+  sendAttachment({ kind: 'voice', mime: clip.mime, secs: clip.secs, data: await AprAlerts.blobToBase64(clip.blob) }, '🎤 Voice message (' + clip.secs + 's)');
+}
+function ensureName() {
+  if (chat.name) return true;
+  const name = $('chatName').value.trim();
+  if (!name) { toast('Add your name first'); $('chatName').focus(); return false; }
+  chat.name = name; chat.contact = $('chatContact').value.trim(); save();
+  return true;
+}
+// Photo or file from the phone (chatAttach in Code.gs).
+async function attachFile() {
+  if (!ensureName()) return;
+  const file = await AprMedia.pick();
+  if (!file) return;
+  $('attachBtn').disabled = true;
+  try {
+    const up = await AprMedia.prepare(file);
+    if (up.error) { toast(up.error); return; }
+    await sendAttachment(up, up.kind === 'image' ? '🖼️ Sending photo…' : '📎 Sending ' + (file.name || 'file') + '…');
+  } finally { $('attachBtn').disabled = false; }
+}
+async function sendAttachment(up, pendingText) {
+  if (!ensureName()) return;
+  const pending = { from: 'guest', text: pendingText, at: new Date().toISOString(), pending: true };
   chat.msgs = (chat.msgs || []).concat(pending); render();
   $('log').scrollTop = $('log').scrollHeight;
   try {
-    const data = await AprAlerts.blobToBase64(clip.blob);
-    const d = await call({ action: 'chatVoice', convo: convoId(), name: chat.name, contact: chat.contact || '', mime: clip.mime, secs: clip.secs, data });
+    const d = await call(Object.assign({ action: 'chatAttach', convo: convoId(), name: chat.name, contact: chat.contact || '' }, up));
     if (!d || !d.ok) throw new Error((d && d.error) || 'Not sent');
     chat.msgs = chat.msgs.filter(m => m !== pending);
     apply(d.messages);
     fastUntil = Date.now() + 5 * 60000;
   } catch (err) {
     chat.msgs = chat.msgs.filter(m => m !== pending); save(); render();
-    toast(err.message && !/fetch|abort|timeout|network/i.test(err.message) ? err.message : 'Voice message not sent. Check your connection and try again');
+    toast(err.message && !/fetch|abort|timeout|network/i.test(err.message) ? err.message : 'Not sent. Check your connection and try again');
   } finally { schedule(); }
 }
 

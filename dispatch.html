@@ -130,7 +130,11 @@ header p{font-size:0.72rem;color:var(--muted);margin-top:2px}
           <button class="svc-chip" onclick="closeStaffThread()" style="margin-bottom:10px">← All chats</button>
           <div id="chatThreadMsgs" class="chat-thread"></div>
           <textarea class="svc-input" id="chatReply" rows="2" maxlength="1000" placeholder="Reply to the guest…" style="resize:vertical;margin-top:10px"></textarea>
-          <button class="btn confirm" id="chatReplyBtn" onclick="sendStaffReply()" style="width:100%">Send reply</button>
+          <div style="display:flex;gap:8px">
+            <button type="button" class="team-tool" onclick="teamAttach()" aria-label="Send a photo or file" title="Send a photo or file"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.4 11.1-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg></button>
+      <button type="button" class="team-tool" id="teamVoiceBtn" onclick="teamVoice()" aria-label="Record a voice note" title="Record a voice note"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg></button>
+            <button class="btn confirm" id="chatReplyBtn" onclick="sendStaffReply()" style="flex:1">Send reply</button>
+          </div>
         </div>
       </div>
     </details>
@@ -143,6 +147,10 @@ header p{font-size:0.72rem;color:var(--muted);margin-top:2px}
 
 <script src="offline-queue.js"></script>
 <script src="chat-alerts.js"></script>
+<script src="chat-media.js"></script>
+<script src="chat-call.js"></script>
+<style>.team-tool{width:44px;flex-shrink:0;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--teal);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.team-tool.rec{background:#D63A3A;border-color:#D63A3A;color:#fff}</style>
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});</script>
 <script>
 const BACKEND = 'https://script.google.com/macros/s/AKfycbzr1KHela518-pgQ3dJyvv77tm9z2JWo_TTovRNys6RwYNBIUfdyJKxGF_ETzNk9m47Ww/exec';
@@ -196,6 +204,9 @@ async function checkPin() {
     setInterval(() => { if (!document.hidden) { fetchStaffChats(); if (openConvo) fetchStaffThread(openConvo); } }, 15000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) { fetchStaffChats(); if (openConvo) fetchStaffThread(openConvo); } });
     openChatFromHash();
+    // Guests can call from the booking page; it rings here (chat-call.js).
+    AprCall.staffInit({ token: STAFF_TOKEN, staffName: () => document.getElementById("staffName").value.trim(),
+      onAnswered: ({ convo }) => { document.getElementById("chatPanel").open = true; openStaffThread(convo); } });
     startDispatchPolling();
   } else {
     showToast('Wrong PIN');
@@ -518,6 +529,47 @@ window.addEventListener("hashchange", openChatFromHash);
 function chatTextHtml(text) {
   return escapeHtml(text).replace(/https:\/\/drive\.google\.com\/[^\s<]+/g, u => '<a href="' + u + '" target="_blank" rel="noopener">play</a>');
 }
+
+// ── Photos, files and voice notes to the guest (chat-media.js, chat-alerts.js) ──
+let teamRec = null;
+async function teamAttach() {
+  if (!openConvo) return;
+  const who = document.getElementById("staffName").value.trim(); if (!who) { showToast("Add your first name first"); document.getElementById("staffName").focus(); return; } saveStaffName(who);
+  const file = await AprMedia.pick();
+  if (!file) return;
+  const up = await AprMedia.prepare(file);
+  if (up.error) { showToast(up.error); return; }
+  teamSendUpload(up, up.kind === 'image' ? 'Photo sent' : 'File sent');
+}
+async function teamVoice() {
+  const btn = document.getElementById('teamVoiceBtn');
+  if (teamRec) {
+    const rec = teamRec; teamRec = null;
+    btn.classList.remove('rec'); btn.setAttribute('aria-label', 'Record a voice note');
+    const clip = await rec.stop();
+    if (!clip) { showToast('Too short. Hold on a second longer'); return; }
+    teamSendUpload({ kind: 'voice', mime: clip.mime, secs: clip.secs, data: await AprAlerts.blobToBase64(clip.blob) }, 'Voice note sent');
+    return;
+  }
+  if (!openConvo) return;
+  const who = document.getElementById("staffName").value.trim(); if (!who) { showToast("Add your first name first"); document.getElementById("staffName").focus(); return; } saveStaffName(who);
+  if (!AprAlerts.canRecord) { showToast('This browser can\'t record. Use Chrome or Safari.'); return; }
+  const rec = new AprAlerts.Recorder(secs => { btn.title = 'Recording ' + secs + 's, tap to send'; if (secs >= AprAlerts.RECORD_MAX_SECS && teamRec === rec) teamVoice(); });
+  try { await rec.start(); } catch (e) { showToast('Allow the microphone to record'); return; }
+  teamRec = rec;
+  btn.classList.add('rec'); btn.setAttribute('aria-label', 'Recording, tap to send');
+}
+async function teamSendUpload(up, done) {
+  const convo = openConvo;
+  showToast('Sending…');
+  try {
+    const d = await chatApi(Object.assign({ action: 'staffChatAttach', convo, staffName: document.getElementById("staffName").value.trim() }, up));
+    if (!d || !d.ok) throw new Error((d && d.error) || 'Not sent');
+    if (openConvo === convo) renderStaffThread(d.messages || []); fetchStaffChats();
+    showToast(done);
+  } catch (err) { showToast(err.message || 'Not sent'); }
+}
+
 async function fetchStaffChats() {
   try {
     const d = await chatApi({ action: "staffGetChats" });
@@ -531,7 +583,7 @@ async function fetchStaffChats() {
     document.getElementById("chatList").innerHTML = chats.length ? chats.map(c =>
       `<button class="chat-row${c.lastFrom === "guest" ? " waiting" : ""}" data-convo="${escapeHtml(c.convo)}" onclick="openStaffThread(this.dataset.convo)">
         <span class="when">${ago(c.lastAt)}</span><b>${escapeHtml(c.name)}</b>
-        <span class="last">${c.lastFrom === "guest" ? "" : c.lastFrom === "auto" ? "Auto: " : "Team: "}${escapeHtml(String(c.lastText).replace(/: https:\/\/drive\.google\.com\/\S+/, ''))}</span></button>`).join("")
+        <span class="last">${c.lastFrom === "guest" ? "" : c.lastFrom === "auto" ? "Auto: " : "Team: "}${escapeHtml(AprMedia.label(c.lastText))}</span></button>`).join("")
       : "<div class=\"svc-help\">No guest chats in the last 30 days.</div>";
   } catch (e) { /* offline — next refresh */ }
 }
@@ -559,7 +611,7 @@ function renderStaffThread(msgs) {
   el.innerHTML = msgs.map(m => {
     const cls = m.from === "guest" ? "" : m.from === "auto" ? " auto" : " team";
     const who = m.from === "auto" ? (m.name || "Automatic answer") : m.name || "Guest";
-    return `<div class="cmsg${cls}"><small>${escapeHtml(who)} · ${ago(m.at)}</small>${chatTextHtml(m.text)}</div>`;
+    return `<div class="cmsg${cls}"><small>${escapeHtml(who)} · ${ago(m.at)}</small>${AprMedia.html(m.text) || chatTextHtml(m.text)}</div>`;
   }).join("");
   el.scrollTop = el.scrollHeight;
 }
