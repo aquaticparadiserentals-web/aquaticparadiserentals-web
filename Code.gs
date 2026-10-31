@@ -4576,7 +4576,7 @@ function chatCallRing(p) {
     if (_chatBlocked(convo)) return { ok: false, error: CHAT_CLOSED_MSG };
     if (!_rateLimitOk('call_' + convo, 3)) return { ok: false, error: 'Please wait a minute before calling again.' };
     var link = SITE_URL + 'dispatch.html#call=' + callId;
-    var text = '📞 GUEST CALLING NOW · Chat #' + convo.slice(0, 6) + '\nFrom: ' + name + '\n\nTap to answer in the app (rings for 45 seconds):';
+    var text = '📞 GUEST CALLING NOW · Chat #' + convo.slice(0, 6) + '\nFrom: ' + name + '\n\nTap to answer in the app (rings for 60 seconds). Telegram may open it inside Telegram: if the microphone doesn\'t work there, tap ⋮ and open in Chrome or Safari.';
     var ok = _tgSendButtons(text, { inline_keyboard: [[{ text: '📞 Answer call', url: link }]] });
     try { if (_cmbChatAlert(convo, !_chatThread(convo).length, name, '', '📞 Calling now. Answer: ' + link)) ok = true; }
     catch (err) { _logError('chatCallRing.callmebot', err); }

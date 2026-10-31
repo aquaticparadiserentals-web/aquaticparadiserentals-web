@@ -1,8 +1,8 @@
-// APR Service Worker v11.0
+// APR Service Worker v12.0
 // Bump CACHE whenever static assets (manifest, icons, logo) change — they're
 // cached-first with no expiry, so the version string is the only thing that
 // forces a refresh. HTML is network-first and self-heals on next reload.
-const CACHE = 'apr-v11';
+const CACHE = 'apr-v12';
 const ASSETS = [
   './manifest.json',
   './logo.jpg',
@@ -143,7 +143,8 @@ self.addEventListener('push', e => {
     badge: 'icons/icon-48.png',
     tag: d.tag || 'apr-chat',
     renotify: true,
-    vibrate: [200, 100, 200],
+    vibrate: d.call ? [600, 300, 600, 300, 600] : [200, 100, 200],
+    requireInteraction: !!d.call, // a call stays on screen until it's tapped or dismissed
     data: { url: d.url || './' },
   }));
 });
@@ -154,7 +155,8 @@ self.addEventListener('notificationclick', e => {
   const url = new URL((e.notification.data && e.notification.data.url) || './', self.location.href).href;
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
     const same = list.find(c => c.url.split('#')[0] === url.split('#')[0]);
-    if (same) return same.focus().then(c => (c && 'navigate' in c ? c.navigate(url) : c));
+    // Already open: switch it to the chat or call without reloading (a reload would sign staff out).
+    if (same) { same.postMessage({ type: 'apr-open', url }); return same.focus(); }
     return self.clients.openWindow(url);
   }));
 });

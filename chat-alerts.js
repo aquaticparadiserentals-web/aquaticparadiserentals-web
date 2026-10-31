@@ -147,5 +147,11 @@
     });
   }
 
+  // A notification tapped while this page is already open (sw.js): jump to its chat or call.
+  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => {
+    if (!e.data || e.data.type !== 'apr-open') return;
+    try { const u = new URL(e.data.url, location.href); if (u.hash && u.hash !== location.hash) location.hash = u.hash; } catch (x) {}
+  });
+
   window.AprAlerts = { tone, notifyHere, pushState, enablePush, canRecord, Recorder, blobToBase64, RECORD_MAX_SECS, isIOS, standalone };
 })();

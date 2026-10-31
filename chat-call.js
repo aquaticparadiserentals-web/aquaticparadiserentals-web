@@ -245,6 +245,10 @@
     if (staffOpts.onAnswered) staffOpts.onAnswered({ convo: d.convo, name: d.name });
   }
 
+  window.addEventListener('hashchange', () => {
+    const m = location.hash.match(/^#call=([a-f0-9]{24})$/);
+    if (m && staffSession) { history.replaceState(null, '', location.pathname); answer(m[1]); }
+  });
   window.addEventListener('pagehide', () => { if (active) hangUp(true); });
   window.AprCall = { guestCall, staffInit, answer, supported: !!(window.RTCPeerConnection && navigator.mediaDevices) };
 })();
