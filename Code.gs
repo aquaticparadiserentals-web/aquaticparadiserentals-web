@@ -1881,7 +1881,9 @@ var PRICES = {
   FLC:  { '1 Hour': 10, 'Full Day': 20, 'Weekend (2 days)': 35, 'Week (7 days)': 90 },
   BPG:  { '1 Hour': 8,  'Full Day': 15, 'Weekend (2 days)': 25, 'Week (7 days)': 60 }
 };
-var PACKAGE_PRICES = { 'Family Package': 150, 'Paddle Board + Snorkel Duo': 190, 'Combo for 2': 220, 'Day Rental Combo': 160, 'Premium Paddle': 270 };
+// Package prices must match index.html PACKAGES. "Combo for 2" (same gear as the Duo) was merged
+// into the Duo on 31 Oct 2026; it stays here only so older bookings still price-check.
+var PACKAGE_PRICES = { 'Family Package': 120, 'Paddle Board + Snorkel Duo': 80, 'Combo for 2': 220, 'Day Rental Combo': 65, 'Premium Paddle': 270 };
 // Order matters: "paddle games" must win over "paddle board".
 var BOOK_GEAR_WORDS = [
   [/\b(paddle\s*games?|beach\s*paddles?|rackets?)\b/i, 'BPG'],
@@ -1893,12 +1895,12 @@ var BOOK_GEAR_WORDS = [
   [/\b(paddle\s*boards?|paddleboards?|boards?|sups?|isups?)\b/i, 'SUP']
 ];
 var BOOK_PACKAGE_WORDS = [
-  [/family/i, 'Family Package'], [/duo/i, 'Paddle Board + Snorkel Duo'], [/combo\s*for\s*2|couple/i, 'Combo for 2'],
+  [/family/i, 'Family Package'], [/duo/i, 'Paddle Board + Snorkel Duo'], [/combo\s*for\s*2|couple/i, 'Paddle Board + Snorkel Duo'],
   [/day\s*(rental\s*)?combo/i, 'Day Rental Combo'], [/premium/i, 'Premium Paddle']
 ];
 var BOOK_HELP = 'To log a WhatsApp booking, send one line like:\n' +
   '/book 2 paddle boards, 1 snorkel, sat 10am, 1 hour, John Smith 784-555-1234\n\n' +
-  'Gear: paddle board, kayak, snorkel, tube, lounge chair, paddle games — or a package (family, duo, combo for 2, day combo, premium).\n' +
+  'Gear: paddle board, kayak, snorkel, tube, lounge chair, paddle games — or a package (family, duo, day combo, premium).\n' +
   'When: today / tomorrow / sat / 27/9, plus a time like 10am.\n' +
   'Length: 1 hour, full day, weekend, week.\n' +
   'Beach (optional): pmb, lower bay, friendship.\n' +

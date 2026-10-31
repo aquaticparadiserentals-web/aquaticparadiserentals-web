@@ -50,10 +50,9 @@ These same numbers live in three places that must stay in sync: `index.html` (GE
 **Combo packages:**
 | Package | Contents | XCD | USD |
 |---|---|---|---|
-| Family Package | 2 paddle boards, 1 floater, snorkel gear, life jackets | $150 | $55 |
-| Paddle Board + Snorkel Duo | 1 paddle board, 2 snorkel sets | $190 | $70 |
-| Combo for 2 | 1 paddle board, 2 snorkel sets, life jackets | $220 | $80 |
-| Day Rental Combo | 1 paddle board, full snorkel set, life jacket | $160 | $60 |
+| Family Package | 2 paddle boards, 1 floater, snorkel gear, life jackets | $120 | $44 |
+| Paddle Board + Snorkel Duo | 1 paddle board, 2 snorkel sets, life jackets | $80 | $30 |
+| Day Rental Combo | 1 paddle board, full snorkel set, life jacket | $65 | $24 |
 | Premium Paddle + 2 Snorkel Sets | Best snorkeling experience for two | $270 | $100 |
 
 **Weekend & group deals:**
