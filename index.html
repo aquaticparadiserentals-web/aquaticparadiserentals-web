@@ -2752,6 +2752,7 @@ function chatTime(iso) {
   return isNaN(d) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
+let chatRenderedHtml = null, chatRenderedCount = -1;
 function renderChat() {
   if (helpView !== 'chat') return;
   const body = document.getElementById('helpBody');
@@ -2808,8 +2809,22 @@ function renderChat() {
     html += `<p class="chat-chips-h">Common questions, answered instantly</p><div class="chat-chips">` +
       chips.map(f => `<button class="chat-chip" onclick="askFaq('${f.id}')">${esc(f.q)}</button>`).join('') + `</div>`;
   }
+  // Background refreshes must not reload photos or move the guest's place in the chat.
+  if (html === chatRenderedHtml && body.querySelector('.chat-log')) return;
+  const count = msgs.length + (chatState.auto || []).length, grew = count !== chatRenderedCount, keepTop = body.scrollTop;
+  const hadChat = !!body.querySelector('.chat-log');
+  chatRenderedHtml = html;
+  chatRenderedCount = count;
   body.innerHTML = html;
-  body.scrollTop = (msgs.length || (chatState.auto || []).length) ? body.scrollHeight : 0;
+  if (!count) { body.scrollTop = 0; return; }
+  if (hadChat && !grew) { body.scrollTop = keepTop; return; }
+  // New message: show it, not the question buttons below it.
+  const showNewest = () => {
+    const el = body.querySelector('.chat-log').lastElementChild;
+    if (el) body.scrollTop += el.getBoundingClientRect().bottom - body.getBoundingClientRect().bottom + 8;
+  };
+  showNewest();
+  body.querySelectorAll('.cm-photo img').forEach(img => img.addEventListener('load', showNewest, { once: true }));
 }
 
 // ── AUTOMATIC ANSWERS ── Instant replies to the questions guests ask most.

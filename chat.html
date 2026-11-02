@@ -273,7 +273,7 @@ function render() {
   if (sent && !answered) html += `<p class="note">Sent to the team's phones. ${openNow() ? 'We usually reply within a few minutes.' : 'We\'re off the water now and reply from 8AM.'} You can leave this page and come back — the conversation stays on this device.</p>`;
   const log = $('log');
   const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
-  log.innerHTML = html;
+  if (html !== render.html) { log.innerHTML = html; render.html = html; } // a refresh with nothing new must not reload photos
   if (msgs.length && (atBottom || render.first !== false)) log.scrollTop = log.scrollHeight;
   render.first = false;
   $('whoForm').hidden = !!chat.name;

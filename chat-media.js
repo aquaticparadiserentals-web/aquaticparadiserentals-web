@@ -77,7 +77,7 @@
     if (m) {
       const id = driveId(m[1]);
       return '<a class="cm-photo" href="' + escape(m[1]) + '" target="_blank" rel="noopener">' +
-        (id ? '<img src="https://drive.google.com/thumbnail?id=' + id + '&amp;sz=w600" alt="Photo" loading="lazy" onerror="this.replaceWith(document.createTextNode(\'🖼️ View photo\'))">' : '🖼️ View photo') + '</a>';
+        (id ? '<img src="https://drive.google.com/thumbnail?id=' + id + '&amp;sz=w600" alt="Photo" onerror="this.replaceWith(document.createTextNode(\'🖼️ View photo\'))">' : '🖼️ View photo') + '</a>';
     }
     m = t.match(/^📎 (.+?): (https:\/\/drive\.google\.com\/\S+)$/);
     if (m) return '<a class="cm-file" href="' + escape(m[2]) + '" target="_blank" rel="noopener">📎 ' + escape(m[1]) + '</a>';
