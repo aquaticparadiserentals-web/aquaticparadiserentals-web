@@ -2885,6 +2885,7 @@ async function clearChat() {
   if (!confirm(onServer ? 'Delete this whole conversation? It is removed from our records and from this phone. This can\'t be undone.' : 'Clear this chat from this phone?')) return;
   if (onServer) {
     try {
+      AprAlerts.outbox.clear();
       const d = await chatCall({ action: 'chatDelete', convo: chatState.convo });
       if (!d || !d.ok) throw new Error((d && d.error) || 'Could not delete');
     } catch (err) { showToast('Could not reach us — try again when you\'re online', 'warn'); return; }
@@ -2971,6 +2972,7 @@ function speakText(htmlOrText) {
 
 function toggleVoice() {
   if (voiceRecorder) { stopVoiceMessage(); return; }
+  if (!navigator.onLine) { startVoiceMessage(); return; } // speech-to-text needs signal, recording doesn't
   if (!SpeechRec || !speechRecUsable) { startVoiceMessage(); return; }
   if (voiceListening && voiceRec) { voiceRec.stop(); return; }
   if ('speechSynthesis' in window) speechSynthesis.cancel();
@@ -3043,8 +3045,10 @@ async function stopVoiceMessage() {
 
 async function sendVoiceMessage(clip) {
   chatState.voiceUsed = true;
-  sendChatAttachment({ kind: 'voice', mime: clip.mime, secs: clip.secs, data: await AprAlerts.blobToBase64(clip.blob) },
-    '🎤 Voice message (' + clip.secs + 's)');
+  if (!chatEnsureName()) return;
+  const up = { kind: 'voice', mime: clip.mime, secs: clip.secs, data: await AprAlerts.blobToBase64(clip.blob) };
+  const saved = await AprAlerts.outbox.add(Object.assign({ action: 'chatAttach', convo: chatConvoId(), name: chatState.name, contact: chatState.contact || '' }, up));
+  if (!saved) sendChatAttachment(up, '🎤 Voice message (' + clip.secs + 's)');
 }
 
 // Name first: the team needs to know who's writing (same rule as text messages).
@@ -3091,6 +3095,11 @@ async function sendChatAttachment(up, pendingText) {
     scheduleChatPoll();
   }
 }
+
+// Voice notes wait on this phone until there's signal (chat-alerts.js). A minute of audio on weak signal needs longer than a text.
+AprAlerts.outbox.start({ role: 'guest',
+  send: body => fetch(BACKEND, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), signal: AbortSignal.timeout(120000) }).then(r => r.json()),
+  onSent: d => { applyChatMessages(d.messages); chatFastUntil = Date.now() + 5 * 60000; scheduleChatPoll(); } });
 
 // Voice notes, photos and files show as a player, picture or link (chat-media.js).
 function chatMsgHtml(text) {

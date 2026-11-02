@@ -4101,9 +4101,9 @@ function sharePartnerStatement(code) {
 // ── GUEST CHATS (chatSend/getChats/chatReplyAdmin in Code.gs) ──
 let openChatConvo = null, chatsPollTimer = null, chatsCache = [];
 
-async function chatsApi(body) {
+async function chatsApi(body, ms) {
   const res = await fetch(BACKEND, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(Object.assign({ token: APP_TOKEN }, body)), signal: AbortSignal.timeout(15000) });
+    body: JSON.stringify(Object.assign({ token: APP_TOKEN }, body)), signal: AbortSignal.timeout(ms || 15000) });
   return res.json();
 }
 
@@ -4411,7 +4411,9 @@ async function teamVoice() {
     btn.classList.remove('rec'); btn.setAttribute('aria-label', 'Record a voice note');
     const clip = await rec.stop();
     if (!clip) { showToast('Too short. Hold on a second longer'); return; }
-    teamSendUpload({ kind: 'voice', mime: clip.mime, secs: clip.secs, data: await AprAlerts.blobToBase64(clip.blob) }, 'Voice note sent');
+    const up = { kind: 'voice', mime: clip.mime, secs: clip.secs, data: await AprAlerts.blobToBase64(clip.blob) };
+    const saved = await AprAlerts.outbox.add(Object.assign({ action: 'chatAttachAdmin', convo: openChatConvo }, up));
+    if (!saved) teamSendUpload(up, 'Voice note sent');
     return;
   }
   if (!openChatConvo) return;
@@ -4435,6 +4437,9 @@ async function teamSendUpload(up, done) {
 
 // Guests can call from the booking page; it rings here while admin is open (chat-call.js).
 function startCalls() {
+  // Voice notes recorded with no signal wait on this phone (chat-alerts.js).
+  AprAlerts.outbox.start({ role: 'team', send: body => chatsApi(body, 120000),
+    onSent: (d, body) => { if (openChatConvo === body.convo) renderChatThread(d.messages || []); fetchChats(true); showToast('Voice note sent'); } });
   AprCall.staffInit({ token: APP_TOKEN, staffName: () => (currentUser && currentUser.name !== 'Owner' ? currentUser.name : ''),
     onAnswered: ({ convo }) => { switchATab('chats'); openChat(convo); } });
 }

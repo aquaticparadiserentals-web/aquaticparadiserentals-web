@@ -224,6 +224,9 @@ function enterApp(token) {
     setInterval(() => { if (!document.hidden) { fetchStaffChats(); if (openConvo) fetchStaffThread(openConvo); } }, 15000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) { fetchStaffChats(); if (openConvo) fetchStaffThread(openConvo); } });
     openChatFromHash();
+    // Voice notes recorded with no signal wait on this phone (chat-alerts.js).
+    AprAlerts.outbox.start({ role: 'team', send: body => chatApi(body, 120000),
+      onSent: (d, body) => { if (openConvo === body.convo) renderStaffThread(d.messages || []); fetchStaffChats(); showToast('Voice note sent'); } });
     // Guests can call from the booking page; it rings here (chat-call.js).
     AprCall.staffInit({ token: STAFF_TOKEN, staffName: () => document.getElementById("staffName").value.trim(),
       onAnswered: ({ convo }) => { document.getElementById("chatPanel").open = true; openStaffThread(convo); } });
@@ -500,9 +503,9 @@ let openConvo = null;
 const STAFF_NAME_KEY = "apr_staff_name";
 try { document.getElementById("staffName").value = localStorage.getItem(STAFF_NAME_KEY) || ""; } catch (e) {}
 function saveStaffName(v) { try { localStorage.setItem(STAFF_NAME_KEY, v.trim()); } catch (e) {} }
-async function chatApi(body) {
+async function chatApi(body, ms) {
   const res = await fetch(BACKEND, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify(Object.assign({ token: STAFF_TOKEN }, body)), signal: AbortSignal.timeout(15000) });
+    body: JSON.stringify(Object.assign({ token: STAFF_TOKEN }, body)), signal: AbortSignal.timeout(ms || 15000) });
   return res.json();
 }
 function ago(iso) {
@@ -572,7 +575,9 @@ async function teamVoice() {
     btn.classList.remove('rec'); btn.setAttribute('aria-label', 'Record a voice note');
     const clip = await rec.stop();
     if (!clip) { showToast('Too short. Hold on a second longer'); return; }
-    teamSendUpload({ kind: 'voice', mime: clip.mime, secs: clip.secs, data: await AprAlerts.blobToBase64(clip.blob) }, 'Voice note sent');
+    const up = { kind: 'voice', mime: clip.mime, secs: clip.secs, data: await AprAlerts.blobToBase64(clip.blob) };
+    const saved = await AprAlerts.outbox.add(Object.assign({ action: 'staffChatAttach', convo: openConvo, staffName: document.getElementById("staffName").value.trim() }, up));
+    if (!saved) teamSendUpload(up, 'Voice note sent');
     return;
   }
   if (!openConvo) return;

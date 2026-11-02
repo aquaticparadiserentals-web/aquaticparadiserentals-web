@@ -178,7 +178,7 @@ button{font:inherit}
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg>
       </button>
     </div>
-    <p class="fine" id="fine">Our team reads these messages on their phones. Automatic answers come from our price list and rules; a team member follows up. Please don't send card numbers or passwords. Chats are kept for up to 6 months. Voice input is turned into text by your browser's speech service (Google or Apple); where a phone can't do that, your voice message is sent to our team as a recording — <a href="privacy.html#chat">privacy notice</a>.</p>
+    <p class="fine" id="fine">Our team reads these messages on their phones. Automatic answers come from our price list and rules; a team member follows up. Please don't send card numbers or passwords. Chats are kept for up to 6 months. Voice input is turned into text by your browser's speech service (Google or Apple); where a phone can't do that, or there's no signal, your voice message is sent to our team as a recording. With no signal it waits on your phone until it can send, and you can delete it — <a href="privacy.html#chat">privacy notice</a>.</p>
   </form>
 </div>
 <div class="toast" id="toast" role="status"></div>
@@ -372,7 +372,7 @@ function speakText(text) {
 }
 function toggleVoice() {
   if (voiceRecorder) { stopVoiceMessage(); return; }
-  if (!SpeechRec || !speechRecUsable) { startVoiceMessage(); return; }
+  if (!SpeechRec || !speechRecUsable || !navigator.onLine) { startVoiceMessage(); return; } // speech-to-text needs signal, recording doesn't
   if (voiceListening && voiceRec) { voiceRec.stop(); return; }
   if ('speechSynthesis' in window) speechSynthesis.cancel();
   const ta = $('chatInput'), mic = $('micBtn');
@@ -441,7 +441,10 @@ async function stopVoiceMessage() {
   const clip = await rec.stop();
   if (!clip) { toast('That was too short. Hold on a second longer'); return; }
   voiceUsed = true;
-  sendAttachment({ kind: 'voice', mime: clip.mime, secs: clip.secs, data: await AprAlerts.blobToBase64(clip.blob) }, '🎤 Voice message (' + clip.secs + 's)');
+  if (!ensureName()) return;
+  const up = { kind: 'voice', mime: clip.mime, secs: clip.secs, data: await AprAlerts.blobToBase64(clip.blob) };
+  const saved = await AprAlerts.outbox.add(Object.assign({ action: 'chatAttach', convo: convoId(), name: chat.name, contact: chat.contact || '' }, up));
+  if (!saved) sendAttachment(up, '🎤 Voice message (' + clip.secs + 's)');
 }
 function ensureName() {
   if (chat.name) return true;
@@ -524,6 +527,7 @@ async function deleteChat() {
   if (!chat.convo || !(chat.msgs || []).length) { toast('There\'s no chat to delete'); return; }
   if (!confirm('Delete this whole conversation? It is removed from our records and from this device. This can\'t be undone.')) return;
   try {
+    AprAlerts.outbox.clear();
     const d = await call({ action: 'chatDelete', convo: chat.convo });
     if (!d || !d.ok) throw new Error((d && d.error) || 'Could not delete');
   } catch (err) { toast('Could not reach us — try again when you\'re online'); return; }
@@ -545,6 +549,10 @@ window.addEventListener('pageshow', e => { if (e.persisted) { poll(); schedule()
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
 window.addEventListener('storage', e => { if (e.key === CHAT_KEY) { try { chat = JSON.parse(e.newValue) || {}; } catch (x) { chat = {}; } render(); } });
 
+// Voice notes wait on this phone until there's signal (chat-alerts.js). A minute of audio on weak signal needs longer than a text.
+AprAlerts.outbox.start({ role: 'guest',
+  send: body => fetch(BACKEND, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), signal: AbortSignal.timeout(120000) }).then(r => r.json()),
+  onSent: d => { apply(d.messages); fastUntil = Date.now() + 5 * 60000; schedule(); } });
 renderStatus(); render(); poll(); schedule(); initVoice();
 setInterval(renderStatus, 60000);
 </script>

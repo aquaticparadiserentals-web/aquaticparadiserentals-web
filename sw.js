@@ -10,6 +10,13 @@ const ASSETS = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './offline-queue.js',
+  './index.html',
+  './chat.html',
+  './dispatch.html',
+  './chat-alerts.js',
+  './chat-media.js',
+  './chat-call.js',
+  './auto-update.js',
   './img/gear/SUP.jpg',
   './img/gear/KAY.jpg',
   './img/gear/KAY2.jpg',
@@ -61,7 +68,7 @@ self.addEventListener('fetch', e => {
         caches.open(CACHE).then(c => c.put(e.request, clone));
       }
       return res;
-    }).catch(() => caches.match(e.request).then(hit => hit || Response.error()))
+    }).catch(() => caches.match(e.request, { ignoreSearch: true }).then(hit => hit || Response.error()))
   );
 });
 
