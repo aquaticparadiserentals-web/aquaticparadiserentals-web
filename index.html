@@ -2525,6 +2525,7 @@ async function submitBooking() {
 
   let ok = false;
   let queued = false;
+  let soldOut = false, unreadable = false; // unreadable: sent, but this browser can't see the reply
   try {
     // A photo/signature payload is too large for a URL query string, so it
     // must go via POST. Everything else still prefers GET, since GAS
@@ -2538,6 +2539,7 @@ async function submitBooking() {
       const result = await AQPQueue.queueOrSend(BACKEND, payload, { forceNoCors: true, dedupeKey: refNum });
       ok = result.ok;
       queued = result.queued === true;
+      unreadable = ok && !queued;
     } else {
       const params = new URLSearchParams();
       params.append('data', JSON.stringify(payload));
@@ -2547,6 +2549,7 @@ async function submitBooking() {
         const data = await res.json();
         if (data && data.ok === true) {
           ok = true;
+          soldOut = data.soldOut === true;
         } else if (data && data.ok === false && data.error === 'Offline') {
           // sw.js's synthetic offline Response — the GET never actually
           // reached the network, so this is a real connectivity gap, not a
@@ -2566,7 +2569,7 @@ async function submitBooking() {
             headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify(payload),
           });
-          ok = true; // no-cors means we can't read response, assume ok
+          ok = true; unreadable = true; // no-cors means we can't read the response; checked below
         } catch (e2) {
           await AQPQueue.enqueue(BACKEND, payload, refNum);
           ok = true; queued = true;
@@ -2579,6 +2582,24 @@ async function submitBooking() {
       await AQPQueue.enqueue(BACKEND, payload, refNum);
       ok = true; queued = true;
     } catch(e2) { ok = false; }
+  }
+
+  if (ok && unreadable) {
+    try {
+      const res = await fetch(BACKEND + '?action=checkBooking&ref=' + encodeURIComponent(refNum), { signal: AbortSignal.timeout(10000) });
+      const chk = await res.json();
+      if (chk && chk.ok === true && chk.booked === false) soldOut = true;
+    } catch (e) { /* can't check: the owner's alarm covers it */ }
+  }
+  if (soldOut) {
+    btn.disabled = false;
+    btn.innerHTML = t('btn_confirm', 'Confirm Booking');
+    await loadAvailability();
+    const msg = 'We could not hold this booking. Someone may have just taken the last one. Please pick another time or change your gear, or message us on WhatsApp.';
+    const notice = document.getElementById('stockNotice');
+    if (notice) { notice.textContent = cartShortfall() || msg; notice.style.display = 'block'; }
+    showToast(msg, 'warn');
+    return;
   }
 
   if (ok) {

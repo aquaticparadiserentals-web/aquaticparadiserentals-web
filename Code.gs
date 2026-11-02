@@ -982,11 +982,12 @@ function endDeal(p) {
 }
 
 // Called from saveBooking while it holds the script lock, BEFORE the row is
-// written. Never throws and never rejects the booking: many bookings arrive
-// via a no-cors POST whose response the guest's page can't read, so a
-// rejection would look like success to the guest. index.html pre-checks
-// stock before submitting; anything that still slips through (a race, an
-// offline-queued booking) is saved, flagged in notes, and alarmed.
+// written. Never throws. index.html pre-checks stock before submitting;
+// anything that still slips through (two guests within seconds, an
+// offline-queued booking) is refused by saveBooking: it goes straight to
+// Deleted Bookings so it holds no gear, and the owner gets an alarm. Many
+// bookings arrive via a no-cors POST whose reply the page can't read, so the
+// page asks checkBooking afterwards and tells the guest.
 function _reserveStockForBooking(p) {
   var result = { short: [], after: {}, dealNote: '', dealSoldOut: [], when: '' };
   try {
@@ -1004,7 +1005,7 @@ function _reserveStockForBooking(p) {
 
     var dealOff = 0; // discount the server agrees with, for the price check below
     var dealIds = Array.isArray(p.dealIds) ? p.dealIds.slice(0, 10).map(String) : [];
-    if (dealIds.length) {
+    if (dealIds.length && !result.short.length) {
       var deals = _readJsonProp(DEALS_PROP, []);
       var notes = [];
       result.dealSoldOut = [];
@@ -3008,6 +3009,9 @@ function doGet(e) {
       // public booking page to display.
       return _json({ ok: true, photos: getSitePhotos() });
     }
+    if (p.action === 'checkBooking') {
+      return _json(checkBooking(p));
+    }
     if (p.action === 'getAvailability') {
       // Public — guests see how much is left for their chosen time.
       return _json(getAvailability(p));
@@ -3450,7 +3454,9 @@ function saveBooking(p) {
     catch (lockErr) { _logError('saveBooking.stockLock', lockErr); }
     var stock = _reserveStockForBooking(p);
     var flags = [];
-    if (stock.short.length) flags.push('🚨 OVERBOOKED — ' + stock.short.join('; '));
+    // The owner logging a booking by hand was already warned, so that one is their call.
+    var refused = stock.short.length > 0 && p.source !== 'WhatsApp';
+    if (stock.short.length) flags.push((refused ? '🚨 NOT BOOKED, sold out — ' : '🚨 OVERBOOKED — ') + stock.short.join('; '));
     if (stock.dealNote) flags.push(stock.dealNote);
     if (flags.length) p.notes = flags.join(' · ') + (p.notes && p.notes !== 'N/A' ? ' — ' + p.notes : '');
 
@@ -3481,6 +3487,15 @@ function saveBooking(p) {
       return _fail('saveBooking.write', writeErr);
     } finally {
       if (haveStockLock) { try { stockLock.releaseLock(); } catch (e) {} }
+    }
+
+    if (refused) {
+      deleteBooking({ ref: p.ref });
+      try {
+        _alarm('NOT BOOKED ' + p.ref, '🚨 Not booked, sold out: ' + p.ref + ' (' + (String(p.fname || 'Guest') + ' ' + String(p.lname || '')).trim() + ', ' + String(p.phone || 'no phone') + ')\n' +
+          stock.short.join('\n') + '\nWhen: ' + stock.when + '\nThe gear stays with the earlier booking. If they booked with no signal they may not know yet, so contact them. It is in Deleted Bookings in admin.', true);
+      } catch (refuseErr) { _logError('saveBooking.refusedAlarm', refuseErr); }
+      return { ok: true, ref: p.ref, soldOut: true, short: stock.short }; // ok: the offline queue must not send it again
     }
 
     try {
@@ -3541,6 +3556,33 @@ function saveBooking(p) {
   } catch (err) {
     return _fail('saveBooking', err);
   }
+}
+
+// Public: is this booking being held? Used by the booking page after a send whose
+// reply it can't read. Says nothing about the guest or the booking.
+function checkBooking(p) {
+  try {
+    var ref = String((p && p.ref) || '');
+    if (!/^APR-[A-Z0-9]{1,12}$/.test(ref)) return { ok: false, error: 'Invalid ref' };
+    var data = _sheet().getDataRange().getValues();
+    var refIdx = data[0] ? data[0].indexOf('ref') : -1;
+    for (var i = 1; i < data.length; i++) { if (String(data[i][refIdx]) === ref) return { ok: true, booked: true }; }
+    return { ok: true, booked: false };
+  } catch (err) {
+    return _fail('checkBooking', err);
+  }
+}
+
+// What's short if this gear were active for this time, not counting the booking itself.
+function _shortfallFor(gear, datetime, duration, ref) {
+  var w = _bookingWindow(datetime, duration);
+  if (!w) return [];
+  var wanted = _gearDemand(gear), avail = _availabilityFor(w.start, w.end, ref), short = [];
+  Object.keys(wanted).forEach(function (k) {
+    var a = avail[k];
+    if (a && a.left !== null && wanted[k] > a.left) short.push(GEAR_LABELS[k] + ': ' + a.left + ' left, needs ' + wanted[k]);
+  });
+  return short;
 }
 
 function getBookings(limit) {
@@ -3828,6 +3870,13 @@ function updateStatus(p) {
 
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][refIdx]) === String(p.ref)) {
+        var was = String(data[i][statusIdx] || '').trim() || 'pending';
+        if (was === 'N/A') was = 'pending';
+        if (ACTIVE_BOOKING_STATUSES.indexOf(was) === -1 && ACTIVE_BOOKING_STATUSES.indexOf(p.status) !== -1) {
+          var iG = data[0].indexOf('gear'), iD = data[0].indexOf('datetime'), iL = data[0].indexOf('duration');
+          var short = _shortfallFor(data[i][iG], data[i][iD], data[i][iL], p.ref);
+          if (short.length) return { ok: false, error: 'Not enough gear for that time. ' + short.join('; ') };
+        }
         sh.getRange(i + 1, statusIdx + 1).setValue(p.status);
         return { ok: true };
       }
@@ -3923,6 +3972,11 @@ function restoreBooking(p) {
         var archived = {};
         archiveHeader.forEach(function (h, idx) { archived[h] = data[i][idx]; });
 
+        var backStatus = String(archived.status || '').trim() || 'pending';
+        if (ACTIVE_BOOKING_STATUSES.indexOf(backStatus === 'N/A' ? 'pending' : backStatus) !== -1) {
+          var backShort = _shortfallFor(archived.gear, archived.datetime, archived.duration, p.ref);
+          if (backShort.length) return { ok: false, error: 'Not enough gear for that time. ' + backShort.join('; ') };
+        }
         var bookingSheet = _sheet(); // runs self-healing migration first
         var liveHeader = bookingSheet.getRange(1, 1, 1, bookingSheet.getLastColumn()).getValues()[0];
         var newRow = liveHeader.map(function (h) {

@@ -1582,6 +1582,13 @@ async function setBkState(ref, state) {
     const b = allBookings.find(x=>x && x.ref===ref);
     if (b) b.status = state;
   } catch (err) {
+    if (/^Not enough gear/.test(err.message)) { // refused: put the card back as it was
+      delete bookingStates[ref];
+      localStorage.setItem('apr_bk_states', JSON.stringify(bookingStates));
+      renderBookings(); updateKPIs();
+      showToast(err.message, 'warn');
+      return;
+    }
     showToast('Status saved on this device but did not sync: '+err.message, 'warn');
   }
 }
