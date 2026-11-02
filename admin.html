@@ -2555,12 +2555,12 @@ async function payPartner(partner, total) {
 function renderStock() {
   const items = stockOverview.items || [];
   const sum = f => items.reduce((s,i) => s + (Number(i[f])||0), 0);
-  const counted = items.filter(i => i.total !== null);
+  const counted = items.filter(i => i.total !== null && i.key !== 'LJ'); // jackets go with the gear, not rented on their own
   const availNow = counted.reduce((s,i) => s + (Number(i.leftNow)||0), 0);
   const soldOut = items.filter(i => i.leftNow === 0).map(i => i.label);
   document.getElementById('stockKpis').innerHTML = `
     <div class="kpi-card"><div class="kpi-label">Available now</div><div class="kpi-val">${counted.length ? availNow : '—'}</div><div class="kpi-sub">${counted.length ? 'units ready to rent' : 'set counts below'}</div></div>
-    <div class="kpi-card gold"><div class="kpi-label">Out on rental</div><div class="kpi-val">${sum('outNow')}</div><div class="kpi-sub">booked for right now</div></div>
+    <div class="kpi-card gold"><div class="kpi-label">Out on rental</div><div class="kpi-val">${sum('outNow') - (items.find(i => i.key === 'LJ')?.outNow || 0)}</div><div class="kpi-sub">booked for right now</div></div>
     <div class="kpi-card ${sum('repair')?'coral':''}"><div class="kpi-label">In repair</div><div class="kpi-val">${sum('repair')}</div><div class="kpi-sub">not rentable</div></div>
     <div class="kpi-card ${soldOut.length?'coral':''}"><div class="kpi-label">Sold out now</div><div class="kpi-val">${soldOut.length}</div><div class="kpi-sub">${soldOut.length ? escapeHtml(soldOut.join(', ')) : 'nothing missing'}</div></div>`;
   document.getElementById('stockRows').innerHTML = items.map(i => {
@@ -2577,7 +2577,7 @@ function renderStock() {
     </tr>`;
   }).join('');
   const sel = document.getElementById('dealGear');
-  if (sel && !sel.options.length) sel.innerHTML = items.map(i => `<option value="${i.key}">${escapeHtml(i.label)}</option>`).join('');
+  if (sel && !sel.options.length) sel.innerHTML = items.filter(i => i.key !== 'LJ').map(i => `<option value="${i.key}">${escapeHtml(i.label)}</option>`).join('');
 }
 
 async function saveStockCounts() {

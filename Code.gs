@@ -758,12 +758,14 @@ function setBankGuide(p) {
 // Stock is a simple per-item count the owner sets in admin (Stock & Deals):
 // how many units we own and how many are out for repair. A booking holds its
 // units for its own date/time window (pending/confirmed/delivering), so the
-// same board can be booked 10am and again 2pm. Items with no count set are
-// treated as unlimited — nothing is blocked until the owner enters numbers.
+// same board can be booked 10am and again 2pm. Every item starts from the owner's
+// real counts (DEFAULT_STOCK), so nothing is unlimited; admin changes them.
+// Life jackets are a shared limit: every guest on the water wears one, so a
+// time can sell out of jackets before it sells out of gear.
 // Bookings only store gear as text ("Paddle Board x2, Snorkel Set x1" or a
 // package name), so quantities are parsed back out of that text.
-var STOCK_KEYS = ['SUP', 'KAY', 'KAY2', 'SNK', 'FLT', 'FLC', 'BPG'];
-var GEAR_LABELS = { SUP: 'Paddle Board', KAY: 'Kayak (Single)', KAY2: 'Kayak (Double)', SNK: 'Snorkel Set', FLT: 'Floating Tube', FLC: 'Floating Lounge Chair', BPG: 'Beach Paddle Games' };
+var STOCK_KEYS = ['SUP', 'KAY', 'KAY2', 'SNK', 'FLT', 'FLC', 'BPG', 'LJ'];
+var GEAR_LABELS = { SUP: 'Paddle Board', KAY: 'Kayak (Single)', KAY2: 'Kayak (Double)', SNK: 'Snorkel Set', FLT: 'Floating Tube', FLC: 'Floating Lounge Chair', LJ: 'Life Jackets', BPG: 'Beach Paddle Games' };
 var GEAR_BY_NAME = {
   'Paddle Board': 'SUP', 'Kayak (Single)': 'KAY', 'Kayak (Double)': 'KAY2', 'Snorkel Set': 'SNK',
   'Floating Tube': 'FLT', 'Floater/Board': 'FLT', 'Floating Lounge Chair': 'FLC', 'Beach Paddle Games': 'BPG'
@@ -800,6 +802,17 @@ function _parseGearQty(gearText) {
   return out;
 }
 
+// What a booking holds, life jackets included. Seats on boards, kayaks and floats
+// each need a jacket. Snorkelers may be the same people (a Duo is 1 board and 2
+// snorkel sets for 2 guests), so it's the larger of seats and snorkel sets. Mirrors cartPeople in index.html.
+function _gearDemand(gearText) {
+  var q = _parseGearQty(gearText);
+  var n = function (k) { return q[k] || 0; };
+  var people = Math.max(n('SUP') + n('KAY') + 2 * n('KAY2') + n('FLT') + n('FLC'), n('SNK'));
+  if (people > 0) q.LJ = people;
+  return q;
+}
+
 function _bookingWindow(datetime, duration) {
   var start = (datetime instanceof Date) ? datetime.getTime() : new Date(String(datetime || '')).getTime();
   if (isNaN(start)) return null;
@@ -817,8 +830,14 @@ function _readJsonProp(key, fallback) {
 }
 
 // Used until the owner saves counts in admin (then the saved counts win).
-var DEFAULT_STOCK = { SUP: { total: 8, repair: 0 }, KAY: { total: 2, repair: 0 }, KAY2: { total: 2, repair: 0 } };
-function _stockConfig() { return _readJsonProp(STOCK_PROP, DEFAULT_STOCK); }
+// Owner's count of 2 Nov 2026. Snorkel sets stay at the safe 7 until the fins are counted.
+var DEFAULT_STOCK = { SUP: { total: 8, repair: 0 }, KAY: { total: 4, repair: 0 }, KAY2: { total: 2, repair: 0 }, SNK: { total: 7, repair: 0 },
+  FLT: { total: 12, repair: 0 }, FLC: { total: 4, repair: 0 }, BPG: { total: 2, repair: 0 }, LJ: { total: 17, repair: 0 } };
+function _stockConfig() {
+  var saved = _readJsonProp(STOCK_PROP, {}), cfg = {};
+  Object.keys(DEFAULT_STOCK).forEach(function (k) { cfg[k] = saved[k] || DEFAULT_STOCK[k]; });
+  return cfg;
+}
 
 // Units held per item by active bookings overlapping [start, end).
 function _heldInWindow(start, end, excludeRef) {
@@ -834,7 +853,7 @@ function _heldInWindow(start, end, excludeRef) {
     if (ACTIVE_BOOKING_STATUSES.indexOf(status) === -1) continue;
     var w = _bookingWindow(row[iDt], row[iDur]);
     if (!w || !(w.start < end && start < w.end)) continue;
-    var q = _parseGearQty(row[iGear]);
+    var q = _gearDemand(row[iGear]);
     Object.keys(q).forEach(function (k) { held[k] = (held[k] || 0) + q[k]; });
   }
   return held;
@@ -974,7 +993,7 @@ function _reserveStockForBooking(p) {
     var w = _bookingWindow(p.datetime, p.duration);
     if (!w) return result;
     result.when = Utilities.formatDate(new Date(w.start), Session.getScriptTimeZone(), 'EEE d MMM, h:mm a');
-    var wanted = _parseGearQty(p.gear);
+    var wanted = _gearDemand(p.gear);
     var avail = _availabilityFor(w.start, w.end);
     Object.keys(wanted).forEach(function (k) {
       var a = avail[k];
@@ -2046,7 +2065,7 @@ function _startBookDraft(msgText) {
   try {
     var w = _bookingWindow(b.datetime, b.duration);
     var avail = _availabilityFor(w.start, w.end);
-    var wanted = _parseGearQty(b.gear);
+    var wanted = _gearDemand(b.gear);
     Object.keys(wanted).forEach(function (k) {
       var a = avail[k];
       if (!a || a.left === null) return;

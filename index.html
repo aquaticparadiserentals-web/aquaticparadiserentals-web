@@ -1568,6 +1568,15 @@ function offReason(key) {
 function escapeHtmlText(val) {
   return String(val == null ? '' : val).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
+// Life jackets a selection needs (every seat on the water wears one). Mirrors _gearDemand in Code.gs.
+function cartPeople(uses) {
+  const n = k => uses[k] || 0;
+  return Math.max(n('SUP') + n('KAY') + 2 * n('KAY2') + n('FLT') + n('FLC'), n('SNK'));
+}
+function jacketsShort(uses) {
+  const left = itemLeft('LJ');
+  return left !== null && cartPeople(uses) > left;
+}
 // Why a package can't be booked right now (item turned off or not enough
 // left for the chosen time), or '' if it's fine. Keys of p.uses mirror
 // PACKAGE_GEAR in Code.gs.
@@ -1578,6 +1587,7 @@ function packageBlockReason(p) {
     const left = itemLeft(id);
     if (left !== null && left < qty) return 'Sold out for your time';
   }
+  if (jacketsShort(p.uses || {})) return 'Not enough life jackets left for your time';
   return '';
 }
 function packageBlocked(p) { return !!packageBlockReason(p); }
@@ -1644,6 +1654,7 @@ function cartShortfall() {
     const g = GEAR.find(x => x.id === id);
     return (left !== null && qty > left) ? `only ${left} ${g ? g.name : id} left` : '';
   }).filter(Boolean);
+  if (jacketsShort(selectedGear)) short.push(`only ${itemLeft('LJ')} life jackets left, and every guest on the water needs one,`);
   return short.length ? 'Sorry — ' + short.join(', ') + ' for that time. Pick another time or change your gear.' : '';
 }
 function renderStockNotice() {
@@ -1876,6 +1887,10 @@ function changeQty(id, delta) {
   const left = itemLeft(id);
   if (delta > 0 && left !== null && cur + delta > left) {
     showToast(`Only ${left} left for that time`, 'warn');
+    return;
+  }
+  if (delta > 0 && jacketsShort(Object.assign({}, selectedGear, { [id]: cur + delta }))) {
+    showToast(`Only ${itemLeft('LJ')} life jackets left for that time`, 'warn');
     return;
   }
   const next = Math.max(0, cur + delta);
