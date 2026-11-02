@@ -1747,6 +1747,51 @@ function _findBooking(ref) {
   return null;
 }
 
+// ── PLATFORM WATCHDOG ── Checks the Render platform from outside every 5 minutes.
+// Two failures in a row (one blip doesn't count) alarms the owner once; another alarm when it's back.
+var PLATFORM_HEALTH_URL = 'https://aquatic-platform.onrender.com/healthz';
+function _platformAnswers() {
+  try {
+    var r = UrlFetchApp.fetch(PLATFORM_HEALTH_URL, { muteHttpExceptions: true, followRedirects: true });
+    return r.getResponseCode() === 200 && r.getContentText().indexOf('"ok":true') !== -1;
+  } catch (err) {
+    return false;
+  }
+}
+function platformWatch() {
+  var props = PropertiesService.getScriptProperties();
+  var downSince = props.getProperty('platform_down_since');
+  if (_platformAnswers()) {
+    props.setProperty('platform_fail_count', '0');
+    if (downSince) {
+      props.deleteProperty('platform_down_since');
+      var mins = Math.max(1, Math.round((Date.now() - Number(downSince)) / 60000));
+      _alarm('Platform back up', '✅ The platform is back up after about ' + mins + ' minutes.', true);
+    }
+    return;
+  }
+  var fails = (Number(props.getProperty('platform_fail_count')) || 0) + 1;
+  props.setProperty('platform_fail_count', String(fails));
+  if (fails === 2 && !downSince) {
+    props.setProperty('platform_down_since', String(Date.now() - 5 * 60000));
+    _alarm('Platform down', '🚨 The platform (aquatic-platform.onrender.com) is not answering. Render tries restarting it by itself. ' +
+      'If it is not back in 10 minutes: open dashboard.render.com, then aquatic-platform, then Events, and roll back to the last working version. ' +
+      'The booking site is separate and still takes bookings.', true);
+  }
+}
+// Installs the 5-minute check the first time the Telegram poll runs after this is deployed.
+function _ensurePlatformWatch() {
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('platform_watch_installed')) return;
+  try {
+    var have = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'platformWatch'; });
+    if (!have) ScriptApp.newTrigger('platformWatch').timeBased().everyMinutes(5).create();
+    props.setProperty('platform_watch_installed', '1');
+  } catch (err) {
+    _logError('_ensurePlatformWatch', err);
+  }
+}
+
 // Makes sure the poll + 7am briefing triggers exist once Telegram is connected.
 function _ensureTelegramTriggers() {
   try {
@@ -1763,6 +1808,7 @@ function _ensureTelegramTriggers() {
 function pollTelegram() {
   // User lock, not script lock: a /book save calls saveBooking(), which takes
   // the script lock itself for its stock check.
+  _ensurePlatformWatch();
   var lock = LockService.getUserLock();
   if (!lock.tryLock(0)) return; // previous run still going
   try {
