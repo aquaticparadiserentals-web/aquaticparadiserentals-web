@@ -7,6 +7,8 @@
   const IMAGE_MAX_SIDE = 1600;
   const IMAGE_MAX_BYTES = 6 * 1024 * 1024;
   const FILE_MAX_BYTES = 10 * 1024 * 1024;
+  // Drive won't let other sites play its files, so voice notes play through the platform server (aquatic-platform src/apr-media.js).
+  const AUDIO_BASE = window.APR_MEDIA_BASE || 'https://aquatic-platform.onrender.com/apr/media/';
   const FILE_ACCEPT = 'image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,audio/*,video/mp4,video/quicktime';
 
   // Opens the phone's picker. accept: 'image/*' for photos (camera or gallery).
@@ -68,7 +70,7 @@
     if (m) {
       const id = driveId(m[2]);
       return '<span class="cm-voice"><span>🎤 Voice message · ' + m[1] + 's</span>' +
-        (id ? '<audio controls preload="none" src="https://drive.google.com/uc?export=download&amp;id=' + id + '"></audio>' : '') +
+        (id ? '<audio controls preload="none" src="' + AUDIO_BASE + id + '"></audio>' : '') +
         '<a href="' + escape(m[2]) + '" target="_blank" rel="noopener">Open</a></span>';
     }
     m = t.match(/^🖼️ Photo: (https:\/\/drive\.google\.com\/\S+)$/);
