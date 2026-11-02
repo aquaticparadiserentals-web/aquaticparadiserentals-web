@@ -1,8 +1,7 @@
-// APR Service Worker v12.0
-// Bump CACHE whenever static assets (manifest, icons, logo) change — they're
-// cached-first with no expiry, so the version string is the only thing that
-// forces a refresh. HTML is network-first and self-heals on next reload.
-const CACHE = 'apr-v12';
+// APR Service Worker v13.0
+// Everything is network-first, so upgrades need no version bump to reach phones.
+// Bumping CACHE only clears out old offline copies.
+const CACHE = 'apr-v13';
 const ASSETS = [
   './manifest.json',
   './logo.jpg',
@@ -19,9 +18,6 @@ const ASSETS = [
   './img/gear/FLC.jpg',
   './img/gear/BPG.jpg',
 ];
-// apr-config.js rides with the HTML (network-first) so edits to deposit %,
-// PayPal or partners reach guests immediately instead of sticking in cache.
-const HTML_FILES = ['./', './index.html', './admin.html', './apr-config.js', './chat-alerts.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -49,33 +45,23 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  const isHTML = e.request.mode === 'navigate' ||
-    HTML_FILES.some(f => e.request.url.endsWith(f.replace('./', '')));
+  // Only this site's own page loads go through here. Calls and alerts to the
+  // platform server are left to the browser: a call's live connection never
+  // ends, so copying it into the cache broke it (worst on phones, which stop
+  // service workers quickly).
+  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== self.location.origin) return;
 
-  if (isHTML) {
-    // Network-first for HTML so updates show up immediately.
-    // Falls back to cache only when offline.
-    e.respondWith(
-      fetch(e.request).then(res => {
-        const clone = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
-        return res;
-      }).catch(() => caches.match(e.request))
-    );
-    return;
-  }
-
-  // Cache-first for static assets (images, manifest). Only good responses are
-  // stored: caching a 404 (e.g. a photo requested a moment before it was
-  // uploaded) would keep showing the fallback forever on that phone.
+  // Network-first for everything so an upgrade shows up on the next load at the
+  // same link. The cached copy is only for when there's no signal. Only good
+  // responses are stored, so a 404 never sticks on a phone.
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
+    fetch(e.request).then(res => {
       if (res.ok) {
         const clone = res.clone();
         caches.open(CACHE).then(c => c.put(e.request, clone));
       }
       return res;
-    }))
+    }).catch(() => caches.match(e.request).then(hit => hit || Response.error()))
   );
 });
 

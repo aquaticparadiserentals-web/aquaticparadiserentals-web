@@ -10,8 +10,11 @@
   let ringing = new Map(); // staff: id -> { name, convo }
   let ringTimer = null;
 
+  const timeout = ms => { const c = new AbortController(); setTimeout(() => c.abort(), ms); return c.signal; }; // AbortSignal.timeout is missing on older phones
   const post = (path, body) => fetch(BASE + path, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify(body), signal: AbortSignal.timeout(20000) }).then(r => r.json());
+    body: JSON.stringify(body), signal: timeout(20000) }).then(r => r.json());
+  const WHATSAPP = (window.APR_CONFIG && APR_CONFIG.whatsapp) || '17844963447';
+  const CONNECT_MS = 25000; // answered but no audio by now: this network needs another way
 
   // ── Screen ──
   const css = document.createElement('style');
@@ -23,7 +26,7 @@
   .cc-status{font-size:.9rem;opacity:.8;margin:0 0 22px;min-height:1.3em}
   .cc-row{display:flex;justify-content:center;gap:18px;flex-wrap:wrap}
   .cc-btn{border:0;border-radius:999px;min-width:64px;height:64px;padding:0 18px;font:inherit;font-size:.85rem;font-weight:700;cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center;gap:8px}
-  .cc-btn svg{width:24px;height:24px}
+  .cc-btn[hidden]{display:none}.cc-btn svg{width:24px;height:24px}a.cc-btn{text-decoration:none}
   .cc-end{background:#D63A3A}.cc-ok{background:#16A34A}.cc-mute{background:rgba(255,255,255,.14)}.cc-mute.on{background:#fff;color:#0B1E33}
   .cc-link{margin-top:14px;background:none;border:0;color:#fff;opacity:.8;text-decoration:underline;font:inherit;font-size:.85rem;cursor:pointer}
   .cc-ring{position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:999;background:#0B1E33;color:#fff;border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);width:min(420px,calc(100vw - 24px))}
@@ -89,18 +92,33 @@
       let a = document.getElementById('ccAudio');
       if (!a) { a = document.createElement('audio'); a.id = 'ccAudio'; a.autoplay = true; a.setAttribute('playsinline', ''); document.body.appendChild(a); }
       a.srcObject = e.streams[0];
-      a.play().catch(() => {});
+      a.play().catch(() => { setStatus('Tap anywhere to hear the call'); document.addEventListener('pointerdown', () => a.play().catch(() => {}), { once: true }); });
     };
     pc.onconnectionstatechange = () => {
       if (!active || active.pc !== pc) return;
-      if (pc.connectionState === 'connected' && !active.answeredAt) startTimer();
-      if (pc.connectionState === 'failed') { setStatus('Connection failed. The network may be blocking calls.'); setTimeout(() => hangUp(), 2500); }
+      if (pc.connectionState === 'connected' && !active.answeredAt) { clearTimeout(active.watchdog); startTimer(); }
+      if (pc.connectionState === 'failed') cantConnect();
     };
     if (offerer) {
       pc.createOffer().then(o => pc.setLocalDescription(o))
         .then(() => post('/signal', { id: active.id, key: active.key, data: { sdp: pc.localDescription.toJSON() } }));
     }
     setStatus('Connecting…');
+    active.watchdog = setTimeout(() => { if (active && active.pc === pc && !active.answeredAt) cantConnect(); }, CONNECT_MS);
+  }
+
+  // The network wouldn't carry the audio. Never leave anyone stuck on "Connecting…".
+  function cantConnect() {
+    if (!active) return;
+    const guest = active.role === 'guest';
+    post('/end', { id: active.id, key: active.key }).catch(() => {});
+    const a = cleanup();
+    if (guest && a.onEnd) a.onEnd('failed', 0, a.by || '');
+    setStatus(guest ? 'This network blocked the call. You can reach us on WhatsApp instead.' : 'This network blocked the call. Ask the guest to use WhatsApp, or reply in the chat.');
+    const row = document.getElementById('ccButtons');
+    if (!row) return;
+    row.innerHTML = (guest ? '<a class="cc-btn cc-ok" href="https://wa.me/' + WHATSAPP + '" target="_blank" rel="noopener">WhatsApp us</a>' : '') + '<button class="cc-btn cc-mute" type="button" id="ccClose">Close</button>';
+    row.querySelector('#ccClose').onclick = closeScreen;
   }
 
   async function onSignal(data) {
@@ -122,6 +140,7 @@
   function listen(handlers) {
     const es = new EventSource(BASE + '/stream?id=' + active.id + '&key=' + active.key);
     active.es = es;
+    active.handlers = handlers;
     Object.entries(handlers).forEach(([ev, fn]) => es.addEventListener(ev, e => { try { fn(JSON.parse(e.data || '{}')); } catch (x) {} }));
     es.addEventListener('signal', e => { try { onSignal(JSON.parse(e.data)); } catch (x) {} });
   }
@@ -131,6 +150,7 @@
     const a = active;
     active = null;
     clearInterval(a.clock);
+    clearTimeout(a.watchdog);
     try { a.es && a.es.close(); } catch (e) {}
     try { a.pc && a.pc.close(); } catch (e) {}
     try { a.mic && a.mic.getTracks().forEach(t => t.stop()); } catch (e) {}
@@ -249,6 +269,12 @@
     const m = location.hash.match(/^#call=([a-f0-9]{24})$/);
     if (m && staffSession) { history.replaceState(null, '', location.pathname); answer(m[1]); }
   });
+  // Phones cut live connections while the screen is off; pick them back up on return.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    if (active && active.es && active.es.readyState === 2) listen(active.handlers);
+    if (staffSession && staffES && staffES.readyState === 2) openStaffStream();
+  });
   window.addEventListener('pagehide', () => { if (active) hangUp(true); });
-  window.AprCall = { guestCall, staffInit, answer, supported: !!(window.RTCPeerConnection && navigator.mediaDevices) };
+  window.AprCall = { guestCall, staffInit, answer, inCall: () => !!active, supported: !!(window.RTCPeerConnection && navigator.mediaDevices) };
 })();
