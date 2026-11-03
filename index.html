@@ -553,7 +553,7 @@ header .top-links a:hover,header .top-links a.active{color:#fff}
         <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Open daily, 8 AM to 6 PM</li>
         <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Free cancellation up to 2 hours before</li>
         <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Unsafe weather? Free rebooking or a full refund</li>
-        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Pay cash or bank transfer when your rental starts</li>
+        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Pay by bank transfer (BOSVG)</li>
       </ul>
     </div>
     <form class="quick-book" id="quickBook" onsubmit="quickBook(event)" aria-labelledby="qbTitle">
@@ -803,20 +803,18 @@ header .top-links a:hover,header .top-links a.active{color:#fff}
       <li data-i18n="pricing_note_2">Safety whistle provided on each rental</li>
       <li data-i18n="pricing_note_3">Group discounts available — ask on WhatsApp</li>
       <li data-i18n="pricing_note_4">Hotel partner rates negotiated separately</li>
-      <li data-i18n="pricing_note_5">Payment accepted: Cash (XCD/USD), bank transfer, card arrangements via WhatsApp</li>
+      <li data-i18n="pricing_note_5">Payment: bank transfer only (BOSVG)</li>
     </ul>
   </div>
 
   <div class="section-title" data-i18n="payment_options_title">Payment Options</div>
   <div class="info-card">
     <ul>
-      <li data-i18n="pay_cash"><strong>Cash</strong> — XCD or USD, paid at the start of your rental</li>
       <!-- The account number is NEVER published on the site: guests ask for it
            on WhatsApp. The step-by-step guide below (#bankGuideRates) appears
            only when staff switch it on in admin → Stock & Deals. -->
       <li><strong data-i18n="pay_bank_label">Bank Transfer</strong> <span data-i18n="pay_bank_desc">— Bank of St. Vincent &amp; the Grenadines (BOSVG).</span>
         <a href="https://wa.me/17844963447?text=Hi%20APR!%20Please%20send%20me%20the%20bank%20transfer%20details%20for%20my%20booking." data-i18n="link_whatsapp_msg">Message us on WhatsApp</a> <span data-i18n="pay_bank_for">for the account details.</span></li>
-      <li data-i18n="pay_card"><strong>Card</strong> — arranged via WhatsApp</li>
     </ul>
     <p style="font-size:0.78rem;color:var(--muted);margin-top:8px" data-i18n="pay_ref_note">Paying by bank transfer? Send us your booking reference (APR-…) with the payment so we can match it.</p>
   </div>
@@ -1063,7 +1061,7 @@ const TRANSLATIONS = {
     th_fullday:'Full Day', th_weekend:'Weekend (2 days)', th_weekly:'Week (7 days)', swipe_hint:'Swipe sideways to see all prices', section_packages:'Packages',
     pricing_notes_title:'Pricing Notes', pricing_note_1:'Life jackets / PFDs included free with all gear',
     pricing_note_2:'Safety whistle provided on each rental', pricing_note_3:'Group discounts available — ask on WhatsApp',
-    pricing_note_4:'Hotel partner rates negotiated separately', pricing_note_5:'Payment accepted: Cash (XCD/USD), bank transfer, card arrangements via WhatsApp',
+    pricing_note_4:'Hotel partner rates negotiated separately', pricing_note_5:'Payment: bank transfer only (BOSVG)',
     payment_options_title:'Payment Options', pay_cash:'<strong>Cash</strong> — XCD or USD, paid at the start of your rental',
     pay_bank_label:'Bank Transfer', pay_bank_desc:'— Bank of St. Vincent &amp; the Grenadines (BOSVG).',
     link_whatsapp_msg:'Message us on WhatsApp', pay_bank_for:'for the account details.',
@@ -1107,7 +1105,7 @@ const TRANSLATIONS = {
     th_fullday:'Journée complète', th_weekend:'Week-end (2 jours)', th_weekly:'Semaine', swipe_hint:'Faites défiler pour voir tous les prix', section_packages:'Forfaits',
     pricing_notes_title:'Notes tarifaires', pricing_note_1:'Gilets de sauvetage inclus gratuitement avec tout le matériel',
     pricing_note_2:'Sifflet de sécurité fourni à chaque location', pricing_note_3:'Réductions de groupe disponibles — demandez sur WhatsApp',
-    pricing_note_4:'Tarifs partenaires hôteliers négociés séparément', pricing_note_5:'Paiement accepté : espèces (XCD/USD), virement bancaire, carte via WhatsApp',
+    pricing_note_4:'Tarifs partenaires hôteliers négociés séparément', pricing_note_5:'Paiement : virement bancaire uniquement (BOSVG)',
     payment_options_title:'Modes de paiement', pay_cash:'<strong>Espèces</strong> — XCD ou USD, payées au début de votre location',
     pay_bank_label:'Virement bancaire', pay_bank_desc:'— Bank of St. Vincent &amp; the Grenadines (BOSVG).',
     link_whatsapp_msg:'Contactez-nous sur WhatsApp', pay_bank_for:'pour les coordonnées du compte.',
@@ -1151,7 +1149,7 @@ const TRANSLATIONS = {
     th_fullday:'Heldag', th_weekend:'Helg (2 dagar)', th_weekly:'Vecka', swipe_hint:'Svep i sidled för att se alla priser', section_packages:'Paket',
     pricing_notes_title:'Prisanmärkningar', pricing_note_1:'Flytvästar ingår gratis med all utrustning',
     pricing_note_2:'Säkerhetsvissla ingår vid varje uthyrning', pricing_note_3:'Grupprabatter tillgängliga — fråga på WhatsApp',
-    pricing_note_4:'Hotellpartnerpriser förhandlas separat', pricing_note_5:'Betalning accepteras: kontant (XCD/USD), banköverföring, kortarrangemang via WhatsApp',
+    pricing_note_4:'Hotellpartnerpriser förhandlas separat', pricing_note_5:'Betalning: endast banköverföring (BOSVG)',
     payment_options_title:'Betalningsalternativ', pay_cash:'<strong>Kontant</strong> — XCD eller USD, betalas vid hyrans start',
     pay_bank_label:'Banköverföring', pay_bank_desc:'— Bank of St. Vincent &amp; the Grenadines (BOSVG).',
     link_whatsapp_msg:'Meddela oss på WhatsApp', pay_bank_for:'för kontouppgifter.',
@@ -1195,7 +1193,7 @@ const TRANSLATIONS = {
     th_fullday:'Día completo', th_weekend:'Fin de semana (2 días)', th_weekly:'Semanal', swipe_hint:'Desliza hacia los lados para ver todos los precios', section_packages:'Paquetes',
     pricing_notes_title:'Notas de precios', pricing_note_1:'Chalecos salvavidas incluidos gratis con todo el equipo',
     pricing_note_2:'Silbato de seguridad incluido en cada alquiler', pricing_note_3:'Descuentos de grupo disponibles — pregunta por WhatsApp',
-    pricing_note_4:'Tarifas de socios hoteleros negociadas por separado', pricing_note_5:'Pago aceptado: efectivo (XCD/USD), transferencia bancaria, tarjeta mediante WhatsApp',
+    pricing_note_4:'Tarifas de socios hoteleros negociadas por separado', pricing_note_5:'Pago: solo transferencia bancaria (BOSVG)',
     payment_options_title:'Opciones de pago', pay_cash:'<strong>Efectivo</strong> — XCD o USD, pagado al inicio de tu alquiler',
     pay_bank_label:'Transferencia bancaria', pay_bank_desc:'— Bank of St. Vincent &amp; the Grenadines (BOSVG).',
     link_whatsapp_msg:'Escríbenos por WhatsApp', pay_bank_for:'para los datos de la cuenta.',
@@ -1239,7 +1237,7 @@ const TRANSLATIONS = {
     th_fullday:'Ganzer Tag', th_weekend:'Wochenende (2 Tage)', th_weekly:'Wöchentlich', swipe_hint:'Seitlich wischen, um alle Preise zu sehen', section_packages:'Pakete',
     pricing_notes_title:'Preishinweise', pricing_note_1:'Schwimmwesten kostenlos bei jeder Ausrüstung enthalten',
     pricing_note_2:'Sicherheitspfeife bei jeder Ausleihe enthalten', pricing_note_3:'Gruppenrabatte verfügbar — frag auf WhatsApp',
-    pricing_note_4:'Hotelpartnertarife separat verhandelt', pricing_note_5:'Zahlung akzeptiert: Bar (XCD/USD), Banküberweisung, Kartenvereinbarung über WhatsApp',
+    pricing_note_4:'Hotelpartnertarife separat verhandelt', pricing_note_5:'Zahlung: nur per Banküberweisung (BOSVG)',
     payment_options_title:'Zahlungsoptionen', pay_cash:'<strong>Bar</strong> — XCD oder USD, zahlbar zu Beginn deiner Ausleihe',
     pay_bank_label:'Banküberweisung', pay_bank_desc:'— Bank of St. Vincent &amp; the Grenadines (BOSVG).',
     link_whatsapp_msg:'Schreib uns auf WhatsApp', pay_bank_for:'für die Kontodaten.',
@@ -1283,7 +1281,7 @@ const TRANSLATIONS = {
     th_fullday:'Giornata intera', th_weekend:'Weekend (2 giorni)', th_weekly:'Settimanale', swipe_hint:'Scorri lateralmente per vedere tutti i prezzi', section_packages:'Pacchetti',
     pricing_notes_title:'Note sui prezzi', pricing_note_1:"Giubbotti salvagente inclusi gratuitamente con tutta l'attrezzatura",
     pricing_note_2:'Fischietto di sicurezza fornito con ogni noleggio', pricing_note_3:'Sconti di gruppo disponibili — chiedi su WhatsApp',
-    pricing_note_4:'Tariffe partner alberghieri negoziate separatamente', pricing_note_5:'Pagamento accettato: contanti (XCD/USD), bonifico bancario, accordi con carta tramite WhatsApp',
+    pricing_note_4:'Tariffe partner alberghieri negoziate separatamente', pricing_note_5:'Pagamento: solo bonifico bancario (BOSVG)',
     payment_options_title:'Opzioni di pagamento', pay_cash:"<strong>Contanti</strong> — XCD o USD, pagati all'inizio del noleggio",
     pay_bank_label:'Bonifico bancario', pay_bank_desc:'— Bank of St. Vincent &amp; the Grenadines (BOSVG).',
     link_whatsapp_msg:'Scrivici su WhatsApp', pay_bank_for:'per i dettagli del conto.',
@@ -1327,7 +1325,7 @@ const TRANSLATIONS = {
     th_fullday:'Dia inteiro', th_weekend:'Fim de semana (2 dias)', th_weekly:'Semanal', swipe_hint:'Deslize para o lado para ver todos os preços', section_packages:'Pacotes',
     pricing_notes_title:'Notas sobre preços', pricing_note_1:'Coletes salva-vidas incluídos gratuitamente com todo o equipamento',
     pricing_note_2:'Apito de segurança fornecido em cada aluguel', pricing_note_3:'Descontos para grupos disponíveis — pergunte pelo WhatsApp',
-    pricing_note_4:'Tarifas de parceiros hoteleiros negociadas separadamente', pricing_note_5:'Pagamento aceito: dinheiro (XCD/USD), transferência bancária, cartão combinado pelo WhatsApp',
+    pricing_note_4:'Tarifas de parceiros hoteleiros negociadas separadamente', pricing_note_5:'Pagamento: apenas transferência bancária (BOSVG)',
     payment_options_title:'Opções de pagamento', pay_cash:'<strong>Dinheiro</strong> — XCD ou USD, pago no início do aluguel',
     pay_bank_label:'Transferência bancária', pay_bank_desc:'— Bank of St. Vincent &amp; the Grenadines (BOSVG).',
     link_whatsapp_msg:'Fale conosco pelo WhatsApp', pay_bank_for:'para os dados da conta.',
@@ -1371,7 +1369,7 @@ const TRANSLATIONS = {
     th_fullday:'Hele dag', th_weekend:'Weekend (2 dagen)', th_weekly:'Wekelijks', swipe_hint:'Veeg zijwaarts om alle prijzen te zien', section_packages:'Pakketten',
     pricing_notes_title:'Prijsopmerkingen', pricing_note_1:'Reddingsvesten gratis inbegrepen bij alle uitrusting',
     pricing_note_2:'Veiligheidsfluitje bij elke verhuur inbegrepen', pricing_note_3:'Groepskortingen beschikbaar — vraag op WhatsApp',
-    pricing_note_4:'Hotelpartnertarieven apart onderhandeld', pricing_note_5:'Betaling geaccepteerd: contant (XCD/USD), bankoverschrijving, kaartregeling via WhatsApp',
+    pricing_note_4:'Hotelpartnertarieven apart onderhandeld', pricing_note_5:'Betaling: alleen bankoverschrijving (BOSVG)',
     payment_options_title:'Betaalopties', pay_cash:'<strong>Contant</strong> — XCD of USD, betaald bij aanvang van je huur',
     pay_bank_label:'Bankoverschrijving', pay_bank_desc:'— Bank of St. Vincent &amp; the Grenadines (BOSVG).',
     link_whatsapp_msg:'Stuur ons een bericht op WhatsApp', pay_bank_for:'voor de rekeninggegevens.',
@@ -2892,7 +2890,7 @@ const CHAT_FAQ = [
   { id:'cancel', q:'Can I cancel or change?', keys:/\b(cancel|cancellation|refund|change|reschedule|move my booking)\b/i,
     a:() => 'You can cancel free of charge up to 2 hours before your start time, and any deposit is refunded in full. Just message us. Cancellations within 2 hours of the start may carry a 50% charge, and there are no refunds for early returns. If the sea is unsafe at your rental time, you choose a free rebooking or a full refund.' },
   { id:'pay', q:'How do I pay?', keys:/\b(pay|payment|cash|card|credit|bank|transfer|deposit|paypal)\b/i,
-    a:() => 'Payment is due when your rental starts: cash (XCD or USD), bank transfer to Bank of St. Vincent & the Grenadines, or card arranged on WhatsApp. To lock in a slot early you can pay a 25% deposit by bank transfer; it is refunded in full if you cancel more than 2 hours before your start time. We send the bank details privately on WhatsApp.' },
+    a:() => 'We take payment by bank transfer only, to Bank of St. Vincent & the Grenadines. To lock in your slot, pay the deposit shown after booking (30% of the total) by bank transfer; it is refunded in full if you cancel more than 2 hours before your start time. We send the bank details privately on WhatsApp.' },
   { id:'bring', q:'What should I bring?', keys:/\b(what (should|do|must) (i|we) (bring|wear|pack)|what to (bring|wear|pack)|need to bring|sunscreen|towel|water shoes|reef shoes)\b/i,
     a:() => 'Swimwear, sunscreen, a hat and drinking water. Leave anything you do not want wet on the beach. Please keep the gear in the shade when you are not using it: the sun can overheat inflatable boards.' },
   { id:'tours', q:'Do you do guided tours?', keys:/\b(tours?|guides?|guided|trips?|excursions?|snorkel spots?|where to snorkel)\b/i,
@@ -3362,7 +3360,7 @@ function showHelpTopic(id) {
         <strong>2.</strong> Fill in your details and guest count<br/>
         <strong>3.</strong> Tap Confirm — you'll get a booking reference and our team confirms via WhatsApp
       </div>
-      <div class="help-note">Payment is due at the start of your rental. Cash (XCD/USD), bank transfer (BOSVG), or card arrangements via WhatsApp.</div>
+      <div class="help-note">Payment is by bank transfer only (BOSVG). We send the account details privately on WhatsApp.</div>
       <button class="help-topic-btn" style="background:var(--gold);text-align:center" onclick="toggleHelp();switchTab('book')">Start Booking →</button>
     `;
     return;

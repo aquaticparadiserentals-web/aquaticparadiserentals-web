@@ -4781,7 +4781,7 @@ var CHAT_AUTO_TOPICS = [
     text: 'You can book in a minute on the booking page (Book Now): pick gear, time and beach, and you\'ll get a booking reference. The team confirms on WhatsApp. If something is sold out at that time, the booking page shows it.' },
   { id: 'payment', label: 'payment & deposit',
     re: /\b(pay|payment|paying|card|credit|debit|cash|bank|transfer|paypal|deposit)\b/i,
-    text: 'Payment is due at the start of the rental: cash (XCD or USD), bank transfer (Bank of St. Vincent & the Grenadines) or card arranged on WhatsApp. To hold a slot early you can pay a 25% deposit by bank transfer; it is refunded in full if you cancel more than 2 hours before your start time. We send bank details privately on WhatsApp, never in public.' },
+    text: 'We take payment by bank transfer only (Bank of St. Vincent & the Grenadines). To hold your slot, pay the deposit shown after booking (30% of the total) by bank transfer; it is refunded in full if you cancel more than 2 hours before your start time. We send bank details privately on WhatsApp, never in public.' },
   { id: 'cancel', label: 'cancellation & weather',
     re: /\b(cancel\w*|refund\w*|reschedul\w*|change my|weather|rain\w*|wind\w*|storm\w*|rough)\b/i,
     text: 'You can cancel free of charge up to 2 hours before your start time, and any deposit is refunded in full. Cancelling within 2 hours of the start may carry a 50% charge. If the sea is unsafe at your rental time, you choose a free rebooking or a full refund of anything paid. No refunds for returning gear early.' },
