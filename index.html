@@ -2134,6 +2134,30 @@ function renderDepositBox(ref, totalXCD, fname) {
   if (note) note.style.display = 'none';
 }
 
+// ── PAY DEPOSIT BY CARD (Aquatic Paradise Platform, WiPay) ──
+// The backend signs the link with the price-list amount; nothing here sets the price.
+// No button while the owner has it switched off (PLATFORM_PAY_ON) or the gear isn't priced.
+async function addCardDepositButton(ref) {
+  try {
+    const res = await fetch(BACKEND + '?action=payLink&ref=' + encodeURIComponent(ref), { signal: AbortSignal.timeout(10000) });
+    const data = await res.json();
+    if (!data || !data.ok || !data.url || !/^https:\/\/aquatic-platform\.onrender\.com\/x\//.test(data.url)) return;
+    const box = document.getElementById('depositBox');
+    if (!box || box.querySelector('.dep-platform')) return;
+    const a = document.createElement('a');
+    a.className = 'dep-btn dep-card dep-platform';
+    a.href = data.url;
+    a.rel = 'noopener';
+    a.textContent = t('dep_pay_card_now', 'Pay deposit by card') + ' · XCD $' + Number(data.amount).toFixed(0);
+    const bank = box.querySelector('.dep-bank');
+    box.insertBefore(a, bank || null);
+    const fine = document.createElement('div');
+    fine.className = 'dep-fine';
+    fine.textContent = t('dep_card_fine', 'Secure card payment on the Aquatic Paradise Platform, processed by WiPay. We never see your card number.');
+    box.appendChild(fine);
+  } catch (e) { /* no button: bank transfer still works */ }
+}
+
 // ── PAY BY BANK TRANSFER GUIDE ──
 // Hidden unless staff switch it on in admin → Stock & Deals (Code.gs
 // setBankGuide; arrives with getServiceStatus). Off/unreachable = hidden.
@@ -2603,6 +2627,7 @@ async function submitBooking() {
   if (ok) {
     document.getElementById('bookingRef').textContent = refNum;
     renderDepositBox(refNum, payload.total, payload.fname);
+    if (!queued) addCardDepositButton(refNum);
     renderBankGuide('bankGuideSuccess', refNum, depositFor(payload.total) || payload.total);
     document.getElementById('step-gear').style.display='none';
     document.getElementById('step-details').style.display='none';

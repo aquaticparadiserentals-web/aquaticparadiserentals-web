@@ -3058,6 +3058,11 @@ function doGet(e) {
     if (p.action === 'checkBooking') {
       return _json(checkBooking(p));
     }
+    if (p.action === 'payLink') {
+      // Public — returns a signed link to pay this booking's deposit online
+      // through the Aquatic Paradise Platform, or url:null while that's off.
+      return _json(getPayLink(p));
+    }
     if (p.action === 'getAvailability') {
       // Public — guests see how much is left for their chosen time.
       return _json(getAvailability(p));
@@ -3137,6 +3142,10 @@ function doPost(e) {
     var LOCKDOWN_EXEMPT_ACTIONS = ['verifyPin', 'setLockdown', 'getLockdownStatus'];
     if (_isLockedDown() && LOCKDOWN_EXEMPT_ACTIONS.indexOf(payload.action) === -1) {
       return _json({ ok: false, error: LOCKDOWN_MESSAGE });
+    }
+    if (payload.action === 'platformPaid') {
+      // No admin token: the platform proves it's genuine with the shared-secret signature.
+      return _json(platformPaid(payload));
     }
     if (payload.action === 'waWebhook') {
       // Relayed by the platform server; authenticated by Meta's signature inside waWebhook().
@@ -3617,6 +3626,131 @@ function checkBooking(p) {
   } catch (err) {
     return _fail('checkBooking', err);
   }
+}
+
+// ── ONLINE DEPOSIT THROUGH THE AQUATIC PARADISE PLATFORM ──
+// The guest pays the deposit by card on the platform's secure checkout (WiPay).
+// This script signs the pay link, so the amount comes from the price list here,
+// never from the guest's browser. When WiPay confirms the payment, the platform
+// sends back a signed note and the deposit is recorded on the booking.
+// Set up in Apps Script → Project Settings → Script properties:
+//   PLATFORM_PAY_SECRET  same value as EXTERNAL_PAY_SECRETS on the platform (48+ characters)
+//   PLATFORM_PAY_ON      true to show the "Pay deposit by card" button, anything else hides it
+var PLATFORM_URL = 'https://aquatic-platform.onrender.com';
+var PLATFORM_SLUG = 'aquatic-paradise';
+var DEPOSIT_PCT = 30;      // keep in step with apr-config.js depositPct
+var DEPOSIT_MIN_XCD = 20;  // keep in step with apr-config.js depositMinXCD
+var PAY_LINK_DAYS = 7;
+
+function _platformSecret() {
+  try { var v = String(PropertiesService.getScriptProperties().getProperty('PLATFORM_PAY_SECRET') || ''); return v.length >= 32 ? v : ''; }
+  catch (err) { return ''; }
+}
+function _platformPayOn() {
+  try { return PropertiesService.getScriptProperties().getProperty('PLATFORM_PAY_ON') === 'true'; } catch (err) { return false; }
+}
+function _hmacHex(secret, parts) {
+  var bytes = Utilities.computeHmacSha256Signature(parts.join('|'), secret);
+  return bytes.map(function (b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('');
+}
+function _safeEqual(a, b) {
+  a = String(a || ''); b = String(b || '');
+  if (a.length !== b.length) return false;
+  var diff = 0;
+  for (var i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+function _depositFor(total) {
+  total = Number(total) || 0;
+  if (total <= 0) return 0;
+  return Math.min(total, Math.max(DEPOSIT_MIN_XCD, Math.ceil(total * DEPOSIT_PCT / 100)));
+}
+
+function getPayLink(p) {
+  try {
+    var ref = String((p && p.ref) || '');
+    if (!/^APR-[A-Z0-9]{1,12}$/.test(ref)) return { ok: false, error: 'Invalid ref' };
+    var secret = _platformSecret();
+    if (!secret || !_platformPayOn()) return { ok: true, url: null };
+    var data = _sheet().getDataRange().getValues();
+    var h = data[0] || [];
+    var I = {}; ['ref', 'gear', 'duration', 'status', 'depositStatus'].forEach(function (k) { I[k] = h.indexOf(k); });
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][I.ref]) !== ref) continue;
+      var st = String(data[i][I.status] || '');
+      if (st === 'cancelled' || st === 'done' || String(data[i][I.depositStatus]) === 'received') return { ok: true, url: null };
+      // Price from the price list only. If the gear isn't recognised, no online link.
+      var expected = _expectedTotal(data[i][I.gear], data[i][I.duration]);
+      if (expected === null || !(expected > 0)) return { ok: true, url: null };
+      var amount = _depositFor(expected).toFixed(2);
+      var exp = String(Math.floor(Date.now() / 1000) + PAY_LINK_DAYS * 86400);
+      var sig = _hmacHex(secret, ['pay', PLATFORM_SLUG, ref, amount, 'XCD', exp]);
+      return { ok: true, amount: Number(amount), url: PLATFORM_URL + '/x/' + PLATFORM_SLUG + '/pay?ref=' + encodeURIComponent(ref) +
+        '&amount=' + amount + '&cur=XCD&exp=' + exp + '&sig=' + sig };
+    }
+    return { ok: true, url: null };
+  } catch (err) {
+    return _fail('getPayLink', err);
+  }
+}
+
+// Signed note from the platform after WiPay has confirmed a card payment.
+function platformPaid(p) {
+  try {
+    var secret = _platformSecret();
+    if (!secret) return { ok: false, error: 'Not set up' };
+    var parts = ['paid', String(p.slug), String(p.ref), String(p.amount), String(p.currency), String(p.txn), String(p.environment), String(p.ts)];
+    if (!_safeEqual(_hmacHex(secret, parts), p.sig)) { _logError('platformPaid', new Error('bad signature for ' + p.ref)); return { ok: false, error: 'Bad signature' }; }
+    var age = Math.abs(Date.now() / 1000 - Number(p.ts));
+    if (!(age < 86400)) return { ok: false, error: 'Too old' };
+    var amount = Number(p.amount);
+    if (p.environment !== 'live') {
+      // Test payment: no real money moved, so the booking's deposit is NOT marked received.
+      GmailApp.sendEmail(NOTIFY_EMAIL, 'APR: TEST card payment for ' + p.ref + ' (no real money)',
+        'WiPay test-mode payment of XCD ' + p.amount + ' for ' + p.ref + ' (transaction ' + p.txn + ').\nThe deposit was NOT marked as received because this was a test.');
+      return { ok: true, test: true };
+    }
+    var r = markDepositReceived({ ref: String(p.ref), amount: amount });
+    if (r && r.alreadyReceived) {
+      GmailApp.sendEmail(NOTIFY_EMAIL, 'APR: second deposit payment for ' + p.ref,
+        'A card payment of XCD ' + p.amount + ' arrived for ' + p.ref + ' but a deposit was already recorded. Check whether a refund is needed. WiPay transaction ' + p.txn + '.');
+      return { ok: true, duplicate: true };
+    }
+    if (!r || !r.ok) {
+      GmailApp.sendEmail(NOTIFY_EMAIL, 'APR: card payment needs checking for ' + p.ref,
+        'A card payment of XCD ' + p.amount + ' arrived for ' + p.ref + ' but could not be recorded (' + ((r && r.error) || 'unknown') + '). WiPay transaction ' + p.txn + '.');
+      return { ok: false, error: (r && r.error) || 'Not recorded' };
+    }
+    _guestDepositReceipt(String(p.ref), amount, String(p.txn));
+    GmailApp.sendEmail(NOTIFY_EMAIL, 'APR: deposit paid by card · ' + p.ref,
+      'Deposit of XCD ' + p.amount + ' paid by card for ' + p.ref + '. WiPay transaction ' + p.txn + '.\nIt is marked as received on the booking.');
+    return { ok: true };
+  } catch (err) {
+    return _fail('platformPaid', err);
+  }
+}
+
+function _guestDepositReceipt(ref, amount, txn) {
+  try {
+    var data = _sheet().getDataRange().getValues();
+    var h = data[0] || [];
+    var refIdx = h.indexOf('ref'), emailIdx = h.indexOf('email'), nameIdx = h.indexOf('fname');
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][refIdx]) !== ref) continue;
+      var email = String(data[i][emailIdx] || '').trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+      var subject = '✅ Deposit received — ' + ref + ' · Aquatic Paradise Rentals';
+      GmailApp.sendEmail(email, subject, [
+        'Hi ' + (String(data[i][nameIdx] || '').trim() || 'there') + ',', '',
+        'We received your card deposit of XCD ' + amount.toFixed(2) + ' for booking ' + ref + '. Thank you!',
+        'Card payment reference: ' + txn, '',
+        'We\'ll confirm your booking on WhatsApp. Need to change anything? https://wa.me/17844963447', '',
+        'Aquatic Paradise Rentals — Bequia, St. Vincent & the Grenadines'
+      ].join('\n'), { name: 'Aquatic Paradise Rentals' });
+      _logMessage(ref, 'email', email, subject);
+      return;
+    }
+  } catch (err) { _logError('_guestDepositReceipt', err); }
 }
 
 // What's short if this gear were active for this time, not counting the booking itself.
