@@ -277,6 +277,7 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 <div class="asection active" id="asec-home">
   <div class="home-grid">
     <div class="home-tile" onclick="switchATab('today')"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg></span><span class="ht-label">Today</span><span class="ht-sub">Dashboard &amp; KPIs</span></div>
+    <div class="home-tile" id="tileGetPaid" onclick="switchATab('getpaid')" style="border-color:var(--teal)"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10 12 4l9 6"/><path d="M5 10v8M9 10v8M15 10v8M19 10v8"/><path d="M3 20h18"/></svg></span><span class="ht-label">Get Paid</span><span class="ht-sub" id="tileGetPaidSub">Connect your bank</span></div>
     <div class="home-tile" onclick="switchATab('bookings')"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg></span><span class="ht-label">Bookings</span><span class="ht-sub">Live bookings</span></div>
     <div class="home-tile" onclick="switchATab('dispatch')"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></span><span class="ht-label">Dispatch</span><span class="ht-sub">Deliveries &amp; status</span></div>
     <div class="home-tile" onclick="switchATab('customers')"><span class="ht-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 2v2"/><path d="M7 22v-2a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/><path d="M8 2v2"/><circle cx="12" cy="11" r="3"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg></span><span class="ht-label">Customers</span><span class="ht-sub">Customer records</span></div>
@@ -426,6 +427,38 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
 </div>
 
 <!-- ═ INVENTORY / FLEET ═ -->
+<!-- ═ GET PAID: everything about connecting the bank, in one place ═ -->
+<div class="asection" id="asec-getpaid">
+  <div class="sec-title">Step 1 · Your business bank account</div>
+  <div class="card">
+    <p style="margin:0 0 6px">Guests pay straight into <strong>your own BOSVG account</strong>. The website never holds money and never shows your account number.</p>
+    <ol style="margin:6px 0 0;padding-left:20px;font-size:0.85rem;line-height:1.6">
+      <li>Register the business name at CIPO, Kingstown · (784) 456-1516</li>
+      <li>Open a business account at BOSVG with the certificate</li>
+      <li>Set up BOSVG online banking (iBank) on the account</li>
+    </ol>
+  </div>
+
+  <div class="sec-title">Step 2 · Show guests how to pay by bank transfer</div>
+  <div class="card" id="bankGuideCard">Loading…</div>
+
+  <div class="sec-title">Step 3 · When a guest pays</div>
+  <div class="card" style="font-size:0.85rem;line-height:1.6">
+    <ol style="margin:0;padding-left:20px">
+      <li>The guest messages you on WhatsApp for the account details. Send them privately.</li>
+      <li>They send the money with their booking reference (APR-…).</li>
+      <li>Check it arrived in BOSVG iBank, then confirm the booking in <a href="#" onclick="switchATab('bookings');return false">Bookings</a>.</li>
+    </ol>
+    <p style="margin:10px 0 0"><a class="stock-btn" style="display:inline-block;width:auto;text-decoration:none" href="https://www.bosvg.com/ibank/" target="_blank" rel="noopener">Open BOSVG iBank</a></p>
+  </div>
+
+  <div class="sec-title">Step 4 · Card payments (WiPay)</div>
+  <div class="card" style="font-size:0.85rem;line-height:1.6">
+    <div style="font-weight:700"><span class="dot off"></span>Not connected yet</div>
+    <p style="margin:6px 0 0">Sign up for a WiPay <strong>Business</strong> account at wipaycaribbean.com (choose St Vincent), link your BOSVG business account, and wait for approval. Then card payments can be switched on. Never share your WiPay password or API key in chat.</p>
+  </div>
+</div>
+
 <div class="asection" id="asec-inventory">
   <!-- ═ STOCK & DEALS ═ Counts here drive what guests can book (per date/time). -->
   <div class="sec-title">Stock — what's available right now</div>
@@ -451,9 +484,6 @@ body::before{content:'';position:fixed;inset:-24px;z-index:-1;pointer-events:non
     <p style="font-size:0.72rem;color:var(--muted);margin:10px 0 0">The deal shows on the booking page with how many are left at that price and stops by itself once they're all used. You get an alarm when it runs out.</p>
     <div id="dealList" style="margin-top:12px"></div>
   </div>
-
-  <div class="sec-title">Pay by Bank Transfer (guest guide)</div>
-  <div class="card" id="bankGuideCard">Loading…</div>
 
   <div class="sec-title">AI Chat Assistant</div>
   <div class="card" id="aiCard">Loading…</div>
@@ -2605,6 +2635,8 @@ async function saveStockCounts() {
 // until the business bank account is set up (Code.gs setBankGuide).
 function renderBankGuide() {
   const on = !!(stockOverview && stockOverview.bankGuide);
+  const sub = document.getElementById('tileGetPaidSub');
+  if (sub) sub.textContent = on ? 'Bank transfer: ON' : 'Bank transfer: OFF · tap to set up';
   document.getElementById('bankGuideCard').innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
       <div>
@@ -3898,9 +3930,9 @@ function toggleCustomer(key) {
 }
 
 // ── SECTION NAVIGATION (full-screen sections + back button) ──
-const ATABS = ['home','today','bookings','dispatch','chats','customers','inventory','safety','team','drivers','feedback','commission','partners','cashflow','messages','settings','rates'];
+const ATABS = ['home','today','getpaid','bookings','dispatch','chats','customers','inventory','safety','team','drivers','feedback','commission','partners','cashflow','messages','settings','rates'];
 const MIC_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>';
-const ATAB_LABELS = {home:'Operations Dashboard',today:'Today',bookings:'Bookings',dispatch:'Dispatch',chats:'Guest Chats',customers:'Customers',inventory:'Fleet',safety:'Safety',team:'Team',drivers:'Drivers',feedback:'Feedback',commission:'Commission',partners:'Partners',cashflow:'Cash Flow',messages:'Messages',settings:'Settings',rates:'Rates'};
+const ATAB_LABELS = {home:'Operations Dashboard',today:'Today',getpaid:'Get Paid',bookings:'Bookings',dispatch:'Dispatch',chats:'Guest Chats',customers:'Customers',inventory:'Fleet',safety:'Safety',team:'Team',drivers:'Drivers',feedback:'Feedback',commission:'Commission',partners:'Partners',cashflow:'Cash Flow',messages:'Messages',settings:'Settings',rates:'Rates'};
 function switchATab(tab) {
   // Every section opens as a full page from the top — without this, the scroll
   // position from the previous section carries over and you land at the bottom.
@@ -3914,6 +3946,7 @@ function switchATab(tab) {
   if (tab==='dispatch') { fetchDispatchAdmin(); startDispatchPolling(); } else { stopDispatchPolling(); }
   if (tab==='customers') fetchCustomers();
   if (tab==='inventory') { fetchInventory(); fetchStockOverview(); }
+  if (tab==='getpaid') fetchStockOverview();
   if (tab==='safety') renderSafety();
   if (tab==='drivers') renderDrivers();
   if (tab==='feedback') fetchFeedback();
