@@ -355,3 +355,22 @@ Benchmark note: commercial solar smart-locker systems (HiWater, Whenever Watersp
 ## Credentials
 
 This manual intentionally excludes every password, PIN, account number, and API token — including `APP_TOKEN` and `STAFF_TOKEN` (see §4). As of 2026-07-28 these no longer live in source: they're generated on first use and stored in the Apps Script project's Script Properties (`APR_APP_TOKEN`/`APR_STAFF_TOKEN`), not committed to the (public) GitHub repo. Don't compound the old exposure by duplicating them into a doc either. Store real credentials — Google account passwords, admin/dispatch PINs, banking PINs, account numbers — in a proper password manager (Bitwarden's free tier, 1Password, or similar), never in a Word document or plaintext file, especially not one syncing to OneDrive or sitting in a shared folder. If you're currently keeping banking PINs or account numbers in a `.docx`, that should be moved out and that file deleted as soon as the credentials are safely stored elsewhere.
+
+## Online card deposits through the Aquatic Paradise Platform
+
+Guests can pay the deposit by card on the platform's secure checkout (WiPay). This script signs the
+pay link with the price-list deposit (30%, min XCD 20), so the amount can't be changed in the browser.
+When WiPay confirms a **live** payment, the platform sends a signed note and the deposit is marked
+received on the booking; the guest gets a receipt email. Test payments are emailed to you only.
+
+Setup (once):
+1. Make a secret: `openssl rand -hex 32`.
+2. Render → aquatic-platform → Environment:
+   - `EXTERNAL_PAY_SECRETS` = `aquatic-paradise=<secret>`
+   - `EXTERNAL_PAY_CALLBACKS` = `aquatic-paradise=<this script's /exec URL>`
+3. Apps Script → Project Settings → Script properties:
+   - `PLATFORM_PAY_SECRET` = the same `<secret>`
+   - `PLATFORM_PAY_ON` = `true` (anything else hides the button)
+4. Deploy this script: `clasp push` then `clasp deploy -i <deployment id>` (§6).
+5. On the platform: connect WiPay for Aquatic Paradise (Payments & Banking) and tick
+   **Pay online by card** in My business. The button only appears once all of this is done.
