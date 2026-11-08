@@ -691,6 +691,10 @@ function getSitePhotos() {
 // available at the moment" with a short reason (boat maintenance, weather,
 // etc.). Read publicly by index.html so guests see it before booking.
 // Stored as one JSON blob in Script Properties — tiny, rarely-changed config.
+// Guided tours and the safety boat are not operating. Only the owner turns this back on, once
+// safety and insurance are checked. Must match TOURS_ENABLED in index.html.
+var TOURS_ENABLED = false;
+
 var SERVICE_KEYS = ['SUP', 'KAY', 'KAY2', 'SNK', 'FLT', 'FLC', 'BPG', 'DELIVERY', 'TOURS'];
 var SERVICE_STATUS_PROP = 'service_status';
 var MAX_SERVICE_REASON_LEN = 120;
@@ -4921,7 +4925,7 @@ var CHAT_AUTO_TOPICS = [
     text: 'You can cancel free of charge up to 2 hours before your start time, and any deposit is refunded in full. Cancelling within 2 hours of the start may carry a 50% charge. If the sea is unsafe at your rental time, you choose a free rebooking or a full refund of anything paid. No refunds for returning gear early.' },
   { id: 'tours', label: 'tours',
     re: /\b(tours?|guides?|guided|excursions?|trips?)\b/i,
-    text: 'Yes, we arrange guided tours. Tell us the day, how many people and what you\'d like to see, and the team will reply here with times and the price.' },
+    text: TOURS_ENABLED ? 'Yes, we arrange guided tours. Tell us the day, how many people and what you\'d like to see, and the team will reply here with times and the price.' : 'Guided tours are not available right now. You can rent paddle boards, kayaks and snorkel gear, and the team can tell you about good spots nearby.' },
   { id: 'damage', label: 'damage',
     re: /\b(damage\w*|break\w*|broke|broken|lost|lose|insurance|scratch\w*)\b/i,
     text: 'Normal wear is fine. Loss or damage beyond normal wear is the renter\'s responsibility, so tell staff straight away if anything goes wrong — please don\'t try to repair gear yourself.' }
