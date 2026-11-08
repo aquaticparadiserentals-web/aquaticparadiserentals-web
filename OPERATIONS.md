@@ -1,6 +1,12 @@
-# Aquatic Paradise Rentals — Operations Manual
-
-Single reference for running both the business and the booking system. Written for Delroy and whoever he brings on to help (staff, admin assistant, future hire) — no developer background assumed.
+| Item | 30 min | 1 hr | 2 hr | Half day | Full day | Weekend | Week |
+|---|---|---|---|---|---|---|---|
+| Paddle Board | $25 | $40 | $65 | $80 | $120 | $220 | $520 |
+| Kayak (Single) | $25 | $35 | $60 | $75 | $110 | $200 | $470 |
+| Kayak (Double) | $30 | $50 | $85 | $110 | $160 | $290 | $690 |
+| Snorkel Set | $10 | $15 | $25 | $40 | $55 | $100 | $230 |
+| Floating Tube | $10 | $15 | $25 | $30 | $45 | $80 | $180 |
+| Floating Lounge Chair | – | $10 | – | – | $20 | $35 | $90 |
+| Beach Paddle Games | – | $8 | – | – | $15 | $25 | $60 |
 
 **What this file deliberately does NOT contain:** passwords, PINs, bank account numbers, or login credentials of any kind. Those must never live in a plaintext document — see [Credentials](#credentials) at the bottom for where they actually belong.
 
@@ -50,10 +56,9 @@ These same numbers live in three places that must stay in sync: `index.html` (GE
 **Combo packages:**
 | Package | Contents | XCD | USD |
 |---|---|---|---|
-| Family Package | 2 paddle boards, 1 floater, snorkel gear, life jackets | $120 | $44 |
-| Paddle Board + Snorkel Duo | 1 paddle board, 2 snorkel sets, life jackets | $80 | $30 |
-| Day Rental Combo | 1 paddle board, full snorkel set, life jacket | $65 | $24 |
-| Premium Paddle + 2 Snorkel Sets | Best snorkeling experience for two | $270 | $100 |
+| Family Package | 2 paddle boards, 1 floater, snorkel gear, life jackets | $285 | $106 |
+| Paddle Board + Snorkel Duo | 1 paddle board, 2 snorkel sets, life jackets | $195 | $72 |
+| Day Rental Combo | 1 paddle board, full snorkel set, life jacket | $150 | $56 |
 
 **Weekend & group deals:**
 | Deal | Terms | XCD | USD |

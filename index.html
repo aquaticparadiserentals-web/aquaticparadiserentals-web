@@ -781,7 +781,7 @@ header .top-links a:hover,header .top-links a.active{color:#fff}
   <div class="info-card" style="padding:0;overflow:hidden">
     <div class="rates-scroll">
       <table class="rates-table">
-        <thead><tr><th data-i18n="th_gear">Gear</th><th data-i18n="dur_1hr">1 hr</th>
+        <thead><tr><th data-i18n="th_gear">Gear</th><th data-i18n="dur_30min">30 min</th><th data-i18n="dur_1hr">1 hr</th><th data-i18n="dur_2hr">2 hr</th><th data-i18n="dur_halfday">Half Day</th>
               <th style="color:var(--sea)" data-i18n="th_fullday">Full Day</th>
               <th data-i18n="th_weekend">Weekend (2 days)</th>
               <th style="color:#F0A93B" data-i18n="th_weekly">Weekly</th></tr></thead>
@@ -1431,20 +1431,23 @@ document.addEventListener('click', (e) => {
 // chart — prices set by Delroy 2026-09-27 (Single 30/60/100/300, Double
 // 45/90/160/450; weeks ~5x the day rate like the rest of the chart).
 const GEAR = [
-  { id:'SUP',  icon:'', name:'Paddle Board',          codes:'PB', price60:20, priceFD:50, priceWE:90, priceWK:250 },
-  { id:'KAY',  icon:'', name:'Kayak (Single)',         codes:'KY', price60:30, priceFD:60, priceWE:100, priceWK:300 },
-  { id:'KAY2', icon:'', name:'Kayak (Double)',         codes:'KY', price60:45, priceFD:90, priceWE:160, priceWK:450 },
-  { id:'SNK',  icon:'', name:'Snorkel Set',            codes:'SK', price60:10, priceFD:20, priceWE:35, priceWK:90  },
-  { id:'FLT',  icon:'', name:'Floating Tube',          codes:'FL', price60:8,  priceFD:15, priceWE:25, priceWK:60  },
-  { id:'FLC',  icon:'', name:'Floating Lounge Chair',  codes:'LC', price60:10, priceFD:20, priceWE:35, priceWK:90  },
-  { id:'BPG',  icon:'', name:'Beach Paddle Games',     codes:'BG', price60:8,  priceFD:15, priceWE:25, priceWK:60  },
+  { id:'SUP', icon:'', name:'Paddle Board', codes:'PB', price30:25, price60:40, price120:65, priceHD:80, priceFD:120, priceWE:220, priceWK:520 },
+  { id:'KAY', icon:'', name:'Kayak (Single)', codes:'KY', price30:25, price60:35, price120:60, priceHD:75, priceFD:110, priceWE:200, priceWK:470 },
+  { id:'KAY2', icon:'', name:'Kayak (Double)', codes:'KY', price30:30, price60:50, price120:85, priceHD:110, priceFD:160, priceWE:290, priceWK:690 },
+  { id:'SNK', icon:'', name:'Snorkel Set', codes:'SK', price30:10, price60:15, price120:25, priceHD:40, priceFD:55, priceWE:100, priceWK:230 },
+  { id:'FLT', icon:'', name:'Floating Tube', codes:'FL', price30:10, price60:15, price120:25, priceHD:30, priceFD:45, priceWE:80, priceWK:180 },
+  { id:'FLC', icon:'', name:'Floating Lounge Chair', codes:'LC', price60:10, priceFD:20, priceWE:35, priceWK:90 },
+  { id:'BPG', icon:'', name:'Beach Paddle Games', codes:'BG', price60:8, priceFD:15, priceWE:25, priceWK:60 },
 ];
 
 const DURATIONS = [
-  { label:'1 Hour',           mins:60,    key:'price60', i18nKey:'dur_1hr' },
-  { label:'Full Day',         mins:480,   key:'priceFD', i18nKey:'th_fullday' },
-  { label:'Weekend (2 days)', mins:2880,  key:'priceWE', i18nKey:'th_weekend' },
-  { label:'Week (7 days)',    mins:10080, key:'priceWK', i18nKey:'th_weekly' },
+  { label:'30 min',           mins:30,    key:'price30',  i18nKey:'dur_30min' },
+  { label:'1 Hour',           mins:60,    key:'price60',  i18nKey:'dur_1hr' },
+  { label:'2 Hours',          mins:120,   key:'price120', i18nKey:'dur_2hr' },
+  { label:'Half Day',         mins:240,   key:'priceHD',  i18nKey:'dur_halfday' },
+  { label:'Full Day',         mins:480,   key:'priceFD',  i18nKey:'th_fullday' },
+  { label:'Weekend (2 days)', mins:2880,  key:'priceWE',  i18nKey:'th_weekend' },
+  { label:'Week (7 days)',    mins:10080, key:'priceWK',  i18nKey:'th_weekly' },
 ];
 
 // Matches the printed combo package prices exactly (price charts Aquatic
@@ -1454,14 +1457,14 @@ const DURATIONS = [
 // real 5, so replaced outright rather than patched. None involve kayaks,
 // which conveniently sidesteps the Kayak (Single) comingSoon gap too.
 const PACKAGES = [
-  { id:'PKG_FAM',  name:'Family Package',    desc:'2× Paddle Boards + 1× Floater + Snorkel Gear',        price:120, duration:'Full Day', uses:{SUP:2,FLT:1,SNK:1} },
-  { id:'PKG_DAY',  name:'Day Rental Combo',          desc:'1× Paddle Board + Full Snorkel Gear Set + Life Jacket', price:65, duration:'Full Day', uses:{SUP:1,SNK:1} },
-  { id:'PKG_DUO',  name:'Paddle Board + Snorkel Duo', desc:'1× Paddle Board + 2× Snorkel Gear Sets + Life Jackets', price:80, duration:'Full Day', uses:{SUP:1,SNK:2} },
-  { id:'PKG_PREM', name:'Premium Paddle + 2 Snorkel Sets', desc:'1× Premium Paddle Board + 2× Snorkel Gear Sets + Life Jackets', price:270, duration:'Full Day', uses:{SUP:1,SNK:2} },
+  { id:'PKG_FAM',  name:'Family Package',    desc:'2× Paddle Boards + 1× Floater + Snorkel Gear',        price:285, duration:'Full Day', uses:{SUP:2,FLT:1,SNK:1} },
+  { id:'PKG_DAY',  name:'Day Rental Combo',          desc:'1× Paddle Board + Full Snorkel Gear Set + Life Jacket', price:150, duration:'Full Day', uses:{SUP:1,SNK:1} },
+  { id:'PKG_DUO',  name:'Paddle Board + Snorkel Duo', desc:'1× Paddle Board + 2× Snorkel Gear Sets + Life Jackets', price:195, duration:'Full Day', uses:{SUP:1,SNK:2} },
 ];
 
 let selectedGear = {};
-let selectedDuration = DURATIONS[0]; // default 1 hour
+let selectedDuration = DURATIONS[1]; // default 1 hour
+const lowestPrice = (g) => Math.min(...DURATIONS.map(d => g[d.key]).filter(Boolean));
 let selectedPackage = null;
 
 // ── INIT ──
@@ -1846,7 +1849,7 @@ function renderGear() {
     <div class="gear-card ${qty?'selected':''}" id="gc-${g.id}" role="button" tabindex="0" aria-pressed="${qty?'true':'false'}" onclick="toggleGear('${g.id}')">
       ${iconFor(g)}
       <div class="gear-name">${g.name}</div>
-      <div class="gear-price">from XCD ${g.price60}</div>
+      <div class="gear-price">${g[selectedDuration.key] ? 'from XCD ' + lowestPrice(g) : 'Not offered for ' + selectedDuration.label}</div>
       ${stockBadge(g)}
       <div class="qty-controls" onclick="event.stopPropagation()">
         <button class="qty-btn" aria-label="Remove one ${g.name}" onclick="changeQty('${g.id}',-1)">−</button>
@@ -1884,6 +1887,7 @@ function toggleGear(id) {
 
 function changeQty(id, delta) {
   if (delta > 0 && isOff(id)) return;
+  if (delta > 0 && !GEAR.find(x => x.id === id)?.[selectedDuration.key]) { showToast('Not offered for ' + selectedDuration.label, 'warn'); return; }
   const cur = selectedGear[id] || 0;
   const left = itemLeft(id);
   if (delta > 0 && left !== null && cur + delta > left) {
@@ -1949,7 +1953,7 @@ function selectPackage(id) {
 // ── RENDER DURATIONS ──
 function renderDurations() {
   document.getElementById('durGrid').innerHTML = DURATIONS.map((d,i) => `
-    <div class="dur-btn ${i===0?'selected':''}" id="dur-${i}" role="button" tabindex="0" onclick="selectDuration(${i})">${t(d.i18nKey, d.label)}</div>
+    <div class="dur-btn ${d===selectedDuration?'selected':''}" id="dur-${i}" role="button" tabindex="0" onclick="selectDuration(${i})">${t(d.i18nKey, d.label)}</div>
   `).join('');
 }
 
@@ -1957,6 +1961,13 @@ function selectDuration(idx) {
   DURATIONS.forEach((_,i) => document.getElementById('dur-'+i)?.classList.remove('selected'));
   document.getElementById('dur-'+idx)?.classList.add('selected');
   selectedDuration = DURATIONS[idx];
+  // an item with no price for this length comes out of the order, so nothing can be free by accident
+  Object.keys(selectedGear).forEach(id => {
+    if (GEAR.find(x => x.id === id)?.[selectedDuration.key]) return;
+    delete selectedGear[id];
+    showToast('Some items are not offered for ' + selectedDuration.label + ' and were removed', 'warn');
+  });
+  renderGear();
   updateSummary();
   loadAvailability();
 }
@@ -2656,18 +2667,21 @@ function renderRates() {
   tbody.innerHTML = regularGear.map(g => g.comingSoon ? `
     <tr>
       <td>${gearPhotoTag(g, 'rate-thumb', 80)}${g.name}</td>
-      <td colspan="4" style="color:var(--coral,#e85d4c);font-weight:700;text-align:center">Coming soon</td>
+      <td colspan="7" style="color:var(--coral,#e85d4c);font-weight:700;text-align:center">Coming soon</td>
     </tr>
   ` : `
     <tr>
       <td>${gearPhotoTag(g, 'rate-thumb', 80)}${g.name}${isOff(g.id) ? '<div class="unavail" style="font-weight:600">⛔ Not available right now</div>' : ''}</td>
+      <td>${fmt(g.price30)}</td>
       <td>${fmt(g.price60)}</td>
+      <td>${fmt(g.price120)}</td>
+      <td>${fmt(g.priceHD)}</td>
       <td style="font-weight:700;color:var(--teal-ink)">${fmt(g.priceFD)}</td>
       <td>${fmt(g.priceWE)}</td>
       <td style="color:var(--amber-ink);font-weight:700">${fmt(g.priceWK, true)}</td>
     </tr>
   `).join('');
-  tbody.innerHTML += '<tr style="background:var(--light)"><td colspan="5" style="font-size:0.75rem;color:var(--teal-ink);padding:8px 12px;white-space:normal;position:static;background:transparent">USD ≈ XCD ÷ 2.7 · Life jackets included free with all rentals</td></tr>';
+  tbody.innerHTML += '<tr style="background:var(--light)"><td colspan="8" style="font-size:0.75rem;color:var(--teal-ink);padding:8px 12px;white-space:normal;position:static;background:transparent">USD ≈ XCD ÷ 2.7 · Life jackets included free with all rentals</td></tr>';
 
   const pkgEl = document.getElementById('pkgRatesList');
   if (pkgEl) {

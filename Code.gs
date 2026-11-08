@@ -1030,17 +1030,20 @@ function _reserveStockForBooking(p) {
       result.dealNote = notes.join(' · ');
     }
 
-    // Price check: the booking page works out the total on the guest's
-    // device, so recompute it here. Flag (don't silently change) a mismatch —
-    // the guest was shown their number, so the owner decides what to charge.
+    // Price check: the booking page works out the total on the guest's device, so recompute it
+    // here. A mismatch is saved at the price list total and flagged for the owner.
     var expected = _expectedTotal(p.gear, p.duration);
     if (expected !== null) {
       expected = Math.max(0, expected - dealOff);
       var charged = Number(p.total) || 0;
       if (Math.abs(charged - expected) > 0.5) {
-        var pn = '⚠️ PRICE CHECK: page charged XCD ' + charged + ', price list says XCD ' + expected;
+        var pn = '⚠️ PRICE CHECK: page showed XCD ' + charged + ', saved at the price list total of XCD ' + expected;
         result.dealNote = result.dealNote ? result.dealNote + ' · ' + pn : pn;
+        p.total = expected; // the server's price is the one that counts
       }
+    } else if (_missingPrice(p.gear, p.duration)) {
+      var mp = '⚠️ PRICE CHECK: no price for ' + p.gear + ' for ' + p.duration + '. Check before confirming.';
+      result.dealNote = result.dealNote ? result.dealNote + ' · ' + mp : mp;
     }
   } catch (err) {
     _logError('_reserveStockForBooking', err);
@@ -1943,17 +1946,17 @@ function _handleTgTap(cb, ownerChat) {
 // owner taps Save — a misread line never becomes a booking silently.
 // Prices mirror GEAR/PACKAGES in index.html.
 var PRICES = {
-  SUP:  { '1 Hour': 20, 'Full Day': 50, 'Weekend (2 days)': 90, 'Week (7 days)': 250 },
-  KAY:  { '1 Hour': 30, 'Full Day': 60, 'Weekend (2 days)': 100, 'Week (7 days)': 300 },
-  KAY2: { '1 Hour': 45, 'Full Day': 90, 'Weekend (2 days)': 160, 'Week (7 days)': 450 },
-  SNK:  { '1 Hour': 10, 'Full Day': 20, 'Weekend (2 days)': 35, 'Week (7 days)': 90 },
-  FLT:  { '1 Hour': 8,  'Full Day': 15, 'Weekend (2 days)': 25, 'Week (7 days)': 60 },
-  FLC:  { '1 Hour': 10, 'Full Day': 20, 'Weekend (2 days)': 35, 'Week (7 days)': 90 },
-  BPG:  { '1 Hour': 8,  'Full Day': 15, 'Weekend (2 days)': 25, 'Week (7 days)': 60 }
+  SUP: { '30 min': 25, '1 Hour': 40, '2 Hours': 65, 'Half Day': 80, 'Full Day': 120, 'Weekend (2 days)': 220, 'Week (7 days)': 520 },
+  KAY: { '30 min': 25, '1 Hour': 35, '2 Hours': 60, 'Half Day': 75, 'Full Day': 110, 'Weekend (2 days)': 200, 'Week (7 days)': 470 },
+  KAY2: { '30 min': 30, '1 Hour': 50, '2 Hours': 85, 'Half Day': 110, 'Full Day': 160, 'Weekend (2 days)': 290, 'Week (7 days)': 690 },
+  SNK: { '30 min': 10, '1 Hour': 15, '2 Hours': 25, 'Half Day': 40, 'Full Day': 55, 'Weekend (2 days)': 100, 'Week (7 days)': 230 },
+  FLT: { '30 min': 10, '1 Hour': 15, '2 Hours': 25, 'Half Day': 30, 'Full Day': 45, 'Weekend (2 days)': 80, 'Week (7 days)': 180 },
+  FLC: { '1 Hour': 10, 'Full Day': 20, 'Weekend (2 days)': 35, 'Week (7 days)': 90 },
+  BPG: { '1 Hour': 8, 'Full Day': 15, 'Weekend (2 days)': 25, 'Week (7 days)': 60 }
 };
 // Package prices must match index.html PACKAGES. "Combo for 2" (same gear as the Duo) was merged
 // into the Duo on 31 Oct 2026; it stays here only so older bookings still price-check.
-var PACKAGE_PRICES = { 'Family Package': 120, 'Paddle Board + Snorkel Duo': 80, 'Combo for 2': 220, 'Day Rental Combo': 65, 'Premium Paddle': 270 };
+var PACKAGE_PRICES = { 'Family Package': 285, 'Paddle Board + Snorkel Duo': 195, 'Combo for 2': 220, 'Day Rental Combo': 150, 'Premium Paddle': 270 };
 // Order matters: "paddle games" must win over "paddle board".
 var BOOK_GEAR_WORDS = [
   [/\b(paddle\s*games?|beach\s*paddles?|rackets?)\b/i, 'BPG'],
@@ -1966,7 +1969,7 @@ var BOOK_GEAR_WORDS = [
 ];
 var BOOK_PACKAGE_WORDS = [
   [/family/i, 'Family Package'], [/duo/i, 'Paddle Board + Snorkel Duo'], [/combo\s*for\s*2|couple/i, 'Paddle Board + Snorkel Duo'],
-  [/day\s*(rental\s*)?combo/i, 'Day Rental Combo'], [/premium/i, 'Premium Paddle']
+  [/day\s*(rental\s*)?combo/i, 'Day Rental Combo']
 ];
 var BOOK_HELP = 'To log a WhatsApp booking, send one line like:\n' +
   '/book 2 paddle boards, 1 snorkel, sat 10am, 1 hour, John Smith 784-555-1234\n\n' +
@@ -1978,6 +1981,18 @@ var BOOK_HELP = 'To log a WhatsApp booking, send one line like:\n' +
 
 // Price-list total for a booking's gear text, or null if anything in it
 // isn't recognised (then no price check is made rather than a false alarm).
+// True when the gear is on the list but has no price for this length (lounge chairs and paddle
+// games are only rented by the hour or longer).
+function _missingPrice(gearText, duration) {
+  var text = String(gearText || '').trim();
+  for (var name in PACKAGE_PRICES) { if (text.indexOf(name) === 0) return false; }
+  return text.split(',').some(function (part) {
+    var m = part.trim().match(/^(.*?)\s*x\s*(\d+)$/i);
+    var key = GEAR_BY_NAME[m ? m[1].trim() : part.trim()];
+    return !!key && !!PRICES[key] && !PRICES[key][duration];
+  });
+}
+
 function _expectedTotal(gearText, duration) {
   var text = String(gearText || '').trim();
   if (!text) return null;
@@ -1989,7 +2004,8 @@ function _expectedTotal(gearText, duration) {
     var m = part.trim().match(/^(.*?)\s*x\s*(\d+)$/i);
     var key = GEAR_BY_NAME[m ? m[1].trim() : part.trim()];
     if (!key || !PRICES[key]) { recognised = false; return; }
-    total += (PRICES[key][duration] || 0) * (m ? parseInt(m[2], 10) : 1);
+    if (!PRICES[key][duration]) { recognised = false; return; }
+    total += PRICES[key][duration] * (m ? parseInt(m[2], 10) : 1);
   });
   return recognised ? total : null;
 }
@@ -2036,6 +2052,9 @@ function _parseBookText(raw) {
   var all = segs.join(' ');
   var duration = '';
   if (pkg) duration = 'Full Day';
+  else if (/half\s*day/i.test(all)) duration = 'Half Day';
+  else if (/\b30\s*min/i.test(all)) duration = '30 min';
+  else if (/\b2\s*(hours?|hrs?)\b/i.test(all)) duration = '2 Hours';
   else if (/weekend|2\s*days?/i.test(all)) duration = 'Weekend (2 days)';
   else if (/\bweek\b|7\s*days?/i.test(all)) duration = 'Week (7 days)';
   else if (/full\s*day|all\s*day|\bday\b/i.test(all)) duration = 'Full Day';
@@ -3678,7 +3697,7 @@ function getPayLink(p) {
     if (!secret || !_platformPayOn()) return { ok: true, url: null };
     var data = _sheet().getDataRange().getValues();
     var h = data[0] || [];
-    var I = {}; ['ref', 'gear', 'duration', 'status', 'depositStatus'].forEach(function (k) { I[k] = h.indexOf(k); });
+    var I = {}; ['ref', 'gear', 'duration', 'status', 'depositStatus', 'total'].forEach(function (k) { I[k] = h.indexOf(k); });
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][I.ref]) !== ref) continue;
       var st = String(data[i][I.status] || '');
@@ -3686,6 +3705,8 @@ function getPayLink(p) {
       // Price from the price list only. If the gear isn't recognised, no online link.
       var expected = _expectedTotal(data[i][I.gear], data[i][I.duration]);
       if (expected === null || !(expected > 0)) return { ok: true, url: null };
+      var agreed = Number(data[i][I.total]);
+      if (agreed > 0) expected = Math.min(expected, agreed); // older bookings keep their agreed price
       var amount = _depositFor(expected).toFixed(2);
       var exp = String(Math.floor(Date.now() / 1000) + PAY_LINK_DAYS * 86400);
       var sig = _hmacHex(secret, ['pay', PLATFORM_SLUG, ref, amount, 'XCD', exp]);
