@@ -4914,10 +4914,10 @@ function _chatPublic(msgs) {
 var CHAT_AUTO_TOPICS = [
   { id: 'prices', label: 'prices',
     re: /\b(price|prices|pricing|cost|costs|how much|rates?|charge|fees?|cheap\w*|expensive|afford\w*|xcd|ec\$|usd)\b/i,
-    text: 'Our rates (XCD) — hour / full day / weekend / week:\n' +
-      '• Paddle board: 20 / 50 / 90 / 250\n• Single kayak: 30 / 60 / 100 / 300\n• Double kayak: 45 / 90 / 160 / 450\n' +
-      '• Snorkel set: 10 / 20 / 35 / 90\n• Floating tube: 8 / 15 / 25 / 60\n• Floating lounge chair: 10 / 20 / 35 / 90\n' +
-      '• Beach paddle games: 8 / 15 / 25 / 60\nPackages and any live deals are on the Rates tab of the booking page.' },
+    text: 'Our rates (XCD): 1 hour / full day / weekend / week:\n' +
+      '• Paddle board: 40 / 120 / 220 / 520\n• Double kayak: 50 / 160 / 290 / 690\n' +
+      '• Snorkel set: 15 / 55 / 100 / 230\n• Floating tube: 15 / 45 / 80 / 180\n• Floating lounge chair: 10 / 20 / 35 / 90\n' +
+      '• Beach paddle games: 8 / 15 / 25 / 60\nLife jackets are free. 30-minute, 2-hour and half-day rates and packages are on the Rates tab of the booking page.' },
   { id: 'hours', label: 'hours & location',
     re: /\b(hours?|open|opening|close|closing|when are you|where are you|where (do|can) i find|location|located|address|find you)\b/i,
     text: 'We\'re open 8AM–6PM every day. Our base is Princess Margaret Beach (Admiralty Bay), and we also bring gear to Lower Bay and Friendship Bay.' },
