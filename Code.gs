@@ -4915,7 +4915,7 @@ var CHAT_AUTO_TOPICS = [
   { id: 'prices', label: 'prices',
     re: /\b(price|prices|pricing|cost|costs|how much|rates?|charge|fees?|cheap\w*|expensive|afford\w*|xcd|ec\$|usd)\b/i,
     text: 'Our rates (XCD): 1 hour / full day / weekend / week:\n' +
-      '• Paddle board: 40 / 120 / 220 / 520\n• Double kayak: 50 / 160 / 290 / 690\n' +
+      '• Paddle board: 40 / 120 / 220 / 520\n' +
       '• Snorkel set: 15 / 55 / 100 / 230\n• Floating tube: 15 / 45 / 80 / 180\n• Floating lounge chair: 10 / 20 / 35 / 90\n' +
       '• Beach paddle games: 8 / 15 / 25 / 60\nLife jackets are free. 30-minute, 2-hour and half-day rates and packages are on the Rates tab of the booking page.' },
   { id: 'hours', label: 'hours & location',
@@ -4946,7 +4946,7 @@ var CHAT_AUTO_TOPICS = [
     text: 'You can cancel free of charge up to 2 hours before your start time, and any deposit is refunded in full. Cancelling within 2 hours of the start may carry a 50% charge. If the sea is unsafe at your rental time, you choose a free rebooking or a full refund of anything paid. No refunds for returning gear early.' },
   { id: 'tours', label: 'tours',
     re: /\b(tours?|guides?|guided|excursions?|trips?)\b/i,
-    text: TOURS_ENABLED ? 'Yes, we arrange guided tours. Tell us the day, how many people and what you\'d like to see, and the team will reply here with times and the price.' : 'Guided tours are not available right now. You can rent paddle boards, kayaks and snorkel gear, and the team can tell you about good spots nearby.' },
+    text: TOURS_ENABLED ? 'Yes, we arrange guided tours. Tell us the day, how many people and what you\'d like to see, and the team will reply here with times and the price.' : 'Guided tours are not available right now. You can rent paddle boards and snorkel gear, and the team can tell you about good spots nearby.' },
   { id: 'damage', label: 'damage',
     re: /\b(damage\w*|break\w*|broke|broken|lost|lose|insurance|scratch\w*)\b/i,
     text: 'Normal wear is fine. Loss or damage beyond normal wear is the renter\'s responsibility, so tell staff straight away if anything goes wrong — please don\'t try to repair gear yourself.' }
@@ -5055,7 +5055,7 @@ function _aiFacts() {
 
 function _aiSystemPrompt() {
   return [
-    'You are the chat assistant for Aquatic Paradise Rentals, a family-run water-sports rental business on Princess Margaret Beach, Bequia, St. Vincent and the Grenadines (paddle boards, kayaks, snorkel sets, floats, beach games). Guests write or speak to you from the booking website.',
+    'You are the chat assistant for Aquatic Paradise Rentals, a family-run water-sports rental business on Princess Margaret Beach, Bequia, St. Vincent and the Grenadines (paddle boards, snorkel sets, floats, beach games). Guests write or speak to you from the booking website.',
     '',
     'How to answer:',
     '- Use ONLY the facts below. Never invent prices, times, discounts, availability, policies or phone numbers. If the facts don\'t cover it, say a team member will reply here shortly.',
