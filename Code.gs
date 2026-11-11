@@ -695,7 +695,8 @@ function getSitePhotos() {
 // safety and insurance are checked. Must match TOURS_ENABLED in index.html.
 var TOURS_ENABLED = false;
 
-var SERVICE_KEYS = ['SUP', 'KAY', 'KAY2', 'SNK', 'FLT', 'FLC', 'BPG', 'DELIVERY', 'TOURS'];
+// CHAT isn't gear: 'off' = show guests "Team busy" in the chat (index.html / chat.html).
+var SERVICE_KEYS = ['SUP', 'KAY', 'KAY2', 'SNK', 'FLT', 'FLC', 'BPG', 'DELIVERY', 'TOURS', 'CHAT'];
 var SERVICE_STATUS_PROP = 'service_status';
 var MAX_SERVICE_REASON_LEN = 120;
 
