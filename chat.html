@@ -231,11 +231,22 @@ function dayOf(iso) {
   return d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
+// Busy = owner/staff turned "Chat" off in dispatch → Equipment & Services.
+let chatBusy = false;
+async function loadBusy() {
+  try {
+    const res = await fetch(BACKEND + '?action=getServiceStatus', { signal: AbortSignal.timeout(8000) });
+    const data = await res.json();
+    chatBusy = !!(data && data.ok && data.status && data.status.CHAT && data.status.CHAT.off);
+  } catch (e) { /* fail open: show Available */ }
+  renderStatus();
+}
 function renderStatus() {
-  const open = openNow();
+  const open = openNow(), busy = open && chatBusy;
   $('status').classList.toggle('away', !open);
-  $('status').classList.remove('busy');
-  $('statusText').textContent = open ? 'Team available · usually replies in minutes' : 'Team offline · back at 8 AM (Bequia time), leave a message';
+  $('status').classList.toggle('busy', busy);
+  $('statusText').textContent = !open ? 'Team offline · back at 8 AM (Bequia time), leave a message'
+    : busy ? 'Team busy · replies may take a little longer' : 'Team available · usually replies in minutes';
 }
 
 function render() {
@@ -555,7 +566,7 @@ window.addEventListener('storage', e => { if (e.key === CHAT_KEY) { try { chat =
 AprAlerts.outbox.start({ role: 'guest',
   send: body => fetch(BACKEND, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), signal: AbortSignal.timeout(120000) }).then(r => r.json()),
   onSent: d => { apply(d.messages); fastUntil = Date.now() + 5 * 60000; schedule(); } });
-renderStatus(); render(); poll(); schedule(); initVoice();
+renderStatus(); loadBusy(); render(); poll(); schedule(); initVoice();
 setInterval(renderStatus, 60000);
 </script>
 <script src="auto-update.js"></script>
